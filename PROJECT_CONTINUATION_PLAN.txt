@@ -1,0 +1,418 @@
+LFMIS PROJECT CONTINUATION PLAN
+===============================
+
+Project title:
+Design and Development of a Web-Based Livestock Farm Management Information System
+
+Farm:
+Flouri Farm
+
+Date prepared:
+15 September 2026
+
+
+1. WHERE THE PROJECT STARTED
+----------------------------
+
+The project workspace was initially a basic Vite JavaScript frontend starter project. It contained:
+
+- A simple index.html file.
+- A package.json file containing the Vite development commands.
+- Default Vite demo code in frontend/src/main.js.
+- Default Vite styling in frontend/src/style.css.
+- Unused Vite and JavaScript demonstration assets.
+- No PHP backend.
+- No MySQL database.
+- No authentication system.
+- No API endpoints.
+
+The project README already described the intended LFMIS system. The intended system is a web-based platform for managing livestock, animal health, farm activities, produce, stock, sales, customer orders, payments, customer service, and reports.
+
+Therefore, implementation started from the frontend scaffold and used the requirements in the README as the guide for the first interface.
+
+
+2. WHAT HAS BEEN CREATED SO FAR
+-------------------------------
+
+The Vite starter screen was replaced with a Flouri Farm LFMIS dashboard.
+
+The main frontend files are:
+
+- frontend/index.html
+  The browser entry page. It contains the page metadata and loads the JavaScript application.
+
+- frontend/src/main.js
+  The main dashboard interface and basic browser interactions. It currently contains sample dashboard data for the first user interface version.
+
+- frontend/src/style.css
+  The visual design, layout, colors, typography, cards, charts, sidebar, responsive behavior, and mobile layout.
+
+- frontend/package.json
+  Contains the Vite commands used to run and build the frontend.
+
+The dashboard currently includes:
+
+- Flouri Farm branding.
+- LFMIS workspace navigation.
+- Overview, Livestock, Animal Health, Production, Inventory, Sales and Orders, and Reports navigation items.
+- Total livestock summary.
+- Today's milk production summary.
+- Monthly sales summary.
+- Open tasks summary.
+- Milk production trend chart.
+- Today's farm activity list.
+- Herd overview for cattle, goats, rabbits, and poultry.
+- Stock alerts for hay, salt lick, and vaccination records.
+- Search input feedback.
+- Navigation selection feedback.
+- Add record button feedback.
+- Responsive layout for smaller screens.
+- A production build that succeeds using npm run build.
+
+Important limitation:
+The dashboard currently uses demonstration data. It is a user interface prototype and is not yet connected to a database or backend.
+
+
+3. HOW TO RUN THE CURRENT PROJECT
+---------------------------------
+
+Open PowerShell or the VS Code terminal and run:
+
+cd "C:\Final Year Project\Final-year-project---LFMIS\frontend"
+npm install
+npm run dev
+
+Then open the URL displayed by Vite, normally:
+
+http://localhost:5173/
+
+The terminal must remain open while the development server is running.
+
+To stop the development server, press Ctrl + C.
+
+To test a production build, run:
+
+cd "C:\Final Year Project\Final-year-project---LFMIS\frontend"
+npm run build
+
+The npm install command normally only needs to be run once, unless the node_modules folder has been deleted.
+
+
+4. RECOMMENDED NEXT IMPLEMENTATION STEPS
+----------------------------------------
+
+STEP 1: Confirm and document requirements
+
+Create a requirements document containing:
+
+- User roles and permissions.
+- Functional requirements for each role.
+- Non-functional requirements.
+- Main system workflows.
+- Data that must be collected.
+- Reports required by the farmer.
+
+The main roles are:
+
+- Admin or farm owner.
+- Farm worker.
+- Veterinarian.
+- Livestock buyer or customer.
+- Feed or materials supplier.
+- System administrator.
+
+
+STEP 2: Design the database
+
+Use MySQL through XAMPP. Create a database named lfmis.
+
+Recommended initial tables:
+
+- users
+- roles
+- animals
+- animal_types
+- animal_health_records
+- vaccinations
+- treatments
+- farm_activities
+- milk_production
+- egg_production
+- inventory_items
+- inventory_transactions
+- customers
+- orders
+- order_items
+- payments
+- expenses
+- complaints_feedback
+- notifications
+
+Each table should have a primary key. Related records should use foreign keys. The database design should be documented using an ERD before implementation.
+
+Start with the smallest useful database slice:
+
+- users
+- animals
+- animal_health_records
+- milk_production
+- inventory_items
+
+Add the remaining tables after the basic workflow works.
+
+
+STEP 3: Create the PHP backend
+
+Create a backend folder at the project root. The planned backend technology is PHP with MySQL.
+
+Suggested structure:
+
+backend/
+  config/
+    database.php
+  api/
+    auth.php
+    livestock.php
+    health.php
+    production.php
+    inventory.php
+    sales.php
+    reports.php
+  database/
+    lfmis.sql
+  middleware/
+    auth.php
+
+The backend should:
+
+- Connect securely to MySQL.
+- Validate incoming data.
+- Return JSON responses.
+- Use prepared SQL statements.
+- Check the user's permissions.
+- Return useful error messages.
+- Avoid exposing database passwords in the frontend.
+
+The first API endpoints should support:
+
+- Listing animals.
+- Adding an animal.
+- Updating an animal.
+- Recording animal treatment.
+- Listing milk production.
+- Adding a milk production record.
+- Listing inventory alerts.
+
+
+STEP 4: Add authentication and permissions
+
+Implement login before exposing sensitive records.
+
+Authentication should include:
+
+- User login.
+- Password hashing using PHP password_hash and password_verify.
+- Session or token-based authentication.
+- Logout.
+- Role-based access control.
+
+Example permissions:
+
+- Admin: full access.
+- Farm worker: daily activities, observations, and stock usage.
+- Veterinarian: health records and treatment records.
+- Customer: product and livestock browsing, orders, and feedback.
+
+
+STEP 5: Connect the frontend to the backend
+
+Replace sample values in frontend/src/main.js with API requests using fetch.
+
+Examples of frontend data that should eventually come from the backend:
+
+- Total number of animals.
+- Milk production totals.
+- Sales totals.
+- Open tasks.
+- Activity records.
+- Stock alerts.
+- Herd totals.
+
+Create a small frontend API helper, for example:
+
+frontend/src/api.js
+
+This helper can contain functions such as:
+
+- getAnimals()
+- createAnimal(animal)
+- getMilkProduction()
+- createMilkProduction(record)
+- getInventoryAlerts()
+
+Keep API communication separate from visual rendering where possible.
+
+
+STEP 6: Build the main system modules
+
+Implement modules in this order:
+
+1. Authentication and user management.
+2. Livestock registration and animal profiles.
+3. Animal health and treatment history.
+4. Daily farm activities.
+5. Milk and egg production.
+6. Materials and inventory.
+7. Customers and orders.
+8. Sales, expenses, and payments.
+9. Reports and dashboard analytics.
+10. Complaints, feedback, suggestions, and FAQs.
+
+For each module, complete these items:
+
+- Database table.
+- Backend endpoint.
+- Frontend page or form.
+- Validation.
+- Success and error messages.
+- Test data.
+- Basic documentation.
+
+
+STEP 7: Add reports and decision support
+
+The README proposes reporting and a small machine-learning or predictive analytics component.
+
+Start with descriptive reports before machine learning:
+
+- Milk production by day or month.
+- Egg production by day or month.
+- Animal count by type.
+- Treatment and vaccination history.
+- Inventory usage.
+- Sales and expenses.
+- Monthly profit estimate.
+
+After enough real data has been collected, add one carefully scoped prediction feature, such as:
+
+- Milk production forecasting.
+- Egg production forecasting.
+- Feed or material usage forecasting.
+- Unusual production change detection.
+
+The prediction should be labelled as decision support. It should not replace the farmer or veterinarian. Record the data source, evaluation method, accuracy, and limitations.
+
+
+STEP 8: Test the system
+
+Test at several levels:
+
+- Form validation tests.
+- API endpoint tests.
+- Database tests.
+- Authentication and permission tests.
+- Frontend workflow tests.
+- Mobile and desktop layout tests.
+- Backup and recovery tests.
+- Usability testing with the intended farm users.
+
+Important test cases include:
+
+- A user cannot access a page without permission.
+- An animal cannot be saved without required information.
+- A treatment record must belong to an existing animal.
+- Production quantities cannot be negative.
+- Inventory quantities update correctly.
+- An order total matches its order items.
+- A payment is not marked as confirmed without confirmation.
+- Reports use stored records and do not use fabricated data.
+
+
+STEP 9: Improve deployment and documentation
+
+Document:
+
+- Required software: Node.js, PHP, MySQL, and XAMPP.
+- How to start the frontend.
+- How to start Apache and MySQL in XAMPP.
+- How to import the database.
+- How to configure the PHP database connection.
+- How to run the backend.
+- Default development users, if any.
+- Backup and restore instructions.
+
+Never commit real passwords, API keys, M-Pesa credentials, or private customer information.
+
+
+5. A GOOD FIRST BACKEND MILESTONE
+----------------------------------
+
+The first complete milestone should be a working livestock module.
+
+It should allow an authenticated admin or farm worker to:
+
+1. Open the livestock page.
+2. View all animals from MySQL.
+3. Add a new animal.
+4. View an animal profile.
+5. Edit an animal record.
+6. Mark an animal as active, sold, deceased, or transferred.
+7. See the updated total on the dashboard.
+
+This is a better starting point than trying to build every module at once because it proves the complete connection between the frontend, PHP backend, and MySQL database.
+
+
+6. PRESENTATION EXPLANATION
+----------------------------
+
+Short explanation:
+
+“I started with the project requirements in the README and the existing Vite frontend scaffold. The original code was only the default Vite demonstration screen, so I replaced it with the first LFMIS user interface for Flouri Farm. I created a dashboard showing livestock totals, milk production, sales, farm activities, herd composition, and stock alerts. I also added responsive styling for desktop and mobile screens and basic interactions for navigation, searching, and adding records. At this stage the dashboard uses sample data because the PHP backend and MySQL database have not yet been connected. The next phase is to design the database, create the PHP API, add authentication, and replace the sample values with data retrieved from MySQL.”
+
+Longer explanation:
+
+“The system is being developed as a web-based Livestock Farm Management Information System for Flouri Farm. The frontend is the part used by the farmer and workers in a browser. It provides navigation, forms, dashboard summaries, charts, alerts, and reports. The backend will be responsible for business logic, validation, authentication, and communication with the MySQL database. I began from the available frontend starter project, reviewed the project scope, and implemented the dashboard as the first visual slice of the system. The dashboard is intentionally designed around the farm's daily decisions: what animals are present, how much milk is being produced, which activities are due, what stock is low, and how sales are performing.”
+
+
+7. CURRENT STATUS CHECKLIST
+----------------------------
+
+Completed:
+
+[X] Project requirements reviewed.
+[X] Vite starter screen replaced.
+[X] Flouri Farm LFMIS dashboard created.
+[X] Desktop layout created.
+[X] Mobile responsive layout created.
+[X] Basic navigation feedback added.
+[X] Search feedback added.
+[X] Add record feedback added.
+[X] Frontend production build verified with npm run build.
+
+Not yet completed:
+
+[ ] PHP backend.
+[ ] MySQL database.
+[ ] Database ERD implementation.
+[ ] Authentication.
+[ ] Role permissions.
+[ ] Real API requests.
+[ ] Real livestock CRUD operations.
+[ ] Health records module.
+[ ] Production data entry.
+[ ] Inventory management.
+[ ] Orders and payments.
+[ ] M-Pesa integration.
+[ ] Reports from real database records.
+[ ] Machine-learning or predictive analytics evaluation.
+[ ] Full testing and deployment.
+
+
+8. RECOMMENDED IMMEDIATE ACTION
+-------------------------------
+
+The next practical task is:
+
+“Create the MySQL database and implement the first PHP livestock API, then connect the existing dashboard to the animal count returned by that API.”
+
+This task creates the first real end-to-end feature and gives the project a strong foundation for all later modules.
