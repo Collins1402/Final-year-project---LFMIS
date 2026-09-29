@@ -2,9 +2,6 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/mail.php';
-
-$allowedOrigins = ['http://127.0.0.1:5173', 'http://localhost:5173'];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
 if (in_array($origin, $allowedOrigins, true)) {
@@ -724,10 +721,25 @@ try {
              GROUP BY production_date ORDER BY production_date ASC'
         )->fetchAll();
         $summary['recentMilk'] = $recentMilk;
-        $chartRequested = str_contains(strtolower($message), 'chart') && (
-            str_contains(strtolower($message), 'milk') || str_contains(strtolower($message), 'produce')
-            || str_contains($previousMessage, 'milk') || str_contains($previousMessage, 'produce')
+        $lowerMessage = strtolower($message);
+        $chartContext = $lowerMessage . ' ' . $previousMessage;
+        $chartRequested = str_contains($lowerMessage, 'chart') && (
+            str_contains($chartContext, 'milk') || str_contains($chartContext, 'produce')
+            || str_contains($chartContext, 'pie') || str_contains($chartContext, 'line')
+            || str_contains($chartContext, 'bar') || str_contains($chartContext, 'histogram')
         );
+        $chartType = str_contains($chartContext, 'pie') ? 'pie' : (str_contains($chartContext, 'line') || str_contains($chartContext, 'trend') ? 'line' : 'bar');
+        $chart = ['type' => $chartType, 'title' => 'Milk production · last 7 days', 'unit' => 'litres', 'points' => $recentMilk];
+        if ($chartType === 'pie') {
+            $chart = [
+                'type' => 'pie',
+                'title' => 'Active herd composition',
+                'unit' => 'animals',
+                'points' => $db->query(
+                    "SELECT species AS label, COUNT(*) AS value FROM animals WHERE status = 'active' GROUP BY species ORDER BY species"
+                )->fetchAll(),
+            ];
+        }
         $apiUrl = rtrim(getenv('LFMIS_AI_API_URL') ?: '', '/');
         $apiKey = getenv('LFMIS_AI_API_KEY') ?: '';
         $model = getenv('LFMIS_AI_MODEL') ?: 'gpt-4o-mini';
@@ -754,20 +766,21 @@ try {
             if (is_string($reply) && trim($reply) !== '') {
                 $result = ['reply' => trim($reply), 'source' => 'model'];
                 if ($chartRequested) {
-                    $result['chart'] = ['title' => 'Milk production · last 7 days', 'unit' => 'litres', 'points' => $recentMilk];
+                    $result['chart'] = $chart;
                 }
                 respond(200, $result);
             }
             error_log('AI assistant request failed with status ' . $status . '.');
         }
 
-        $lowerMessage = strtolower($message);
         if ($chartRequested) {
-            $reply = 'Here is the milk production chart for the last seven recorded days.';
+            $reply = $chartType === 'pie'
+                ? 'Here is the active herd composition pie chart.'
+                : ($chartType === 'line' ? 'Here is the milk production trend line for the last seven recorded days.' : 'Here is the milk production chart for the last seven recorded days.');
             respond(200, [
                 'reply' => $reply,
                 'source' => 'local',
-                'chart' => ['title' => 'Milk production · last 7 days', 'unit' => 'litres', 'points' => $recentMilk],
+                'chart' => $chart,
             ]);
         } elseif (str_contains($lowerMessage, 'milk') || str_contains($lowerMessage, 'produce')) {
             $reply = "Today's recorded milk production is {$summary['milkTodayLitres']} litres and eggs are {$summary['eggsTodayTrays']} trays. I can help interpret trends once more daily records are available.";

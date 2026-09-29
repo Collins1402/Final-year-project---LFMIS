@@ -575,6 +575,30 @@ async function renderReports(user) {
   }
 }
 
+function assistantChartHtml(chartData) {
+  if (!chartData || !chartData.points?.length) return ''
+  const palette = ['#e07a5f', '#3d7ea6', '#d9a441', '#6b5ca5', '#4f9a63', '#8b6f47']
+  if (chartData.type === 'pie') {
+    const total = chartData.points.reduce((sum, point) => sum + Number(point.value), 0)
+    let angle = 0
+    const slices = chartData.points.map((point, index) => {
+      const start = angle
+      angle += total ? Number(point.value) / total * 360 : 0
+      return `${palette[index % palette.length]} ${start}deg ${angle}deg`
+    }).join(', ')
+    return `<div class="assistant-chart"><strong>${escapeHtml(chartData.title)}</strong><div class="assistant-pie-layout"><div class="pie-chart" style="background:conic-gradient(${slices})"><span>${total}<small>${escapeHtml(chartData.unit)}</small></span></div><div class="pie-legend">${chartData.points.map((point, index) => `<span><i style="background:${palette[index % palette.length]}"></i>${escapeHtml(point.label)} <b>${escapeHtml(point.value)}</b></span>`).join('')}</div></div></div>`
+  }
+  const values = chartData.points.map((point) => Number(point.litres))
+  if (chartData.type === 'line' && values.length > 1) {
+    const min = Math.min(...values)
+    const range = Math.max(...values) - min || 1
+    const points = values.map((value, index) => `${(index / (values.length - 1)) * 100},${92 - ((value - min) / range) * 76}`).join(' ')
+    return `<div class="assistant-chart"><strong>${escapeHtml(chartData.title)}</strong><div class="assistant-line-chart"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="0" y1="92" x2="100" y2="92"></line><polyline points="${points}"></polyline>${values.map((value, index) => `<circle cx="${(index / (values.length - 1)) * 100}" cy="${92 - ((value - min) / range) * 76}" r="1.7"><title>${escapeHtml(chartData.points[index].date)}: ${escapeHtml(value)} ${escapeHtml(chartData.unit)}</title></circle>`).join('')}</svg></div></div>`
+  }
+  const max = Math.max(...values, 1)
+  return `<div class="assistant-chart"><strong>${escapeHtml(chartData.title)}</strong>${chartData.points.map((point) => `<div class="chart-row"><span>${escapeHtml(point.date.slice(5))}</span><div class="chart-track"><i style="width:${Math.max(4, (Number(point.litres) / max) * 100)}%"></i></div><b>${escapeHtml(point.litres)} ${escapeHtml(chartData.unit)}</b></div>`).join('')}</div>`
+}
+
 async function renderAssistant(user) {
   shell(user, 'Old Mark Donald', `<section class="welcome-row"><div><p class="eyebrow">Farm intelligence</p><h1>Old Mark Donald</h1><p class="intro">A practical assistant for your daily farm decisions.</p></div></section><section class="panel assistant-panel"><div class="assistant-intro"><span class="assistant-mark">✦</span><div><h2>Ask about the farm</h2><p>Use plain language to ask about production, livestock records, or planned work.</p></div></div><div id="assistant-messages" class="assistant-messages" aria-live="polite"><div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>Hello. I can help you make sense of the farm records. What would you like to check?</p></div></div><form id="assistant-form" class="assistant-form"><label class="sr-only" for="assistant-input">Message Old Mark Donald</label><textarea id="assistant-input" maxlength="2000" rows="2" placeholder="Ask about today\'s milk, active animals, or open tasks..." required></textarea><button class="primary-button" type="submit">Send <span>→</span></button></form><p id="assistant-suggestion" class="assistant-suggestion" aria-live="polite"></p><p id="assistant-status" class="assistant-note">For animal illness, use this as decision support and contact the veterinarian.</p></section>`)
   const messages = root.querySelector('#assistant-messages')
@@ -628,10 +652,7 @@ async function renderAssistant(user) {
     try {
       const response = await api.assistantChat({ message, previousMessage })
       previousMessage = message
-      const chartData = response.chart
-      const chartHtml = chartData
-        ? `<div class="assistant-chart" role="img" aria-label="${escapeHtml(chartData.title)}"><strong>${escapeHtml(chartData.title)}</strong>${chartData.points.map((point) => `<div class="chart-row"><span>${escapeHtml(point.date.slice(5))}</span><div class="chart-track"><i style="width:${Math.max(4, (Number(point.litres) / Math.max(...chartData.points.map((item) => Number(item.litres)), 1)) * 100)}%"></i></div><b>${escapeHtml(point.litres)} ${escapeHtml(chartData.unit)}</b></div>`).join('')}</div>`
-        : ''
+      const chartHtml = assistantChartHtml(response.chart)
       messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>${escapeHtml(response.reply)}</p>${chartHtml}</div>`)
       status.textContent = response.source === 'model' ? 'Connected to the configured AI model.' : 'Using the local farm assistant until an AI model is configured.'
     } catch (error) {

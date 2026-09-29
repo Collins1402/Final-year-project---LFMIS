@@ -48,6 +48,12 @@ td { color:#58655d; }
 .assistant-message p { margin:0; color:#4f5e55; font-size:13px; line-height:1.5; white-space:pre-wrap; }
 .assistant-chart { display:grid; gap:7px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
 .assistant-chart > strong { color:#58655d; font-size:11px; }
+.assistant-pie-layout { display:flex; align-items:center; gap:16px; }
+.assistant-line-chart { height:120px; }
+.assistant-line-chart svg { display:block; width:100%; height:120px; overflow:visible; }
+.assistant-line-chart line { stroke:#dfe7e2; stroke-width:1; vector-effect:non-scaling-stroke; }
+.assistant-line-chart polyline { fill:none; stroke:#3d7ea6; stroke-width:2.5; vector-effect:non-scaling-stroke; }
+.assistant-line-chart circle { fill:#d96554; stroke:#fff; stroke-width:1; vector-effect:non-scaling-stroke; }
 .chart-row { display:grid; grid-template-columns:38px 1fr 76px; align-items:center; gap:7px; color:#89958c; font-size:10px; }
 .chart-row b { color:#58655d; font-size:10px; font-weight:600; text-align:right; }
 .chart-track { height:9px; overflow:hidden; border-radius:9px; background:#e8eee9; }
