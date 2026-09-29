@@ -597,6 +597,60 @@ try {
         respond($status ?: 502, $forecast);
     }
 
+    if ($method === 'POST' && $path === '/api/demo-data') {
+        $user = requireUser();
+        requireRole($user, ['admin']);
+        if ((int) $db->query('SELECT COUNT(*) FROM animals')->fetchColumn() > 0) {
+            respond(409, ['error' => 'Demo data can only be loaded into an empty farm.']);
+        }
+
+        $db->beginTransaction();
+        try {
+            $animalStatement = $db->prepare(
+                'INSERT INTO animals (tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, notes, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, \'active\', ?, ?)'
+            );
+            $animals = [
+                ['COW-DEMO-001', 'cattle', 'Friesian', 'Malaika', 'female', '2022-03-14', 420, 'Demo record'],
+                ['COW-DEMO-002', 'cattle', 'Ayrshire', 'Nuru', 'female', '2021-11-02', 390, 'Demo record'],
+                ['GOAT-DEMO-001', 'goat', 'Alpine', 'Pendo', 'female', '2023-06-21', 48, 'Demo record'],
+                ['SHEEP-DEMO-001', 'sheep', 'Dorper', 'Baraka', 'male', '2022-08-09', 72, 'Demo record'],
+                ['CHICKEN-DEMO-001', 'chicken', 'Kienyeji', 'Kuku flock', 'unknown', null, 2, 'Demo record'],
+            ];
+            foreach ($animals as $animal) {
+                $animalStatement->execute([...$animal, $user['id']]);
+            }
+
+            $today = new DateTimeImmutable('today');
+            $milkStatement = $db->prepare(
+                'INSERT INTO milk_production (production_date, milking_session, quantity_litres, notes, recorded_by)
+                 VALUES (?, \'morning\', ?, ?, ?)'
+            );
+            $eggStatement = $db->prepare(
+                'INSERT INTO egg_production (production_date, quantity_trays, notes, recorded_by) VALUES (?, ?, ?, ?)'
+            );
+            for ($day = 27; $day >= 0; $day--) {
+                $productionDate = $today->modify("-{$day} days")->format('Y-m-d');
+                $milkStatement->execute([$productionDate, 108 + (27 - $day) * 0.8, 'Demo record', $user['id']]);
+                $eggStatement->execute([$productionDate, 16 + (($day + 2) % 5), 'Demo record', $user['id']]);
+            }
+
+            $activityStatement = $db->prepare(
+                'INSERT INTO farm_activities (activity_type, description, activity_at, status, created_by)
+                 VALUES (?, ?, ?, ?, ?)'
+            );
+            $activityStatement->execute(['Feeding', 'Prepare the morning feed and check clean water for all animals.', $today->setTime(7, 0)->format('Y-m-d H:i:s'), 'planned', $user['id']]);
+            $activityStatement->execute(['Health check', 'Review the herd for appetite, movement, and visible symptoms.', $today->setTime(9, 0)->format('Y-m-d H:i:s'), 'planned', $user['id']]);
+            $activityStatement->execute(['Equipment check', 'Inspect the milking equipment and clean the storage area.', $today->setTime(15, 0)->format('Y-m-d H:i:s'), 'planned', $user['id']]);
+            audit($db, $user['id'], 'create_demo_data', 'farm');
+            $db->commit();
+            respond(201, ['ok' => true, 'message' => 'Demo farm records loaded.']);
+        } catch (Throwable $error) {
+            $db->rollBack();
+            throw $error;
+        }
+    }
+
     if ($method === 'POST' && $path === '/api/assistant/chat') {
         $user = requireUser();
         requireRole($user, ['admin', 'worker', 'veterinarian']);
