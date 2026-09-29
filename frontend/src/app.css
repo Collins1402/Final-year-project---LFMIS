@@ -43,6 +43,65 @@ td { color:#58655d; }
 .order-update { display:flex; align-items:center; gap:6px; }
 .order-update select,.order-update input { min-height:30px; max-width:112px; padding:4px 6px; border:1px solid var(--line); border-radius:4px; background:white; color:var(--ink); font-size:11px; }
 .small-action { border:0; border-radius:4px; padding:7px 9px; color:white; background:var(--green); font-size:10px; font-weight:700; }
+.header-logout { min-width:34px; height:34px; padding:0 10px; border:1px solid var(--line); border-radius:6px; color:var(--green); background:white; font-size:12px; font-weight:700; cursor:pointer; }
+.auth-switch { margin:14px 0 0; color:#78847c; font-size:12px; }
+.danger-button { background:#b4533c !important; }
+.password-field { position:relative; display:block; }
+.password-field input { width:100%; padding-right:40px !important; }
+.password-toggle { position:absolute; top:50%; right:6px; transform:translateY(-50%); display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:4px; color:#78847c; background:transparent; cursor:pointer; }
+.password-toggle:hover,.password-toggle:focus-visible { color:var(--green); background:#eef3ed; }
+.progress-grid { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+.progress-card strong em { color:#849087; font:500 11px 'DM Sans',sans-serif; }
+.progress-bar { height:6px; overflow:hidden; border-radius:4px; background:#e4ece4; }
+.progress-bar span { display:block; height:100%; background:var(--green); }
+.trend-up { color:#337c56 !important; }
+.trend-down { color:#b4533c !important; }
+.whatsapp-form { display:flex; align-items:flex-end; gap:8px; }
+.whatsapp-form label { display:grid; gap:4px; color:#748178; font-size:10px; }
+.whatsapp-form input { min-height:34px; padding:5px 8px; border:1px solid var(--line); border-radius:5px; }
+.store-availability.ok { color:#337c56; }
+.store-availability.error { color:#b4533c; }
+.store-order-panel .csv-link { cursor:pointer; }
+.weekly-strip,.production-weekly { display:grid; gap:15px; margin-bottom:18px; padding:18px 20px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
+.weekly-strip { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.weekly-strip div,.production-totals div { display:grid; gap:5px; }
+.weekly-strip span,.production-totals span { color:#748178; font-size:11px; }
+.weekly-strip strong,.production-totals strong { color:#29372f; font:700 18px Manrope,sans-serif; }
+.weekly-strip small,.production-totals small { color:#98a29b; font-size:10px; }
+.production-weekly-heading,.store-orders-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.production-weekly-heading .eyebrow,.store-orders-heading .eyebrow { margin:0 0 5px; }
+.production-totals { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:12px 0; border-block:1px solid var(--line); }
+.whatsapp-button { padding:10px 13px; border:0; border-radius:5px; color:white; background:#337c56; font-size:11px; font-weight:700; }
+.product-update { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:250px; }
+.product-update input[type="number"] { width:84px; min-height:30px; padding:5px; border:1px solid var(--line); border-radius:4px; }
+.checkbox-label { display:flex !important; align-items:center; gap:4px !important; white-space:nowrap; }
+.storefront { min-height:100vh; }
+.storefront-header { min-height:72px; display:flex; justify-content:space-between; align-items:center; padding:12px max(20px,calc((100vw - 1200px)/2)); background:#eef3ed; border-bottom:1px solid #dde5dc; }
+.storefront-header .brand { padding:0; }
+.storefront-actions { display:flex; align-items:center; gap:14px; color:#68766d; font-size:12px; }
+.storefront-main { max-width:1200px; margin:0 auto; padding:38px 24px; }
+.storefront-intro { margin-bottom:25px; }
+.storefront-intro .eyebrow { margin-left:0; }
+.store-layout { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(280px,.8fr); gap:20px; align-items:start; }
+.store-layout h2,.store-order-panel h2,.store-orders h2 { margin-bottom:14px; }
+.store-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.store-product,.store-order-panel { padding:18px; background:var(--paper); border:1px solid var(--line); border-radius:7px; }
+.store-product .eyebrow { margin:0 0 8px; }
+.store-product h3 { margin:0 0 9px; color:#29372f; font:700 16px Manrope,sans-serif; }
+.store-stock { color:#78847c; font-size:12px; }
+.store-product > strong { display:block; margin:12px 0; color:var(--green); font:700 16px Manrope,sans-serif; }
+.store-product > strong small { color:#849087; font:500 10px 'DM Sans',sans-serif; }
+.store-product .text-button { padding-left:0; font-size:11px; }
+.store-product button:disabled { color:#9aa49c; cursor:not-allowed; }
+.store-order-panel .form-stack { margin-top:18px; }
+.store-order-panel .primary-button { justify-content:center; min-height:42px; }
+.store-availability { margin:0; color:#78847c; font-size:11px; line-height:1.5; }
+.store-orders { margin-top:32px; }
+.csv-link { padding:8px 11px; border:1px solid var(--line); border-radius:5px; color:var(--green); background:white; font-size:11px; font-weight:700; text-decoration:none; }
+.csv-link:hover { background:var(--green-pale); }
+.storefront .toast { z-index:5; }
 @media (max-width:700px) { .auth-panel { padding:25px 20px; } .entry-form { grid-template-columns:1fr; } .table-wrap { margin-inline:-2px; } th,td { padding:11px 12px; } }
 @media (max-width:700px) { .forecast-values { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:700px) { .finance-values { grid-template-columns:repeat(2,minmax(0,1fr)); } .order-update { flex-wrap:wrap; } }
+@media (max-width:800px) { .store-layout { grid-template-columns:1fr; } .store-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:520px) { .storefront-header { padding:12px 16px; } .storefront-actions span { max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .storefront-main { padding:26px 16px; } .store-grid { grid-template-columns:1fr; } .production-weekly-heading { align-items:flex-start; flex-direction:column; } .whatsapp-button { width:100%; } .whatsapp-form { flex-direction:column; align-items:stretch; width:100%; } .progress-grid { grid-template-columns:1fr !important; } }

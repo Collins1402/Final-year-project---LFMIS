@@ -6,6 +6,7 @@ const root = document.querySelector('#app')
 const navSections = [
   ['⌂', 'Overview'], ['◉', 'Livestock'], ['♡', 'Animal health'],
   ['☷', 'Activities'], ['◌', 'Production'], ['▣', 'Inventory'], ['↗', 'Sales & orders'], ['▥', 'Reports'], ['◇', 'Feedback'], ['♙', 'User accounts'],
+  ['▦', 'Products'],
 ]
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -16,10 +17,37 @@ const formatMoney = (value) => new Intl.NumberFormat('en-KE', {
   style: 'currency', currency: 'KES', maximumFractionDigits: 0,
 }).format(Number(value) || 0)
 
+const usernameInput = '<input name="username" autocomplete="username" required minlength="3" maxlength="30" pattern="[A-Za-z0-9_.]{3,30}" title="3–30 letters, numbers, underscores or dots">'
+
+const eyeIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>'
+const eyeOffIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.1-5.9M9.9 5.2A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>'
+
+function addPasswordToggles() {
+  root.querySelectorAll('input[type="password"]:not([data-toggle])').forEach((input) => {
+    input.dataset.toggle = 'true'
+    const wrapper = document.createElement('span')
+    wrapper.className = 'password-field'
+    input.replaceWith(wrapper)
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'password-toggle'
+    button.setAttribute('aria-label', 'Show password')
+    button.innerHTML = eyeIcon
+    button.addEventListener('click', () => {
+      const show = input.type === 'password'
+      input.type = show ? 'text' : 'password'
+      button.innerHTML = show ? eyeOffIcon : eyeIcon
+      button.setAttribute('aria-label', show ? 'Hide password' : 'Show password')
+      input.focus()
+    })
+    wrapper.append(input, button)
+  })
+}
+
 function showMessage(element, message, isError = false) {
   element.textContent = message
   element.classList.toggle('error', isError)
-  element.classList.remove('success')
+  element.classList.toggle('success', !isError)
   element.hidden = !message
 }
 
@@ -30,24 +58,24 @@ function renderAuth(mode, notice = '') {
       <div class="brand auth-brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div>
       <p class="eyebrow">${setup ? 'Initial setup' : 'Farm workspace'}</p>
       <h1 id="auth-title">${setup ? 'Create the farm owner account' : 'Welcome back'}</h1>
-      <p class="intro">${setup ? 'This first account will have administrator access.' : 'Sign in to access farm records.'}</p>
+      <p class="intro">${setup ? 'This first account will have administrator access.' : 'Admins, farm workers, veterinarians, customers, and livestock buyers all sign in here. Your workspace opens based on your account.'}</p>
       <form id="auth-form" class="form-stack">
-        ${setup ? '<label>Full name<input name="fullName" autocomplete="name" required maxlength="120"></label>' : ''}
-        <label>Email<input type="email" name="email" autocomplete="username" required maxlength="190"></label>
+        ${setup ? `<label>Full name<input name="fullName" autocomplete="name" required maxlength="120"></label><label>Username${usernameInput}</label><label>Email<input type="email" name="email" autocomplete="email" required maxlength="190"></label>` : '<label>Username or email<input name="login" autocomplete="username" required maxlength="190"></label>'}
         <label>Password<input type="password" name="password" autocomplete="${setup ? 'new-password' : 'current-password'}" minlength="${setup ? '12' : '1'}" required></label>
         <p class="form-message ${notice ? 'success' : ''}" role="status" ${notice ? '' : 'hidden'}>${escapeHtml(notice)}</p>
         <button class="primary-button" type="submit">${setup ? 'Create account' : 'Sign in'}</button>
       </form>
-      ${setup ? '' : '<button class="text-link" type="button" id="forgot-password">Forgot password?</button>'}
+      ${setup ? '' : '<button class="text-link" type="button" id="forgot-password">Forgot password?</button><p class="auth-switch">New to Flouri Farm? <button class="text-link" type="button" id="open-register">Create an account</button></p>'}
     </section></main>`
 
   const form = root.querySelector('#auth-form')
   root.querySelector('#forgot-password')?.addEventListener('click', renderForgotPassword)
+  root.querySelector('#open-register')?.addEventListener('click', renderRegister)
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(form))
     const feedback = form.querySelector('.form-message')
-    const button = form.querySelector('button')
+    const button = form.querySelector('button[type="submit"]')
     button.disabled = true
     button.textContent = setup ? 'Creating account…' : 'Signing in…'
     try {
@@ -59,6 +87,62 @@ function renderAuth(mode, notice = '') {
       button.textContent = setup ? 'Create account' : 'Sign in'
     }
   })
+}
+
+function renderRegister() {
+  root.innerHTML = `
+    <main class="auth-shell"><section class="auth-panel" aria-labelledby="register-title">
+      <div class="brand auth-brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div>
+      <p class="eyebrow">New account</p><h1 id="register-title">Create an account</h1>
+      <p class="intro">Choose the type of account you need.</p>
+      <form id="register-form" class="form-stack">
+        <label>User type<select name="role" required>
+          <option value="customer">Customer</option>
+          <option value="buyer">Buyer</option>
+          <option value="worker">Farm worker</option>
+          <option value="veterinarian">Veterinarian</option>
+          <option value="admin" disabled>Admin</option>
+        </select></label>
+        <p class="store-availability" id="role-hint">You can start shopping as soon as the account is created.</p>
+        <label>Full name<input name="fullName" autocomplete="name" required maxlength="120"></label>
+        <label>Username${usernameInput}</label>
+        <label>Email<input type="email" name="email" autocomplete="username" required maxlength="190"></label>
+        <label>Password<input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+        <p class="form-message" role="alert" hidden></p>
+        <button class="primary-button" type="submit">Create account</button>
+      </form>
+      <button class="text-link" type="button" id="back-to-login">Back to sign in</button>
+    </section></main>`
+  root.querySelector('#back-to-login').addEventListener('click', () => renderAuth('login'))
+  const form = root.querySelector('#register-form')
+  const roleSelect = form.querySelector('[name="role"]')
+  roleSelect.addEventListener('change', () => {
+    root.querySelector('#role-hint').textContent = ['worker', 'veterinarian'].includes(roleSelect.value)
+      ? 'Staff accounts can sign in after the farm administrator approves them.'
+      : 'You can start shopping as soon as the account is created.'
+  })
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const button = form.querySelector('button[type="submit"]')
+    button.disabled = true
+    try {
+      const result = await api.register(Object.fromEntries(new FormData(form)))
+      if (result.pending) {
+        renderAuth('login', result.message)
+        return
+      }
+      renderHome(result.user)
+    } catch (error) {
+      showMessage(form.querySelector('.form-message'), error.message, true)
+      button.disabled = false
+    }
+  })
+}
+
+async function signOut() {
+  try { await api.logout() } catch {}
+  window.history.replaceState(null, '', window.location.pathname)
+  renderAuth('login', 'You have signed out. Sign in with another account to switch roles.')
 }
 
 function renderForgotPassword() {
@@ -112,7 +196,7 @@ function renderResetPassword(token) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const feedback = form.querySelector('.form-message')
-    const button = form.querySelector('button')
+    const button = form.querySelector('button[type="submit"]')
     const data = Object.fromEntries(new FormData(form))
     if (data.password !== data.confirmPassword) {
       showMessage(feedback, 'The passwords do not match.', true)
@@ -140,6 +224,8 @@ function shell(user, active, content) {
     if (user.role === 'worker') return ['Overview', 'Livestock', 'Activities', 'Production', 'Inventory'].includes(label)
     return false
   })
+  const roleNames = { admin: 'Administrator', worker: 'Farm worker', veterinarian: 'Veterinarian', customer: 'Customer', buyer: 'Livestock buyer' }
+  const roleName = roleNames[user.role] || user.role
   root.innerHTML = `
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div>
@@ -147,16 +233,14 @@ function shell(user, active, content) {
       <nav aria-label="Main navigation"><p class="nav-label">Workspace</p>
         ${visibleSections.map(([icon, label]) => `<button class="nav-item ${label === active ? 'active' : ''}" data-section="${escapeHtml(label)}"><span class="nav-icon">${icon}</span>${escapeHtml(label)}</button>`).join('')}
       </nav>
-      <div class="sidebar-bottom"><button class="nav-item" id="logout">↪ Sign out</button><div class="user"><span class="avatar">${escapeHtml(initials)}</span><div><strong>${escapeHtml(user.fullName)}</strong><small>${escapeHtml(user.role)}</small></div></div></div>
+      <div class="sidebar-bottom"><button class="nav-item" id="logout">↪ Sign out</button><div class="user"><span class="avatar">${escapeHtml(initials)}</span><div><strong>${escapeHtml(user.fullName)}</strong><small>${escapeHtml(roleName)}</small></div></div></div>
     </aside>
-    <main class="main-content"><header class="topbar"><div class="mobile-brand"><span class="brand-mark">F</span> Flouri Farm</div><div class="top-actions"><span class="role-label">${escapeHtml(user.role)}</span></div></header>
+    <main class="main-content"><header class="topbar"><div class="mobile-brand"><span class="brand-mark">F</span> Flouri Farm</div><div class="top-actions"><span class="role-label">${escapeHtml(roleName)}</span><button class="header-logout" id="header-logout" type="button" aria-label="Sign out" title="Sign out">↪ Sign out</button></div></header>
       <div class="page-wrap">${content}<div id="toast" class="toast" role="status"></div></div>
     </main>`
 
   root.querySelectorAll('.nav-item[data-section]').forEach((item) => item.addEventListener('click', () => navigate(user, item.dataset.section)))
-  root.querySelector('#logout').addEventListener('click', async () => {
-    try { await api.logout() } finally { renderAuth('login') }
-  })
+  root.querySelectorAll('#logout, #header-logout').forEach((button) => button.addEventListener('click', signOut))
 }
 
 function toast(message) {
@@ -169,6 +253,7 @@ function toast(message) {
 
 async function renderDashboard(user) {
   shell(user, 'Overview', '<section class="welcome-row"><div><p class="eyebrow">Farm overview</p><h1>Welcome, <span id="welcome-name"></span></h1><p class="intro">Live figures from your farm records.</p></div><button class="primary-button" id="add-animal"><span>＋</span> Register animal</button></section><p class="page-error" id="page-error" role="alert" hidden></p><section class="stat-grid" aria-label="Farm summary"><article class="stat-card"><div class="stat-top"><span class="stat-icon green">♧</span></div><p>Active livestock</p><strong id="stat-animals">—</strong><small>From registered animal records</small></article><article class="stat-card"><div class="stat-top"><span class="stat-icon amber">◌</span></div><p>Today\'s milk</p><strong><span id="stat-milk">—</span> <em>litres</em></strong><small>Recorded for today</small></article><article class="stat-card"><div class="stat-top"><span class="stat-icon blue">▣</span></div><p>Monthly sales</p><strong id="stat-sales">—</strong><small>Recorded sales</small></article><article class="stat-card"><div class="stat-top"><span class="stat-icon coral">!</span></div><p>Open tasks</p><strong id="stat-tasks">—</strong><small>Planned tasks due</small></article></section><section class="content-grid"><article class="panel"><div class="panel-heading"><div><p class="eyebrow">Livestock inventory</p><h2>Herd overview</h2></div><button class="text-button" data-section="Livestock">View records →</button></div><div class="herd-list" id="herd-list"><p class="empty-state">Loading farm records…</p></div></article><article class="panel alerts-panel"><div class="panel-heading"><div><p class="eyebrow">Needs attention</p><h2>Stock alerts</h2></div><span class="alert-count" id="alert-count">0</span></div><div class="alert-list" id="stock-alerts"><p class="empty-state">Loading stock levels…</p></div></article></section>')
+  root.querySelector('.welcome-row').insertAdjacentHTML('afterend', '<section class="weekly-strip" aria-label="Last seven days production"><div><span>Milk · last 7 days</span><strong id="week-milk">—</strong><small>litres recorded</small></div><div><span>Eggs · last 7 days</span><strong id="week-eggs">—</strong><small>trays recorded</small></div><div><span>Wool · last 7 days</span><strong id="week-wool">—</strong><small>kg recorded</small></div></section>')
   root.querySelector('#welcome-name').textContent = user.fullName.split(/\s+/)[0]
   root.querySelector('#add-animal').addEventListener('click', () => navigate(user, 'Livestock'))
   root.querySelector('.text-button[data-section="Livestock"]').addEventListener('click', () => navigate(user, 'Livestock'))
@@ -176,10 +261,13 @@ async function renderDashboard(user) {
     const data = await api.dashboard()
     root.querySelector('#stat-animals').textContent = data.activeAnimals
     root.querySelector('#stat-milk').textContent = Number(data.milkTodayLitres).toLocaleString()
+    root.querySelector('#week-milk').textContent = Number(data.milkWeekLitres).toLocaleString()
+    root.querySelector('#week-eggs').textContent = Number(data.eggWeekTrays).toLocaleString()
+    root.querySelector('#week-wool').textContent = Number(data.woolWeekKg).toLocaleString()
     root.querySelector('#stat-sales').textContent = formatMoney(data.salesThisMonth)
     root.querySelector('#stat-tasks').textContent = data.openTasks
     const counts = Object.fromEntries(data.herdBySpecies.map(({ species, total }) => [species, total]))
-    const speciesNames = { cattle: 'Cattle', goat: 'Goats', rabbit: 'Rabbits', chicken: 'Poultry', other: 'Other' }
+    const speciesNames = { cattle: 'Cattle', sheep: 'Sheep', goat: 'Goats', rabbit: 'Rabbits', chicken: 'Poultry', other: 'Other' }
     root.querySelector('#herd-list').innerHTML = Object.entries(speciesNames).map(([key, label]) => `<div class="herd-row"><span class="animal">${label[0]}</span><div><strong>${label}</strong><small>Active animals</small></div><b>${counts[key] || 0}</b></div>`).join('')
     root.querySelector('#alert-count').textContent = data.stockAlerts.length
     root.querySelector('#stock-alerts').innerHTML = data.stockAlerts.length
@@ -191,7 +279,7 @@ async function renderDashboard(user) {
 }
 
 async function renderLivestock(user) {
-  shell(user, 'Livestock', '<section class="welcome-row"><div><p class="eyebrow">Farm records</p><h1>Livestock</h1><p class="intro">Registered animals and their current status.</p></div><button class="primary-button" id="open-animal-form"><span>＋</span> Register animal</button></section><form id="animal-form" class="entry-form" hidden><label>Tag number<input name="tagNumber" maxlength="80"></label><label>Species<select name="species" required><option value="">Choose species</option><option value="cattle">Cattle</option><option value="goat">Goat</option><option value="rabbit">Rabbit</option><option value="chicken">Chicken</option><option value="other">Other</option></select></label><label>Name<input name="name" maxlength="100"></label><label>Breed<input name="breed" maxlength="100"></label><label>Sex<select name="sex"><option value="unknown">Unknown</option><option value="female">Female</option><option value="male">Male</option></select></label><label>Weight (kg)<input name="weightKg" type="number" min="0" step="0.01"></label><label>Date of birth<input name="dateOfBirth" type="date"></label><button class="primary-button" type="submit">Save animal</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Animal</th><th>Breed</th><th>Sex</th><th>Weight</th><th>Status</th></tr></thead><tbody id="animal-rows"><tr><td colspan="6">Loading records…</td></tr></tbody></table></div>')
+  shell(user, 'Livestock', '<section class="welcome-row"><div><p class="eyebrow">Farm records</p><h1>Livestock</h1><p class="intro">Registered animals and their current status.</p></div><button class="primary-button" id="open-animal-form"><span>＋</span> Register animal</button></section><form id="animal-form" class="entry-form" hidden><label>Tag number<input name="tagNumber" maxlength="80"></label><label>Species<select name="species" required><option value="">Choose species</option><option value="cattle">Cattle</option><option value="sheep">Sheep</option><option value="goat">Goat</option><option value="rabbit">Rabbit</option><option value="chicken">Chicken</option><option value="other">Other</option></select></label><label>Name<input name="name" maxlength="100"></label><label>Breed<input name="breed" maxlength="100"></label><label>Sex<select name="sex"><option value="unknown">Unknown</option><option value="female">Female</option><option value="male">Male</option></select></label><label>Weight (kg)<input name="weightKg" type="number" min="0" step="0.01"></label><label>Date of birth<input name="dateOfBirth" type="date"></label><button class="primary-button" type="submit">Save animal</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Animal</th><th>Breed</th><th>Sex</th><th>Weight</th><th>Status</th></tr></thead><tbody id="animal-rows"><tr><td colspan="6">Loading records…</td></tr></tbody></table></div>')
   const form = root.querySelector('#animal-form')
   root.querySelector('#open-animal-form').addEventListener('click', () => { form.hidden = !form.hidden })
   form.addEventListener('submit', async (event) => {
@@ -220,46 +308,80 @@ async function renderLivestock(user) {
 }
 
 async function renderProduction(user) {
-  shell(user, 'Production', '<section class="welcome-row"><div><p class="eyebrow">Daily farm records</p><h1>Production</h1><p class="intro">Record and review milk and egg totals.</p></div></section><h2 class="section-title">Milk</h2><form id="milk-form" class="entry-form"><label>Date<input name="productionDate" type="date" required></label><label>Session<select name="session" required><option value="morning">Morning</option><option value="evening">Evening</option><option value="other">Other</option></select></label><label>Quantity (litres)<input name="quantityLitres" type="number" min="0" step="0.01" required></label><label>Notes<input name="notes" maxlength="500"></label><button class="primary-button" type="submit">Save milk</button><p class="form-message" role="alert" hidden></p></form><div class="table-wrap"><table><thead><tr><th>Date</th><th>Total milk (litres)</th></tr></thead><tbody id="milk-rows"><tr><td colspan="2">Loading records…</td></tr></tbody></table></div><h2 class="section-title">Eggs</h2><form id="egg-form" class="entry-form"><label>Date<input name="productionDate" type="date" required></label><label>Quantity (trays)<input name="quantityTrays" type="number" min="0" step="0.01" required></label><label>Notes<input name="notes" maxlength="500"></label><button class="primary-button" type="submit">Save eggs</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Date</th><th>Trays</th></tr></thead><tbody id="egg-rows"><tr><td colspan="2">Loading records…</td></tr></tbody></table></div>')
-  const date = root.querySelector('[name="productionDate"]')
-  date.value = new Date().toISOString().slice(0, 10)
-  root.querySelector('#milk-form').addEventListener('submit', async (event) => {
-    event.preventDefault()
-    const form = event.currentTarget
-    try {
-      await api.recordMilk(Object.fromEntries(new FormData(form)))
-      toast('Production recorded')
-      await renderProduction(user)
-    } catch (error) {
-      showMessage(form.querySelector('.form-message'), error.message, true)
-    }
-  })
-  const eggDate = root.querySelector('#egg-form [name="productionDate"]')
-  eggDate.value = date.value
-  root.querySelector('#egg-form').addEventListener('submit', async (event) => {
-    event.preventDefault()
-    const form = event.currentTarget
-    try {
-      await api.recordEggs(Object.fromEntries(new FormData(form)))
-      toast('Egg production recorded')
-      await renderProduction(user)
-    } catch (error) {
-      showMessage(form.querySelector('.form-message'), error.message, true)
-    }
-  })
-  try {
-    const { production } = await api.milkProduction()
-    root.querySelector('#milk-rows').innerHTML = production.length
-      ? production.map((record) => `<tr><td>${escapeHtml(record.production_date)}</td><td>${escapeHtml(record.quantity_litres)}</td></tr>`).join('')
-      : '<tr><td colspan="2">No milk production recorded in the last seven days.</td></tr>'
-    const eggs = await api.eggProduction()
-    root.querySelector('#egg-rows').innerHTML = eggs.production.length
-      ? eggs.production.map((record) => `<tr><td>${escapeHtml(record.production_date)}</td><td>${escapeHtml(record.quantity_trays)}</td></tr>`).join('')
-      : '<tr><td colspan="2">No eggs recorded in the last 30 days.</td></tr>'
-  } catch (error) {
-    showMessage(root.querySelector('#page-error'), error.message, true)
-    root.querySelector('#milk-rows').innerHTML = '<tr><td colspan="2">Records unavailable.</td></tr>'
+  const intro = user.role === 'admin'
+    ? 'Daily and weekly produce recorded by farm workers, with who recorded each entry.'
+    : 'Record today\'s produce, track weekly progress, and share the numbers on WhatsApp.'
+  shell(user, 'Production', `<section class="welcome-row"><div><p class="eyebrow">Daily farm records</p><h1>Production</h1><p class="intro">${intro}</p></div></section><p class="page-error" id="page-error" role="alert" hidden></p><section class="production-weekly"><div class="production-weekly-heading"><div><p class="eyebrow">Progress</p><h2>Today and this week</h2></div><form id="whatsapp-form" class="whatsapp-form"><label>WhatsApp number<input name="phone" type="tel" inputmode="tel" maxlength="20" placeholder="254712345678"></label><button class="whatsapp-button" type="submit">Share to WhatsApp</button></form></div><div class="production-totals progress-grid" id="progress-cards"><p class="empty-state">Loading totals…</p></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Milk (litres)</th><th>Eggs (trays)</th><th>Wool (kg)</th></tr></thead><tbody id="week-rows"><tr><td colspan="4">Loading weekly totals…</td></tr></tbody></table></div></section><h2 class="section-title">Record daily produce</h2><form id="milk-form" class="entry-form"><label>Date<input name="productionDate" type="date" required></label><label>Milking session<select name="session" required><option value="morning">Morning</option><option value="evening">Evening</option><option value="other">Other</option></select></label><label>Milk (litres)<input name="quantityLitres" type="number" min="0" step="0.01" required></label><label>Notes<input name="notes" maxlength="500"></label><button class="primary-button" type="submit">Save milk</button><p class="form-message" role="alert" hidden></p></form><form id="egg-form" class="entry-form"><label>Date<input name="productionDate" type="date" required></label><label>Eggs (trays)<input name="quantityTrays" type="number" min="0" step="0.01" required></label><label>Notes<input name="notes" maxlength="500"></label><button class="primary-button" type="submit">Save eggs</button><p class="form-message" role="alert" hidden></p></form><form id="wool-form" class="entry-form"><label>Date<input name="productionDate" type="date" required></label><label>Wool (kg)<input name="quantityKg" type="number" min="0" step="0.01" required></label><label>Notes<input name="notes" maxlength="500"></label><button class="primary-button" type="submit">Save wool</button><p class="form-message" role="alert" hidden></p></form><h2 class="section-title">Recent entries</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produce</th><th>Quantity</th><th>Session</th><th>Recorded by</th><th>Entered at</th></tr></thead><tbody id="log-rows"><tr><td colspan="6">Loading entries…</td></tr></tbody></table></div>`)
+  const produce = [
+    ['milkLitres', 'Milk', 'litres'],
+    ['eggTrays', 'Eggs', 'trays'],
+    ['woolKg', 'Wool', 'kg'],
+  ]
+  const today = new Date().toISOString().slice(0, 10)
+  root.querySelectorAll('#milk-form, #egg-form, #wool-form').forEach((form) => { form.querySelector('[name="productionDate"]').value = today })
+  let summary = null
+
+  async function refresh() {
+    const [latest, log] = await Promise.all([api.productionSummary(), api.productionLog()])
+    summary = latest
+    root.querySelector('#progress-cards').innerHTML = produce.map(([key, label, unit]) => {
+      const week = Number(summary.thisWeek[key])
+      const previous = Number(summary.previousWeek[key])
+      const change = previous > 0 ? Math.round(((week - previous) / previous) * 100) : null
+      const width = previous > 0 ? Math.min(100, Math.round((week / previous) * 100)) : (week > 0 ? 100 : 0)
+      const trend = change === null ? 'No figures for the previous week' : `${change >= 0 ? '↑' : '↓'} ${Math.abs(change)}% vs previous week (${previous.toLocaleString()} ${unit})`
+      return `<div class="progress-card"><span>${label}</span><strong>${Number(summary.today[key]).toLocaleString()} <em>${unit} today</em></strong><small>${week.toLocaleString()} ${unit} this week</small><div class="progress-bar" role="img" aria-label="${label} this week compared with previous week"><span style="width:${width}%"></span></div><small class="${change !== null && change < 0 ? 'trend-down' : 'trend-up'}">${escapeHtml(trend)}</small></div>`
+    }).join('')
+    root.querySelector('#week-rows').innerHTML = summary.days.map((day) => `<tr><td>${escapeHtml(day.date)}</td><td>${escapeHtml(day.milkLitres)}</td><td>${escapeHtml(day.eggTrays)}</td><td>${escapeHtml(day.woolKg)}</td></tr>`).join('')
+    root.querySelector('#log-rows').innerHTML = log.records.length
+      ? log.records.map((record) => `<tr><td>${escapeHtml(record.production_date)}</td><td>${escapeHtml(record.product)}</td><td>${escapeHtml(record.quantity)} ${escapeHtml(record.unit)}</td><td>${escapeHtml(record.detail || '—')}</td><td>${escapeHtml(record.recorded_by || '—')}</td><td>${escapeHtml(record.created_at)}</td></tr>`).join('')
+      : '<tr><td colspan="6">No production has been recorded yet.</td></tr>'
   }
+
+  const recorders = { '#milk-form': [api.recordMilk, 'Milk recorded'], '#egg-form': [api.recordEggs, 'Eggs recorded'], '#wool-form': [api.recordWool, 'Wool recorded'] }
+  Object.entries(recorders).forEach(([selector, [save, message]]) => {
+    const form = root.querySelector(selector)
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      try {
+        await save(Object.fromEntries(new FormData(form)))
+        toast(message)
+        form.querySelector('[name^="quantity"]').value = ''
+        form.querySelector('[name="notes"]').value = ''
+        showMessage(form.querySelector('.form-message'), '')
+        await refresh()
+      } catch (error) { showMessage(form.querySelector('.form-message'), error.message, true) }
+    })
+  })
+
+  const whatsappForm = root.querySelector('#whatsapp-form')
+  const phoneInput = whatsappForm.querySelector('[name="phone"]')
+  phoneInput.value = window.localStorage.getItem('lfmis-whatsapp') || ''
+  whatsappForm.addEventListener('submit', (event) => {
+    event.preventDefault()
+    if (!summary) return
+    const digits = phoneInput.value.replace(/\D/g, '')
+    if (digits && (digits.length < 8 || digits.length > 15)) {
+      toast('Enter the number in international format, e.g. 254712345678')
+      return
+    }
+    window.localStorage.setItem('lfmis-whatsapp', digits)
+    const lines = [
+      `*Flouri Farm production report* (${user.fullName})`,
+      '',
+      `*Today (${summary.today.date})*`,
+      ...produce.map(([key, label, unit]) => `${label}: ${summary.today[key]} ${unit}`),
+      '',
+      '*Last 7 days*',
+      ...produce.map(([key, label, unit]) => `${label}: ${summary.thisWeek[key]} ${unit} (previous week ${summary.previousWeek[key]} ${unit})`),
+      '',
+      '*Daily breakdown*',
+      ...summary.days.map((day) => `${day.date}: ${day.milkLitres} L milk, ${day.eggTrays} trays eggs, ${day.woolKg} kg wool`),
+    ]
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(lines.join('\n'))}`, '_blank', 'noopener,noreferrer')
+  })
+
+  try { await refresh() } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
 }
 
 async function renderReports(user) {
@@ -399,7 +521,7 @@ async function renderSalesOrders(user) {
     : '<form id="order-form" class="entry-form"><label>Item requested<input name="itemName" required maxlength="120"></label><label>Quantity<input name="quantity" type="number" min="0.01" step="0.01" required></label><label>Unit<input name="unit" required maxlength="30" placeholder="litres, trays, animals"></label><button class="primary-button" type="submit">Request an order</button><p class="form-message" role="alert" hidden></p></form>'
   const salesTable = admin ? '<h2 class="section-title">Sales</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Quantity</th><th>Total</th></tr></thead><tbody id="sales-rows"><tr><td colspan="4">Loading sales…</td></tr></tbody></table></div>' : ''
   const paymentSection = admin ? '<h2 class="section-title">Record payment</h2><form id="payment-form" class="entry-form"><label>Order<select name="orderId" required><option value="">Choose order</option></select></label><label>Method<select name="method"><option value="cash">Cash received</option><option value="bank">Bank transfer received</option><option value="mpesa">M-Pesa (awaiting confirmation)</option><option value="other">Other</option></select></label><label>Transaction reference<input name="transactionReference" maxlength="120"></label><button class="primary-button" type="submit">Record payment</button><p class="form-message" role="alert" hidden></p></form><h2 class="section-title">Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Amount</th><th>Status</th><th>Reference</th></tr></thead><tbody id="payment-rows"><tr><td colspan="5">Loading payments…</td></tr></tbody></table></div>' : ''
-  shell(user, 'Sales & orders', `<section class="welcome-row"><div><p class="eyebrow">Farm transactions</p><h1>${admin ? 'Sales &amp; orders' : 'Order requests'}</h1><p class="intro">${admin ? 'Record sales, manage customer requests, and review totals.' : 'Send the farm an order request for confirmation.'}</p></div></section>${saleFormMarkup}${admin ? '<h2 class="section-title">Create customer order</h2>' : '<h2 class="section-title">New request</h2>'}${orderFormMarkup}<p class="page-error" id="page-error" role="alert" hidden></p>${salesTable}<h2 class="section-title">${admin ? 'Orders' : 'Your orders'}</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Status</th><th>Total</th>${admin ? '<th>Quote/status</th>' : ''}</tr></thead><tbody id="order-rows"><tr><td colspan="${admin ? 5 : 4}">Loading orders…</td></tr></tbody></table></div>${paymentSection}`)
+  shell(user, 'Sales & orders', `<section class="welcome-row"><div><p class="eyebrow">Farm transactions</p><h1>${admin ? 'Sales &amp; orders' : 'Order requests'}</h1><p class="intro">${admin ? 'Record sales, manage customer requests, and review totals.' : 'Send the farm an order request for confirmation.'}</p></div></section>${saleFormMarkup}${admin ? '<h2 class="section-title">Create customer order</h2>' : '<h2 class="section-title">New request</h2>'}${orderFormMarkup}<p class="page-error" id="page-error" role="alert" hidden></p>${salesTable}<h2 class="section-title">${admin ? 'Orders' : 'Your orders'}</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Items</th><th>Status</th><th>Total</th>${admin ? '<th>Quote/status</th>' : ''}</tr></thead><tbody id="order-rows"><tr><td colspan="${admin ? 6 : 5}">Loading orders…</td></tr></tbody></table></div>${paymentSection}`)
   const refresh = async () => {
     const orders = await api.orders()
     if (admin) {
@@ -409,8 +531,8 @@ async function renderSalesOrders(user) {
         : '<tr><td colspan="4">No sales recorded.</td></tr>'
     }
     root.querySelector('#order-rows').innerHTML = orders.orders.length
-      ? orders.orders.map((order) => `<tr><td>${escapeHtml(order.ordered_at)}</td><td>${escapeHtml(order.customer)}</td><td>${escapeHtml(order.status)}</td><td>${formatMoney(order.total_amount)}</td>${admin ? `<td><form class="order-update" data-order-id="${escapeHtml(order.id)}"><select name="status"><option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Pending</option><option value="accepted" ${order.status === 'accepted' ? 'selected' : ''}>Accepted</option><option value="fulfilled" ${order.status === 'fulfilled' ? 'selected' : ''}>Fulfilled</option><option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>Cancelled</option></select><input name="totalAmount" type="number" min="0" step="0.01" value="${escapeHtml(order.total_amount)}" aria-label="Quoted total in KES"><button class="small-action" type="submit">Save</button></form></td>` : ''}</tr>`).join('')
-      : `<tr><td colspan="${admin ? 5 : 4}">No orders recorded.</td></tr>`
+      ? orders.orders.map((order) => `<tr><td>${escapeHtml(order.ordered_at)}</td><td>${escapeHtml(order.customer)}</td><td>${escapeHtml(order.items || '—')}</td><td>${escapeHtml(order.status)}</td><td>${formatMoney(order.total_amount)}</td>${admin ? `<td><form class="order-update" data-order-id="${escapeHtml(order.id)}"><select name="status"><option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Pending</option><option value="accepted" ${order.status === 'accepted' ? 'selected' : ''}>Accepted</option><option value="fulfilled" ${order.status === 'fulfilled' ? 'selected' : ''}>Fulfilled</option><option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>Cancelled</option></select><input name="totalAmount" type="number" min="0" step="0.01" value="${escapeHtml(order.total_amount)}" aria-label="Quoted total in KES"><button class="small-action" type="submit">Save</button></form></td>` : ''}</tr>`).join('')
+      : `<tr><td colspan="${admin ? 6 : 5}">No orders recorded.</td></tr>`
     if (admin) {
       const orderSelect = root.querySelector('#payment-form [name="orderId"]')
       orderSelect.innerHTML = '<option value="">Choose order</option>' + orders.orders.map((order) => `<option value="${escapeHtml(order.id)}">#${escapeHtml(order.id)} · ${escapeHtml(order.customer)} · ${formatMoney(order.total_amount)}</option>`).join('')
@@ -464,21 +586,64 @@ async function renderSalesOrders(user) {
 }
 
 async function renderUsers(user) {
-  shell(user, 'User accounts', '<section class="welcome-row"><div><p class="eyebrow">Access control</p><h1>User accounts</h1><p class="intro">Create staff or customer logins for farm operations.</p></div></section><form id="user-form" class="entry-form"><label>Full name<input name="fullName" required maxlength="120"></label><label>Email<input name="email" type="email" required maxlength="190"></label><label>Password<input name="password" type="password" required minlength="12"></label><label>Role<select name="role"><option value="worker">Farm worker</option><option value="veterinarian">Veterinarian</option><option value="customer">Customer</option><option value="admin">Administrator</option></select></label><button class="primary-button" type="submit">Create account</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody id="user-rows"><tr><td colspan="4">Loading accounts…</td></tr></tbody></table></div>')
+  const roleOptions = '<option value="worker">Farm worker</option><option value="veterinarian">Veterinarian</option><option value="customer">Customer (produce)</option><option value="buyer">Livestock buyer</option>'
+  shell(user, 'User accounts', `<section class="welcome-row"><div><p class="eyebrow">Access control</p><h1>User accounts</h1><p class="intro">Create accounts, approve staff sign-ups, and manage the single admin role.</p></div></section><form id="user-form" class="entry-form"><label>Full name<input name="fullName" required maxlength="120"></label><label>Username${usernameInput}</label><label>Email<input name="email" type="email" required maxlength="190"></label><label>Password<input name="password" type="password" required minlength="12"></label><label>User type<select name="role">${roleOptions}</select></label><button class="primary-button" type="submit">Create account</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>User type</th><th>Status</th><th></th></tr></thead><tbody id="user-rows"><tr><td colspan="6">Loading accounts…</td></tr></tbody></table></div><h2 class="section-title">Your username</h2><form id="username-form" class="entry-form"><label>Username${usernameInput}</label><button class="primary-button" type="submit">Save username</button><p class="form-message" role="alert" hidden></p></form><h2 class="section-title">Transfer admin</h2><p class="intro">The farm has one administrator. Handing over admin rights makes the chosen person the admin and changes your account to the user type you pick.</p><form id="transfer-form" class="entry-form"><label>New admin<select name="userId" required><option value="">Choose an active account</option></select></label><label>Your user type afterwards<select name="newRole" required>${roleOptions}</select></label><label>Your current password<input name="password" type="password" required autocomplete="current-password"></label><button class="primary-button danger-button" type="submit">Transfer admin rights</button><p class="form-message" role="alert" hidden></p></form>`)
   const form = root.querySelector('#user-form')
+  const transferForm = root.querySelector('#transfer-form')
+  const usernameForm = root.querySelector('#username-form')
+  usernameForm.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    try {
+      await api.setUsername(Object.fromEntries(new FormData(usernameForm)))
+      showMessage(usernameForm.querySelector('.form-message'), 'Username saved. You can now sign in with it.')
+      await refresh()
+    } catch (error) { showMessage(usernameForm.querySelector('.form-message'), error.message, true) }
+  })
+  const roleNames = { admin: 'Admin', worker: 'Farm worker', veterinarian: 'Veterinarian', customer: 'Customer', buyer: 'Livestock buyer' }
   async function refresh() {
     const { users } = await api.users()
-    root.querySelector('#user-rows').innerHTML = users.map((account) => `<tr><td>${escapeHtml(account.full_name)}</td><td>${escapeHtml(account.email)}</td><td>${escapeHtml(account.role)}</td><td>${account.is_active ? 'Active' : 'Disabled'}</td></tr>`).join('')
+    const me = users.find((account) => Number(account.id) === Number(user.id))
+    usernameForm.querySelector('[name="username"]').value = me?.username || ''
+    root.querySelector('#user-rows').innerHTML = users.map((account) => {
+      const self = Number(account.id) === Number(user.id)
+      const active = Number(account.is_active) === 1
+      const action = account.role === 'admin' || self
+        ? ''
+        : `<button class="small-action" data-user-id="${escapeHtml(account.id)}" data-active="${active ? 'false' : 'true'}">${active ? 'Deactivate' : 'Approve'}</button>`
+      return `<tr><td>${escapeHtml(account.full_name)}${self ? ' (you)' : ''}</td><td>${escapeHtml(account.username || '—')}</td><td>${escapeHtml(account.email)}</td><td>${escapeHtml(roleNames[account.role] || account.role)}</td><td>${active ? 'Active' : 'Awaiting approval / inactive'}</td><td>${action}</td></tr>`
+    }).join('')
+    transferForm.querySelector('[name="userId"]').innerHTML = '<option value="">Choose an active account</option>' + users
+      .filter((account) => Number(account.is_active) === 1 && Number(account.id) !== Number(user.id))
+      .map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(account.full_name)} · ${escapeHtml(roleNames[account.role] || account.role)}</option>`).join('')
   }
   try { await refresh() } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
       await api.createUser(Object.fromEntries(new FormData(form)))
-      toast('Staff account created')
+      toast('Account created')
       form.reset()
       await refresh()
     } catch (error) { showMessage(form.querySelector('.form-message'), error.message, true) }
+  })
+  root.querySelector('#user-rows').addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-user-id]')
+    if (!button) return
+    try {
+      await api.updateUser(button.dataset.userId, { isActive: button.dataset.active === 'true' })
+      toast(button.dataset.active === 'true' ? 'Account approved' : 'Account deactivated')
+      await refresh()
+    } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
+  })
+  transferForm.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const data = Object.fromEntries(new FormData(transferForm))
+    const target = transferForm.querySelector('[name="userId"]').selectedOptions[0]?.textContent
+    if (!window.confirm(`Make ${target} the farm admin? You will lose admin access immediately.`)) return
+    try {
+      const result = await api.transferAdmin({ ...data, userId: Number(data.userId) })
+      renderHome(result.user)
+    } catch (error) { showMessage(transferForm.querySelector('.form-message'), error.message, true) }
   })
 }
 
@@ -507,6 +672,147 @@ async function renderFeedback(user) {
   })
 }
 
+async function renderProducts(user) {
+  shell(user, 'Products', '<section class="welcome-row"><div><p class="eyebrow">Customer catalog</p><h1>Products</h1><p class="intro">Manage livestock listings and produce availability.</p></div></section><form id="product-form" class="entry-form"><label>Listing name<input name="name" required maxlength="140" placeholder="Fresh milk, Merino wool, etc."></label><label>Type<select name="productType" required><option value="produce">Produce</option><option value="livestock">Livestock</option><option value="other">Other</option></select></label><label id="species-field" hidden>Species<select name="species"><option value="">Choose species</option><option value="cattle">Cattle</option><option value="sheep">Sheep</option><option value="goat">Goat</option><option value="rabbit">Rabbit</option><option value="chicken">Chicken</option><option value="other">Other</option></select></label><label id="production-kind-field">Production source<select name="productionKind"><option value="">Manual stock</option><option value="milk">Milk records</option><option value="eggs">Egg records</option><option value="wool">Wool records</option><option value="other">Other produce</option></select></label><label>Unit<input name="unit" required maxlength="30" value="litres" placeholder="litres, trays, kg"></label><label>Opening stock<input name="availableQuantity" type="number" min="0" step="0.01" value="0" required></label><label>Unit price (KES)<input name="unitPrice" type="number" min="0" step="0.01" required></label><button class="primary-button" type="submit">Publish listing</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Listing</th><th>Type</th><th>Species/source</th><th>Available</th><th>Unit price</th><th>Active</th><th></th></tr></thead><tbody id="product-rows"><tr><td colspan="7">Loading catalog…</td></tr></tbody></table></div>')
+  const form = root.querySelector('#product-form')
+  const type = form.querySelector('[name="productType"]')
+  const speciesField = form.querySelector('#species-field')
+  const sourceField = form.querySelector('#production-kind-field')
+  const quantityField = form.querySelector('[name="availableQuantity"]')
+  const unitField = form.querySelector('[name="unit"]')
+  function updateTypeFields() {
+    const livestock = type.value === 'livestock'
+    speciesField.hidden = !livestock
+    speciesField.querySelector('select').required = livestock
+    sourceField.hidden = type.value !== 'produce'
+    quantityField.disabled = livestock
+    unitField.value = livestock ? 'animals' : unitField.value === 'animals' ? '' : unitField.value
+  }
+  type.addEventListener('change', updateTypeFields)
+  updateTypeFields()
+  async function refresh() {
+    const { products } = await api.products()
+    root.querySelector('#product-rows').innerHTML = products.length
+      ? products.map((product) => `<tr><td>${escapeHtml(product.name)}</td><td>${escapeHtml(product.product_type)}</td><td>${escapeHtml(product.species || product.production_kind || '—')}</td><td>${escapeHtml(product.current_availability)} ${escapeHtml(product.unit)}</td><td>${formatMoney(product.unit_price)}</td><td>${Number(product.is_active) ? 'Listed' : 'Hidden'}</td><td><form class="product-update" data-product-id="${escapeHtml(product.id)}"><input name="availableQuantity" type="number" min="0" step="0.01" value="${escapeHtml(product.available_quantity)}" ${product.product_type === 'livestock' ? 'disabled' : ''} aria-label="Stock quantity"><input name="unitPrice" type="number" min="0" step="0.01" value="${escapeHtml(product.unit_price)}" aria-label="Unit price"><label class="checkbox-label"><input name="isActive" type="checkbox" ${Number(product.is_active) ? 'checked' : ''}> Listed</label><button class="small-action" type="submit">Save</button></form></td></tr>`).join('')
+      : '<tr><td colspan="7">No customer listings yet.</td></tr>'
+  }
+  try { await refresh() } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const data = Object.fromEntries(new FormData(form))
+    if (data.productType === 'livestock') data.availableQuantity = 0
+    try { await api.createProduct(data); toast('Listing published'); form.reset(); updateTypeFields(); await refresh() }
+    catch (error) { showMessage(form.querySelector('.form-message'), error.message, true) }
+  })
+  root.querySelector('#product-rows').addEventListener('submit', async (event) => {
+    const rowForm = event.target.closest('.product-update')
+    if (!rowForm) return
+    event.preventDefault()
+    const data = Object.fromEntries(new FormData(rowForm))
+    data.isActive = rowForm.querySelector('[name="isActive"]').checked
+    try { await api.updateProduct(rowForm.dataset.productId, data); toast('Listing updated'); await refresh() }
+    catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
+  })
+}
+
+async function renderStorefront(user) {
+  const buyer = user.role === 'buyer'
+  const copy = buyer
+    ? { label: 'Livestock market', title: 'Buy livestock', intro: 'Choose an animal type and how many you need. Availability is checked against the farm\'s live herd records.', grid: 'Animals available', item: 'Animal type', qty: 'Number of animals', empty: 'The farm has not listed any livestock for sale yet.' }
+    : { label: 'Farm produce shop', title: 'Buy farm produce', intro: 'Fresh milk, eggs, wool and other produce from Flouri Farm.', grid: 'Produce available', item: 'Produce', qty: 'Quantity', empty: 'The farm has not listed any produce yet.' }
+  root.innerHTML = `<main class="storefront"><header class="storefront-header"><div class="brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>${copy.label}</small></div></div><div class="storefront-actions"><span>Signed in as ${escapeHtml(user.fullName)} · ${buyer ? 'Livestock buyer' : 'Customer'}</span><button class="header-logout" id="store-logout" type="button" aria-label="Sign out" title="Sign out">↪ Sign out</button></div></header><div class="storefront-main"><section class="storefront-intro"><p class="eyebrow">Direct from Flouri Farm</p><h1>${copy.title}</h1><p class="intro">${copy.intro}</p></section><p class="page-error" id="page-error" role="alert" hidden></p><section class="store-layout"><div><h2>${copy.grid}</h2><div class="store-grid" id="store-products"><p class="empty-state">Loading…</p></div></div><section class="store-order-panel"><p class="eyebrow">Your purchase request</p><h2>${buyer ? 'Choose animals' : 'Choose produce'}</h2><form id="store-order-form" class="form-stack"><label>${copy.item}<select name="productId" required><option value="">Choose a listing</option></select></label><label>${copy.qty}<input name="quantity" type="number" min="${buyer ? 1 : 0.01}" step="${buyer ? 1 : 0.01}" required></label><p class="store-availability" id="store-availability">Choose an item to see current availability.</p><button class="primary-button" type="submit">Send purchase request</button>${buyer ? '<button class="csv-link" type="button" id="selection-csv">Download CSV of these animals</button>' : ''}<p class="form-message" role="alert" hidden></p></form></section></section><section class="store-orders"><div class="store-orders-heading"><div><p class="eyebrow">Order history</p><h2>Your requests</h2></div><button class="csv-link" type="button" id="orders-csv">Download orders CSV</button></div><div class="table-wrap"><table><thead><tr><th>Requested</th><th>Items</th><th>Status</th><th>Quoted total</th></tr></thead><tbody id="store-order-rows"><tr><td colspan="4">Loading orders…</td></tr></tbody></table></div></section></div><div id="toast" class="toast" role="status"></div></main>`
+  root.querySelector('#store-logout').addEventListener('click', signOut)
+  const form = root.querySelector('#store-order-form')
+  const selector = form.querySelector('[name="productId"]')
+  const quantityInput = form.querySelector('[name="quantity"]')
+  const availability = root.querySelector('#store-availability')
+  const formMessage = form.querySelector('.form-message')
+  let products = []
+
+  async function refreshOrders() {
+    const { orders } = await api.orders()
+    root.querySelector('#store-order-rows').innerHTML = orders.length
+      ? orders.map((order) => `<tr><td>${escapeHtml(order.ordered_at)}</td><td>${escapeHtml(order.items || '—')}</td><td>${escapeHtml(order.status)}</td><td>${formatMoney(order.total_amount)}</td></tr>`).join('')
+      : '<tr><td colspan="4">No purchase requests yet.</td></tr>'
+  }
+  async function refreshProducts() {
+    products = (await api.storeProducts()).products
+    selector.innerHTML = '<option value="">Choose a listing</option>' + products.map((product) => `<option value="${escapeHtml(product.id)}" ${Number(product.available_quantity) <= 0 ? 'disabled' : ''}>${escapeHtml(product.name)} · ${escapeHtml(Number(product.available_quantity))} ${escapeHtml(product.unit)}</option>`).join('')
+    root.querySelector('#store-products').innerHTML = products.length
+      ? products.map((product) => `<article class="store-product"><p class="eyebrow">${escapeHtml(product.species || product.production_kind || product.product_type)}</p><h3>${escapeHtml(product.name)}</h3><p class="store-stock">${escapeHtml(Number(product.available_quantity))} ${escapeHtml(product.unit)} available</p><strong>${formatMoney(product.unit_price)} <small>/ ${escapeHtml(buyer ? 'animal' : product.unit)}</small></strong><button class="text-button" type="button" data-select-product="${escapeHtml(product.id)}" ${Number(product.available_quantity) <= 0 ? 'disabled' : ''}>${Number(product.available_quantity) <= 0 ? 'Out of stock' : 'Select →'}</button></article>`).join('')
+      : `<p class="empty-state">${copy.empty}</p>`
+  }
+  function selectedProduct() {
+    return products.find((item) => String(item.id) === String(selector.value))
+  }
+  function updateAvailability() {
+    const product = selectedProduct()
+    const requested = Number(quantityInput.value)
+    availability.classList.remove('error', 'ok')
+    if (!product) {
+      availability.textContent = 'Choose an item to see current availability.'
+      return true
+    }
+    const available = Number(product.available_quantity)
+    quantityInput.max = available
+    if (!requested) {
+      availability.textContent = `${available} ${product.unit} available · ${formatMoney(product.unit_price)} each ${buyer ? 'animal' : product.unit}.`
+      return true
+    }
+    if (buyer && !Number.isInteger(requested)) {
+      availability.textContent = 'Enter a whole number of animals.'
+      availability.classList.add('error')
+      return false
+    }
+    if (requested > available) {
+      availability.textContent = `Only ${available} ${product.unit} available — reduce the quantity.`
+      availability.classList.add('error')
+      return false
+    }
+    availability.textContent = `✓ ${requested} of ${available} available · estimated ${formatMoney(requested * Number(product.unit_price))}. The farm confirms your request before fulfillment.`
+    availability.classList.add('ok')
+    return true
+  }
+
+  try {
+    await refreshProducts()
+    await refreshOrders()
+  } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
+
+  selector.addEventListener('change', updateAvailability)
+  quantityInput.addEventListener('input', updateAvailability)
+  root.querySelector('#store-products').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-select-product]')
+    if (!button) return
+    selector.value = button.dataset.selectProduct
+    updateAvailability()
+    quantityInput.focus()
+  })
+  root.querySelector('#selection-csv')?.addEventListener('click', async () => {
+    if (!form.reportValidity() || !updateAvailability()) return
+    try {
+      await api.downloadLivestockSelection(selector.value, quantityInput.value)
+      showMessage(formMessage, '')
+    } catch (error) { showMessage(formMessage, error.message, true) }
+  })
+  root.querySelector('#orders-csv').addEventListener('click', async () => {
+    try { await api.downloadOrders() } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
+  })
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    if (!updateAvailability()) return
+    try {
+      await api.createOrder({ items: [{ productId: selector.value, quantity: quantityInput.value }] })
+      toast('Purchase request sent to the farm')
+      showMessage(formMessage, '')
+      form.reset()
+      await refreshProducts()
+      updateAvailability()
+      await refreshOrders()
+    } catch (error) { showMessage(formMessage, error.message, true) }
+  })
+}
+
 function renderNotReady(user, section) {
   shell(user, section, `<section class="welcome-row"><div><p class="eyebrow">Farm operations</p><h1>${escapeHtml(section)}</h1><p class="intro">This module is not connected yet.</p></div></section>`)
 }
@@ -520,13 +826,14 @@ function navigate(user, section) {
   if (section === 'Inventory') return renderInventory(user)
   if (section === 'Sales & orders') return renderSalesOrders(user)
   if (section === 'User accounts' && user.role === 'admin') return renderUsers(user)
+  if (section === 'Products' && user.role === 'admin') return renderProducts(user)
   if (section === 'Feedback' && ['admin', 'customer'].includes(user.role)) return renderFeedback(user)
   if (section === 'Reports') return renderReports(user)
   renderNotReady(user, section)
 }
 
 function renderHome(user) {
-  if (user.role === 'customer') return renderSalesOrders(user)
+  if (['customer', 'buyer'].includes(user.role)) return renderStorefront(user)
   return renderDashboard(user)
 }
 
@@ -555,4 +862,5 @@ async function start() {
   }
 }
 
+new MutationObserver(addPasswordToggles).observe(root, { childList: true, subtree: true })
 start()

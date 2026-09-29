@@ -7,3 +7,5 @@ __pycache__/
 venv/
 .pytest_cache/
 backend/ml/models/backend/start-dev.sh
+backend/config/mail.local.php
+

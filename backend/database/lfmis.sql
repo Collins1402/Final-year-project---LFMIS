@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   role_id SMALLINT UNSIGNED NOT NULL,
   full_name VARCHAR(120) NOT NULL,
+  username VARCHAR(30) NULL UNIQUE,
   email VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -33,7 +34,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE TABLE IF NOT EXISTS animals (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   tag_number VARCHAR(80) NULL UNIQUE,
-  species ENUM('cattle', 'goat', 'rabbit', 'chicken', 'other') NOT NULL,
+  species ENUM('cattle', 'sheep', 'goat', 'rabbit', 'chicken', 'other') NOT NULL,
   breed VARCHAR(100) NULL,
   name VARCHAR(100) NULL,
   sex ENUM('female', 'male', 'unknown') NOT NULL DEFAULT 'unknown',
@@ -104,6 +105,17 @@ CREATE TABLE IF NOT EXISTS egg_production (
   CONSTRAINT fk_eggs_user FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS wool_production (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  production_date DATE NOT NULL,
+  quantity_kg DECIMAL(9,2) UNSIGNED NOT NULL,
+  notes VARCHAR(500) NULL,
+  recorded_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_wool_date (production_date),
+  CONSTRAINT fk_wool_user FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS inventory_items (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NOT NULL UNIQUE,
@@ -136,6 +148,22 @@ CREATE TABLE IF NOT EXISTS customers (
   INDEX idx_customers_email (email)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS products (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(140) NOT NULL,
+  product_type ENUM('livestock', 'produce', 'other') NOT NULL,
+  production_kind ENUM('milk', 'eggs', 'wool', 'other') NULL,
+  species ENUM('cattle', 'sheep', 'goat', 'rabbit', 'chicken', 'other') NULL,
+  unit VARCHAR(30) NOT NULL,
+  available_quantity DECIMAL(10,2) UNSIGNED NOT NULL DEFAULT 0,
+  unit_price DECIMAL(12,2) UNSIGNED NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_products_active_type (is_active, product_type),
+  INDEX idx_products_species (species),
+  UNIQUE KEY uq_products_production_kind (production_kind)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS orders (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   customer_id BIGINT UNSIGNED NOT NULL,
@@ -151,11 +179,21 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id BIGINT UNSIGNED NOT NULL,
+  product_id BIGINT UNSIGNED NULL,
   item_name VARCHAR(120) NOT NULL,
   quantity DECIMAL(10,2) UNSIGNED NOT NULL,
   unit VARCHAR(30) NOT NULL,
   unit_price DECIMAL(12,2) UNSIGNED NOT NULL,
-  CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
+  CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS order_animals (
+  order_id BIGINT UNSIGNED NOT NULL,
+  animal_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  PRIMARY KEY (order_id, animal_id),
+  CONSTRAINT fk_order_animals_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_animals_animal FOREIGN KEY (animal_id) REFERENCES animals (id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS sales (
@@ -238,4 +276,5 @@ INSERT IGNORE INTO roles (name, description) VALUES
   ('admin', 'Full farm management access'),
   ('worker', 'Daily farm activity and production records'),
   ('veterinarian', 'Animal health records'),
-  ('customer', 'Customer orders and feedback');
+  ('customer', 'Farm produce purchases and feedback'),
+  ('buyer', 'Livestock purchases');

@@ -104,7 +104,7 @@ The development defaults use MySQL at `127.0.0.1:3306`, database `lfmis`, and th
 Open three terminals at the repository root and leave each running:
 
 ```powershell
-& 'C:\Program Files\Git\bin\bash.exe' backend/start-dev.sh
+php -S 127.0.0.1:8000 backend/api/index.php
 ```
 
 ```powershell
@@ -119,6 +119,12 @@ npm --prefix frontend run dev -- --host 127.0.0.1
 
 Open `http://127.0.0.1:5173/`. On a new database, create the first farm-owner account on the initial setup screen. It requires a password with at least 12 characters. An administrator can create staff and customer accounts under **User accounts**.
 
+To switch roles, sign in as an admin, open **User accounts**, and create a worker or customer login with its own email and password. Use the header sign-out button, then sign in using those new credentials. Customers land in a separate farm shop; they do not see staff, inventory, or finance screens.
+
+Admins publish items under **Products**. Livestock availability is computed from active animal records, including cattle, sheep, goats, rabbits, and chickens. Milk/egg listings can be linked to production records so daily entries add to listed stock; other produce such as wool can be listed with manually managed stock. Buyers can request only listed products and available quantities. Stock is checked again when the admin accepts an order; accepted livestock orders record the specific animals sold. Buyers can download their requests and assigned animal identifiers as CSV.
+
+Farm workers and admins can enter daily milk/egg production, review the recorded seven-day totals and daily figures, and share that report through WhatsApp. The same seven-day totals appear on their dashboard.
+
 ### Password recovery
 
 The sign-in page has a **Forgot password?** flow. Reset links are single-use, expire after 30 minutes, and are stored as token hashes. Requests use the same response whether or not the email matches an active account.
@@ -131,7 +137,9 @@ For email delivery, configure PHP's `mail()` transport to use your SMTP relay, s
 - Forgot-password requests and single-use, expiring reset links.
 - Admin, farm-worker, veterinarian, and customer roles, with staff/customer account creation.
 - Livestock registration, health records, farm activities/tasks, milk and egg production, and stock movements.
-- Sales and expenses, admin order quoting/status updates, customer order requests, and payment ledger.
+- Product catalog, availability-checked customer orders, admin order acceptance/stock allocation, and buyer CSV exports.
+- Sales and expenses, admin order quoting/status updates, payment ledger, and customer feedback.
+- Daily/weekly production summaries with WhatsApp sharing for farm workers and admins.
 - Customer feedback, live dashboard totals, monthly financial summaries, and milk forecasts with a seven-day backtest.
 
 The ML service requires at least 21 consecutive daily production records. It rejects missing-day histories rather than treating unrecorded days as zero. No sample farm data is seeded.
@@ -148,5 +156,5 @@ python -m unittest discover -s backend/ml -p "test_*.py"
 ### Not yet integrated
 
 - M-Pesa STK prompts, signed payment callbacks, and automated payment confirmation need real Daraja credentials and a reachable callback URL. M-Pesa payments are stored as pending; non-M-Pesa payments entered by an admin are recorded as confirmed.
-- Payment receipts, notification delivery, supplier workflows, offline synchronization, account deactivation, and broader reporting remain follow-up work.
+- Live M-Pesa prompts and signed payment callbacks need Daraja credentials and a reachable callback URL. Payment receipts, notification delivery, supplier workflows, offline synchronization, account deactivation, and broader reporting remain follow-up work.
 - The forecast is a baseline decision-support model, not a veterinary diagnosis. Its measured error must be reviewed against real farm data before relying on it.

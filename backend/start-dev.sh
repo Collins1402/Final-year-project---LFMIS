@@ -8,5 +8,5 @@ php "$(dirname "$0")/database/migrate.php"
 if [[ "${LFMIS_MIGRATE_ONLY:-0}" == "1" ]]; then
 	exit 0
 fi
-api_port="${LFMIS_API_PORT:-8001}"
+api_port="${LFMIS_API_PORT:-8000}"
 php -S "127.0.0.1:${api_port}" "$(dirname "$0")/api/index.php"
