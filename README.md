@@ -99,6 +99,18 @@ Get-Content -Raw backend/database/lfmis.sql | C:\xampp\mysql\bin\mysql.exe -u ro
 
 The development defaults use MySQL at `127.0.0.1:3306`, database `lfmis`, and the XAMPP `root` account with no password. For a configured account, set `LFMIS_DB_HOST`, `LFMIS_DB_PORT`, `LFMIS_DB_NAME`, `LFMIS_DB_USER`, and `LFMIS_DB_PASSWORD` in the PHP server terminal before starting it. Never commit real credentials.
 
+### Old Mark Donald assistant
+
+The staff workspace includes **Old Mark Donald**, a farm assistant available to administrators, workers, and veterinarians. It works with a local fallback by default. To connect it to an OpenAI-compatible chat model, set these variables in the PHP server terminal before starting the API:
+
+```powershell
+$env:LFMIS_AI_API_URL = 'https://api.openai.com/v1'
+$env:LFMIS_AI_API_KEY = 'replace-with-your-key'
+$env:LFMIS_AI_MODEL = 'gpt-4o-mini'
+```
+
+The API key is server-side only and must never be placed in frontend code or committed to the repository. Without these variables, the assistant answers common production, livestock, and task questions from the live database summary.
+
 ### Start the services
 
 Open three terminals at the repository root and leave each running:

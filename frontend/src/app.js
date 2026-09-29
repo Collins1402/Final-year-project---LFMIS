@@ -6,7 +6,7 @@ const root = document.querySelector('#app')
 const navSections = [
   ['⌂', 'Overview'], ['◉', 'Livestock'], ['♡', 'Animal health'],
   ['☷', 'Activities'], ['◌', 'Production'], ['▣', 'Inventory'], ['↗', 'Sales & orders'], ['▥', 'Reports'], ['◇', 'Feedback'], ['♙', 'User accounts'],
-  ['▦', 'Products'],
+  ['▦', 'Products'], ['✦', 'Old Mark Donald'],
 ]
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -330,8 +330,8 @@ function shell(user, active, content) {
   const visibleSections = navSections.filter(([, label]) => {
     if (user.role === 'admin') return true
     if (user.role === 'customer') return ['Sales & orders', 'Feedback'].includes(label)
-    if (user.role === 'veterinarian') return ['Overview', 'Livestock', 'Animal health', 'Activities'].includes(label)
-    if (user.role === 'worker') return ['Overview', 'Livestock', 'Activities', 'Production', 'Inventory'].includes(label)
+    if (user.role === 'veterinarian') return ['Overview', 'Livestock', 'Animal health', 'Activities', 'Old Mark Donald'].includes(label)
+    if (user.role === 'worker') return ['Overview', 'Livestock', 'Activities', 'Production', 'Inventory', 'Old Mark Donald'].includes(label)
     return false
   })
   const roleNames = { admin: 'Administrator', worker: 'Farm worker', veterinarian: 'Veterinarian', customer: 'Customer', buyer: 'Livestock buyer' }
@@ -533,6 +533,38 @@ async function renderReports(user) {
       } catch (error) { showMessage(form.querySelector('.form-message'), error.message, true) }
     })
   }
+}
+
+async function renderAssistant(user) {
+  shell(user, 'Old Mark Donald', `<section class="welcome-row"><div><p class="eyebrow">Farm intelligence</p><h1>Old Mark Donald</h1><p class="intro">A practical assistant for your daily farm decisions.</p></div></section><section class="panel assistant-panel"><div class="assistant-intro"><span class="assistant-mark">✦</span><div><h2>Ask about the farm</h2><p>Use plain language to ask about production, livestock records, or planned work.</p></div></div><div id="assistant-messages" class="assistant-messages" aria-live="polite"><div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>Hello. I can help you make sense of the farm records. What would you like to check?</p></div></div><form id="assistant-form" class="assistant-form"><label class="sr-only" for="assistant-input">Message Old Mark Donald</label><textarea id="assistant-input" maxlength="2000" rows="2" placeholder="Ask about today\'s milk, active animals, or open tasks..." required></textarea><button class="primary-button" type="submit">Send <span>→</span></button></form><p id="assistant-status" class="assistant-note">For animal illness, use this as decision support and contact the veterinarian.</p></section>`)
+  const messages = root.querySelector('#assistant-messages')
+  const form = root.querySelector('#assistant-form')
+  const input = root.querySelector('#assistant-input')
+  const status = root.querySelector('#assistant-status')
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const message = input.value.trim()
+    if (!message) return
+    messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-user"><strong>You</strong><p>${escapeHtml(message)}</p></div>`)
+    input.value = ''
+    input.disabled = true
+    form.querySelector('button').disabled = true
+    status.textContent = 'Old Mark Donald is thinking…'
+    messages.scrollTop = messages.scrollHeight
+    try {
+      const response = await api.assistantChat({ message })
+      messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>${escapeHtml(response.reply)}</p></div>`)
+      status.textContent = response.source === 'model' ? 'Connected to the configured AI model.' : 'Using the local farm assistant until an AI model is configured.'
+    } catch (error) {
+      messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>${escapeHtml(error.message)}</p></div>`)
+      status.textContent = 'Assistant unavailable.'
+    } finally {
+      input.disabled = false
+      form.querySelector('button').disabled = false
+      input.focus()
+      messages.scrollTop = messages.scrollHeight
+    }
+  })
 }
 
 async function renderHealth(user) {
@@ -995,6 +1027,7 @@ function navigate(user, section) {
   if (section === 'Products' && user.role === 'admin') return renderProducts(user)
   if (section === 'Feedback' && ['admin', 'customer'].includes(user.role)) return renderFeedback(user)
   if (section === 'Reports') return renderReports(user)
+  if (section === 'Old Mark Donald') return renderAssistant(user)
   renderNotReady(user, section)
 }
 

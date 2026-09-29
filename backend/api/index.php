@@ -597,6 +597,68 @@ try {
         respond($status ?: 502, $forecast);
     }
 
+    if ($method === 'POST' && $path === '/api/assistant/chat') {
+        $user = requireUser();
+        requireRole($user, ['admin', 'worker', 'veterinarian']);
+        $message = trim((string) ($body['message'] ?? ''));
+        if ($message === '' || strlen($message) > 2000) {
+            respond(422, ['error' => 'Enter a message up to 2,000 characters.']);
+        }
+
+        $summary = [
+            'activeAnimals' => (int) $db->query("SELECT COUNT(*) FROM animals WHERE status = 'active'")->fetchColumn(),
+            'milkTodayLitres' => (float) $db->query(
+                'SELECT COALESCE(SUM(quantity_litres), 0) FROM milk_production WHERE production_date = CURRENT_DATE()'
+            )->fetchColumn(),
+            'eggsTodayTrays' => (float) $db->query(
+                'SELECT COALESCE(SUM(quantity_trays), 0) FROM egg_production WHERE production_date = CURRENT_DATE()'
+            )->fetchColumn(),
+            'openTasks' => (int) $db->query(
+                "SELECT COUNT(*) FROM farm_activities WHERE status = 'planned'"
+            )->fetchColumn(),
+        ];
+        $apiUrl = rtrim(getenv('LFMIS_AI_API_URL') ?: '', '/');
+        $apiKey = getenv('LFMIS_AI_API_KEY') ?: '';
+        $model = getenv('LFMIS_AI_MODEL') ?: 'gpt-4o-mini';
+
+        if ($apiUrl !== '' && $apiKey !== '') {
+            $messages = [
+                ['role' => 'system', 'content' => "You are Old Mark Donald, a concise and practical farm assistant for Flouri Farm in Nairobi. Use only the supplied farm context and general non-diagnostic knowledge. Never invent records. For animal illness, give general safety guidance and recommend a veterinarian; do not diagnose. Current user role: {$user['role']}. Farm context: " . json_encode($summary)],
+                ['role' => 'user', 'content' => $message],
+            ];
+            $curl = curl_init($apiUrl . '/chat/completions');
+            curl_setopt_array($curl, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode(['model' => $model, 'messages' => $messages, 'temperature' => 0.3, 'max_tokens' => 500]),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $apiKey],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_TIMEOUT => 20,
+            ]);
+            $response = curl_exec($curl);
+            $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+            curl_close($curl);
+            $decoded = is_string($response) ? json_decode($response, true) : null;
+            $reply = $decoded['choices'][0]['message']['content'] ?? null;
+            if (is_string($reply) && trim($reply) !== '') {
+                respond(200, ['reply' => trim($reply), 'source' => 'model']);
+            }
+            error_log('AI assistant request failed with status ' . $status . '.');
+        }
+
+        $lowerMessage = strtolower($message);
+        if (str_contains($lowerMessage, 'milk') || str_contains($lowerMessage, 'produce')) {
+            $reply = "Today's recorded milk production is {$summary['milkTodayLitres']} litres and eggs are {$summary['eggsTodayTrays']} trays. I can help interpret trends once more daily records are available.";
+        } elseif (str_contains($lowerMessage, 'animal') || str_contains($lowerMessage, 'livestock') || str_contains($lowerMessage, 'herd')) {
+            $reply = "The farm currently has {$summary['activeAnimals']} active animals. For a health concern, record the symptoms and contact the veterinarian rather than relying on an automated diagnosis.";
+        } elseif (str_contains($lowerMessage, 'task') || str_contains($lowerMessage, 'activity')) {
+            $reply = "There are {$summary['openTasks']} planned farm activities. Review Activities to see their dates and mark completed work.";
+        } else {
+            $reply = "I can help with production, livestock records, planned activities, and farm reports. Ask me about today's milk, your active animals, or open tasks.";
+        }
+        respond(200, ['reply' => $reply, 'source' => 'local']);
+    }
+
     if ($path === '/api/health-records' && $method === 'GET') {
         $user = requireUser();
         requireRole($user, ['admin', 'veterinarian']);
