@@ -46,6 +46,12 @@ td { color:#58655d; }
 .assistant-message-user { justify-self:end; background:#edf4ee; border-color:#d5e4d7; }
 .assistant-message strong { display:block; margin-bottom:5px; color:var(--green); font-size:11px; }
 .assistant-message p { margin:0; color:#4f5e55; font-size:13px; line-height:1.5; white-space:pre-wrap; }
+.assistant-chart { display:grid; gap:7px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+.assistant-chart > strong { color:#58655d; font-size:11px; }
+.chart-row { display:grid; grid-template-columns:38px 1fr 76px; align-items:center; gap:7px; color:#89958c; font-size:10px; }
+.chart-row b { color:#58655d; font-size:10px; font-weight:600; text-align:right; }
+.chart-track { height:9px; overflow:hidden; border-radius:9px; background:#e8eee9; }
+.chart-track i { display:block; height:100%; border-radius:inherit; background:var(--green); }
 .assistant-form { display:grid; grid-template-columns:1fr auto; align-items:end; gap:10px; padding-top:4px; }
 .assistant-form textarea { width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:5px; outline-color:var(--green); background:#fff; color:var(--ink); font:inherit; resize:vertical; }
 .assistant-form .primary-button { min-height:42px; }

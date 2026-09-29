@@ -655,6 +655,7 @@ try {
         $user = requireUser();
         requireRole($user, ['admin', 'worker', 'veterinarian']);
         $message = trim((string) ($body['message'] ?? ''));
+        $previousMessage = strtolower(trim((string) ($body['previousMessage'] ?? '')));
         if ($message === '' || strlen($message) > 2000) {
             respond(422, ['error' => 'Enter a message up to 2,000 characters.']);
         }
@@ -671,6 +672,17 @@ try {
                 "SELECT COUNT(*) FROM farm_activities WHERE status = 'planned'"
             )->fetchColumn(),
         ];
+        $recentMilk = $db->query(
+            'SELECT production_date AS date, COALESCE(SUM(quantity_litres), 0) AS litres
+             FROM milk_production
+             WHERE production_date >= CURRENT_DATE() - INTERVAL 6 DAY
+             GROUP BY production_date ORDER BY production_date ASC'
+        )->fetchAll();
+        $summary['recentMilk'] = $recentMilk;
+        $chartRequested = str_contains(strtolower($message), 'chart') && (
+            str_contains(strtolower($message), 'milk') || str_contains(strtolower($message), 'produce')
+            || str_contains($previousMessage, 'milk') || str_contains($previousMessage, 'produce')
+        );
         $apiUrl = rtrim(getenv('LFMIS_AI_API_URL') ?: '', '/');
         $apiKey = getenv('LFMIS_AI_API_KEY') ?: '';
         $model = getenv('LFMIS_AI_MODEL') ?: 'gpt-4o-mini';
@@ -695,13 +707,24 @@ try {
             $decoded = is_string($response) ? json_decode($response, true) : null;
             $reply = $decoded['choices'][0]['message']['content'] ?? null;
             if (is_string($reply) && trim($reply) !== '') {
-                respond(200, ['reply' => trim($reply), 'source' => 'model']);
+                $result = ['reply' => trim($reply), 'source' => 'model'];
+                if ($chartRequested) {
+                    $result['chart'] = ['title' => 'Milk production · last 7 days', 'unit' => 'litres', 'points' => $recentMilk];
+                }
+                respond(200, $result);
             }
             error_log('AI assistant request failed with status ' . $status . '.');
         }
 
         $lowerMessage = strtolower($message);
-        if (str_contains($lowerMessage, 'milk') || str_contains($lowerMessage, 'produce')) {
+        if ($chartRequested) {
+            $reply = 'Here is the milk production chart for the last seven recorded days.';
+            respond(200, [
+                'reply' => $reply,
+                'source' => 'local',
+                'chart' => ['title' => 'Milk production · last 7 days', 'unit' => 'litres', 'points' => $recentMilk],
+            ]);
+        } elseif (str_contains($lowerMessage, 'milk') || str_contains($lowerMessage, 'produce')) {
             $reply = "Today's recorded milk production is {$summary['milkTodayLitres']} litres and eggs are {$summary['eggsTodayTrays']} trays. I can help interpret trends once more daily records are available.";
         } elseif (str_contains($lowerMessage, 'animal') || str_contains($lowerMessage, 'livestock') || str_contains($lowerMessage, 'herd')) {
             $reply = "The farm currently has {$summary['activeAnimals']} active animals. For a health concern, record the symptoms and contact the veterinarian rather than relying on an automated diagnosis.";
