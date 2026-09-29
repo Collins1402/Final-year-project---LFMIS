@@ -50,6 +50,46 @@ function validUsername(mixed $value): ?string
     return preg_match('/^[A-Za-z0-9_.]{3,30}$/', $username) ? $username : null;
 }
 
+function appUrl(): string
+{
+    $appUrl = rtrim(getenv('LFMIS_APP_URL') ?: 'http://127.0.0.1:5173', '/');
+    $parts = parse_url($appUrl);
+    if (!is_array($parts) || !in_array($parts['scheme'] ?? '', ['http', 'https'], true) || empty($parts['host'])) {
+        throw new RuntimeException('LFMIS_APP_URL must be an HTTP or HTTPS origin.');
+    }
+    return $appUrl;
+}
+
+function verifyOwnPassword(PDO $db, int $userId, string $password): void
+{
+    $check = $db->prepare('SELECT password_hash FROM users WHERE id = ?');
+    $check->execute([$userId]);
+    if (!password_verify($password, (string) $check->fetchColumn())) {
+        respond(403, ['error' => 'Your current password is incorrect.']);
+    }
+}
+
+function openAdminInvite(PDO $db, bool $lock = false): array|false
+{
+    $statement = $db->query(
+        "SELECT i.id, i.email, i.status, i.new_role_for_current, i.expires_at, i.confirmed_at,
+                i.recipient_user_id, i.created_user, u.full_name AS recipient_name, u.username AS recipient_username
+         FROM admin_transfer_invites i LEFT JOIN users u ON u.id = i.recipient_user_id
+         WHERE i.status IN ('pending', 'confirmed') AND i.expires_at > CURRENT_TIMESTAMP
+         ORDER BY i.id DESC LIMIT 1" . ($lock ? ' FOR UPDATE' : '')
+    );
+    return $statement->fetch();
+}
+
+function closeAdminInvite(PDO $db, array $invite, string $status): void
+{
+    $db->prepare('UPDATE admin_transfer_invites SET status = ? WHERE id = ?')->execute([$status, $invite['id']]);
+    // Remove placeholder accounts that were only created to accept this invite.
+    if ($status === 'cancelled' && (int) $invite['created_user'] === 1 && $invite['recipient_user_id'] !== null) {
+        $db->prepare('DELETE FROM users WHERE id = ? AND is_active = 0')->execute([$invite['recipient_user_id']]);
+    }
+}
+
 function requireUser(): array
 {
     if (!isset($_SESSION['user']['id'])) {
@@ -189,13 +229,7 @@ try {
                 );
                 $saveToken->execute([$user['id'], $tokenHash]);
 
-                $appUrl = rtrim(getenv('LFMIS_APP_URL') ?: 'http://127.0.0.1:5173', '/');
-                $appParts = parse_url($appUrl);
-                if (!is_array($appParts) || !in_array($appParts['scheme'] ?? '', ['http', 'https'], true)
-                    || empty($appParts['host'])) {
-                    throw new RuntimeException('LFMIS_APP_URL must be an HTTP or HTTPS origin.');
-                }
-                $resetUrl = $appUrl . '/#reset_token=' . rawurlencode($token);
+                $resetUrl = appUrl() . '/#reset_token=' . rawurlencode($token);
                 $subject = 'Reset your Flouri Farm LFMIS password';
                 $message = "Hello {$user['full_name']},\n\n"
                     . "Use this link to choose a new password. It expires in 30 minutes and can only be used once:\n\n"
@@ -1433,34 +1467,148 @@ try {
         respond(200, ['ok' => true]);
     }
 
+    if ($path === '/api/admin/transfer' && $method === 'GET') {
+        $user = requireUser();
+        requireRole($user, ['admin']);
+        respond(200, ['invite' => openAdminInvite($db) ?: null]);
+    }
+
     if ($path === '/api/admin/transfer' && $method === 'POST') {
         $user = requireUser();
         requireRole($user, ['admin']);
-        $targetId = filter_var($body['userId'] ?? null, FILTER_VALIDATE_INT);
+        $email = filter_var(trim((string) ($body['email'] ?? '')), FILTER_VALIDATE_EMAIL);
         $newRole = (string) ($body['newRole'] ?? '');
-        $password = (string) ($body['password'] ?? '');
-        if (!$targetId || $targetId === $user['id'] || !in_array($newRole, ['worker', 'veterinarian', 'customer', 'buyer'], true)) {
-            respond(422, ['error' => 'Choose another active account and the role you will take after the transfer.']);
+        if ($email === false || strcasecmp($email, $user['email']) === 0
+            || !in_array($newRole, ['worker', 'veterinarian', 'customer', 'buyer'], true)) {
+            respond(422, ['error' => 'Enter the new admin\'s email (not your own) and the role you will take after the transfer.']);
         }
-        $check = $db->prepare('SELECT password_hash FROM users WHERE id = ?');
-        $check->execute([$user['id']]);
-        if (!password_verify($password, (string) $check->fetchColumn())) {
-            respond(403, ['error' => 'Your current password is incorrect.']);
-        }
+        verifyOwnPassword($db, $user['id'], (string) ($body['password'] ?? ''));
 
+        $token = bin2hex(random_bytes(32));
         $db->beginTransaction();
-        $target = $db->prepare('SELECT id FROM users WHERE id = ? AND is_active = 1 FOR UPDATE');
-        $target->execute([$targetId]);
-        if ($target->fetchColumn() === false) {
+        if ($existing = openAdminInvite($db, true)) {
+            closeAdminInvite($db, $existing, 'cancelled');
+        }
+        $insert = $db->prepare(
+            "INSERT INTO admin_transfer_invites (invited_by, email, token_hash, new_role_for_current, expires_at)
+             VALUES (?, ?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 72 HOUR))"
+        );
+        $insert->execute([$user['id'], $email, hash('sha256', $token), $newRole]);
+        audit($db, $user['id'], 'invite_admin', 'admin_transfer_invite', (int) $db->lastInsertId());
+        $db->commit();
+
+        $inviteUrl = appUrl() . '/#admin_invite=' . rawurlencode($token);
+        $emailed = sendMail(
+            $email,
+            'You have been invited to become the Flouri Farm LFMIS admin',
+            "Hello,\n\n{$user['fullName']} has invited you to take over as administrator of Flouri Farm LFMIS.\n\n"
+            . "Open this link to confirm. It expires in 72 hours:\n\n{$inviteUrl}\n\n"
+            . "After you confirm, {$user['fullName']} will verify it is you before admin access is handed over.\n"
+            . "If you were not expecting this, ignore this email.\n"
+        );
+        respond(201, ['inviteUrl' => $inviteUrl, 'emailed' => $emailed]);
+    }
+
+    if ($path === '/api/admin/transfer/cancel' && $method === 'POST') {
+        $user = requireUser();
+        requireRole($user, ['admin']);
+        $db->beginTransaction();
+        $invite = openAdminInvite($db, true);
+        if ($invite) {
+            closeAdminInvite($db, $invite, 'cancelled');
+            audit($db, $user['id'], 'cancel_admin_invite', 'admin_transfer_invite', (int) $invite['id']);
+        }
+        $db->commit();
+        respond(200, ['ok' => true]);
+    }
+
+    if ($path === '/api/admin/transfer/approve' && $method === 'POST') {
+        $user = requireUser();
+        requireRole($user, ['admin']);
+        verifyOwnPassword($db, $user['id'], (string) ($body['password'] ?? ''));
+        $db->beginTransaction();
+        $invite = openAdminInvite($db, true);
+        if (!$invite || $invite['status'] !== 'confirmed' || $invite['recipient_user_id'] === null) {
             $db->rollBack();
-            respond(404, ['error' => 'The new admin must be an existing, active account.']);
+            respond(409, ['error' => 'There is no confirmed invitation to approve.']);
         }
         $setRole = $db->prepare('UPDATE users SET role_id = (SELECT id FROM roles WHERE name = ?) WHERE id = ?');
-        $setRole->execute([$newRole, $user['id']]);
-        $setRole->execute(['admin', $targetId]);
-        audit($db, $user['id'], 'transfer_admin', 'user', $targetId);
+        $setRole->execute([$invite['new_role_for_current'], $user['id']]);
+        $setRole->execute(['admin', $invite['recipient_user_id']]);
+        $db->prepare('UPDATE users SET is_active = 1 WHERE id = ?')->execute([$invite['recipient_user_id']]);
+        closeAdminInvite($db, $invite, 'approved');
+        audit($db, $user['id'], 'transfer_admin', 'user', (int) $invite['recipient_user_id']);
         $db->commit();
         respond(200, ['user' => requireUser()]);
+    }
+
+    if ($path === '/api/admin-invite' && $method === 'GET') {
+        $token = (string) ($_GET['token'] ?? '');
+        $statement = $db->prepare(
+            "SELECT i.email, i.status, u.full_name AS invited_by,
+                    EXISTS(SELECT 1 FROM users WHERE users.email = i.email) AS has_account
+             FROM admin_transfer_invites i JOIN users u ON u.id = i.invited_by
+             WHERE i.token_hash = ? AND i.status = 'pending' AND i.expires_at > CURRENT_TIMESTAMP"
+        );
+        $statement->execute([preg_match('/^[a-f0-9]{64}$/', $token) ? hash('sha256', $token) : '']);
+        $invite = $statement->fetch();
+        if (!$invite) {
+            respond(404, ['error' => 'This invitation is invalid, has expired, or has already been used.']);
+        }
+        respond(200, ['email' => $invite['email'], 'invitedBy' => $invite['invited_by'], 'hasAccount' => (bool) $invite['has_account']]);
+    }
+
+    if ($path === '/api/admin-invite/accept' && $method === 'POST') {
+        $token = (string) ($body['token'] ?? '');
+        $password = (string) ($body['password'] ?? '');
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+            respond(404, ['error' => 'This invitation is invalid, has expired, or has already been used.']);
+        }
+        $db->beginTransaction();
+        $lookup = $db->prepare(
+            "SELECT id, email FROM admin_transfer_invites
+             WHERE token_hash = ? AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP FOR UPDATE"
+        );
+        $lookup->execute([hash('sha256', $token)]);
+        $invite = $lookup->fetch();
+        if (!$invite) {
+            $db->rollBack();
+            respond(404, ['error' => 'This invitation is invalid, has expired, or has already been used.']);
+        }
+        $existing = $db->prepare('SELECT id, password_hash FROM users WHERE email = ?');
+        $existing->execute([$invite['email']]);
+        $account = $existing->fetch();
+        $createdUser = 0;
+        if ($account) {
+            if (!password_verify($password, $account['password_hash'])) {
+                $db->rollBack();
+                respond(403, ['error' => 'That password does not match the existing account for this email.']);
+            }
+            $recipientId = (int) $account['id'];
+        } else {
+            $name = trim((string) ($body['fullName'] ?? ''));
+            $username = validUsername($body['username'] ?? '');
+            if ($name === '' || strlen($name) > 120 || $username === null || strlen($password) < 12) {
+                $db->rollBack();
+                respond(422, ['error' => 'Enter your full name, a username (3–30 letters, numbers, _ or .), and a password of at least 12 characters.']);
+            }
+            // Inactive placeholder role until the current admin approves the handover.
+            $create = $db->prepare(
+                "INSERT INTO users (role_id, full_name, username, email, password_hash, is_active)
+                 SELECT id, ?, ?, ?, ?, 0 FROM roles WHERE name = 'customer'"
+            );
+            $create->execute([$name, $username, $invite['email'], password_hash($password, PASSWORD_DEFAULT)]);
+            $recipientId = (int) $db->lastInsertId();
+            $createdUser = 1;
+        }
+        $confirm = $db->prepare(
+            "UPDATE admin_transfer_invites SET status = 'confirmed', recipient_user_id = ?, created_user = ?,
+                    confirmed_at = CURRENT_TIMESTAMP WHERE id = ?"
+        );
+        $confirm->execute([$recipientId, $createdUser, $invite['id']]);
+        audit($db, $recipientId, 'confirm_admin_invite', 'admin_transfer_invite', (int) $invite['id']);
+        $db->commit();
+        respond(200, ['message' => 'Confirmed. The current admin will now verify it is you and approve the handover. You can sign in as admin once it is approved.']);
     }
 
     respond(404, ['error' => 'Endpoint not found.']);

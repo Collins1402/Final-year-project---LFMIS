@@ -17,6 +17,23 @@ const formatMoney = (value) => new Intl.NumberFormat('en-KE', {
   style: 'currency', currency: 'KES', maximumFractionDigits: 0,
 }).format(Number(value) || 0)
 
+const aboutSection = `
+  <section class="about-panel" aria-labelledby="about-title">
+    <p class="eyebrow">About us</p>
+    <h2 id="about-title">Flouri Farm</h2>
+    <p>Flouri Farm is a mixed livestock farm raising dairy cattle, goats, sheep, rabbits and chickens, and producing fresh milk, eggs and wool.</p>
+    <p>This Livestock Farm Management Information System (LFMIS) replaces paper notebooks with one simple, shared record of animal health, daily produce, stock and sales, so the farm can care for its animals better and serve customers reliably.</p>
+    <ul class="about-list">
+      <li>Buy fresh milk, eggs and wool directly from the farm</li>
+      <li>Purchase healthy livestock with up-to-date availability</li>
+      <li>Track your orders online</li>
+    </ul>
+    <div class="about-contact">
+      <div><span>Location</span><strong>Nairobi, Kenya</strong></div>
+      <div><span>Phone</span><strong><a href="tel:+254701004028">0701 004 028</a></strong></div>
+    </div>
+  </section>`
+
 const usernameInput = '<input name="username" autocomplete="username" required minlength="3" maxlength="30" pattern="[A-Za-z0-9_.]{3,30}" title="3–30 letters, numbers, underscores or dots">'
 
 const eyeIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>'
@@ -54,7 +71,7 @@ function showMessage(element, message, isError = false) {
 function renderAuth(mode, notice = '') {
   const setup = mode === 'setup'
   root.innerHTML = `
-    <main class="auth-shell"><section class="auth-panel" aria-labelledby="auth-title">
+    <main class="auth-shell"><div class="${setup ? '' : 'auth-layout'}"><section class="auth-panel" aria-labelledby="auth-title">
       <div class="brand auth-brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div>
       <p class="eyebrow">${setup ? 'Initial setup' : 'Farm workspace'}</p>
       <h1 id="auth-title">${setup ? 'Create the farm owner account' : 'Welcome back'}</h1>
@@ -66,7 +83,7 @@ function renderAuth(mode, notice = '') {
         <button class="primary-button" type="submit">${setup ? 'Create account' : 'Sign in'}</button>
       </form>
       ${setup ? '' : '<button class="text-link" type="button" id="forgot-password">Forgot password?</button><p class="auth-switch">New to Flouri Farm? <button class="text-link" type="button" id="open-register">Create an account</button></p>'}
-    </section></main>`
+    </section>${setup ? '' : aboutSection}</div></main>`
 
   const form = root.querySelector('#auth-form')
   root.querySelector('#forgot-password')?.addEventListener('click', renderForgotPassword)
@@ -587,9 +604,9 @@ async function renderSalesOrders(user) {
 
 async function renderUsers(user) {
   const roleOptions = '<option value="worker">Farm worker</option><option value="veterinarian">Veterinarian</option><option value="customer">Customer (produce)</option><option value="buyer">Livestock buyer</option>'
-  shell(user, 'User accounts', `<section class="welcome-row"><div><p class="eyebrow">Access control</p><h1>User accounts</h1><p class="intro">Create accounts, approve staff sign-ups, and manage the single admin role.</p></div></section><form id="user-form" class="entry-form"><label>Full name<input name="fullName" required maxlength="120"></label><label>Username${usernameInput}</label><label>Email<input name="email" type="email" required maxlength="190"></label><label>Password<input name="password" type="password" required minlength="12"></label><label>User type<select name="role">${roleOptions}</select></label><button class="primary-button" type="submit">Create account</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>User type</th><th>Status</th><th></th></tr></thead><tbody id="user-rows"><tr><td colspan="6">Loading accounts…</td></tr></tbody></table></div><h2 class="section-title">Your username</h2><form id="username-form" class="entry-form"><label>Username${usernameInput}</label><button class="primary-button" type="submit">Save username</button><p class="form-message" role="alert" hidden></p></form><h2 class="section-title">Transfer admin</h2><p class="intro">The farm has one administrator. Handing over admin rights makes the chosen person the admin and changes your account to the user type you pick.</p><form id="transfer-form" class="entry-form"><label>New admin<select name="userId" required><option value="">Choose an active account</option></select></label><label>Your user type afterwards<select name="newRole" required>${roleOptions}</select></label><label>Your current password<input name="password" type="password" required autocomplete="current-password"></label><button class="primary-button danger-button" type="submit">Transfer admin rights</button><p class="form-message" role="alert" hidden></p></form>`)
+  shell(user, 'User accounts', `<section class="welcome-row"><div><p class="eyebrow">Access control</p><h1>User accounts</h1><p class="intro">Create accounts, approve staff sign-ups, and manage the single admin role.</p></div></section><form id="user-form" class="entry-form"><label>Full name<input name="fullName" required maxlength="120"></label><label>Username${usernameInput}</label><label>Email<input name="email" type="email" required maxlength="190"></label><label>Password<input name="password" type="password" required minlength="12"></label><label>User type<select name="role">${roleOptions}</select></label><button class="primary-button" type="submit">Create account</button><p class="form-message" role="alert" hidden></p></form><p class="page-error" id="page-error" role="alert" hidden></p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>User type</th><th>Status</th><th></th></tr></thead><tbody id="user-rows"><tr><td colspan="6">Loading accounts…</td></tr></tbody></table></div><h2 class="section-title">Your username</h2><form id="username-form" class="entry-form"><label>Username${usernameInput}</label><button class="primary-button" type="submit">Save username</button><p class="form-message" role="alert" hidden></p></form><h2 class="section-title">Transfer admin</h2><div id="transfer-panel" class="transfer-panel"><p class="empty-state">Loading…</p></div>`)
   const form = root.querySelector('#user-form')
-  const transferForm = root.querySelector('#transfer-form')
+  const transferPanel = root.querySelector('#transfer-panel')
   const usernameForm = root.querySelector('#username-form')
   usernameForm.addEventListener('submit', async (event) => {
     event.preventDefault()
@@ -612,11 +629,49 @@ async function renderUsers(user) {
         : `<button class="small-action" data-user-id="${escapeHtml(account.id)}" data-active="${active ? 'false' : 'true'}">${active ? 'Deactivate' : 'Approve'}</button>`
       return `<tr><td>${escapeHtml(account.full_name)}${self ? ' (you)' : ''}</td><td>${escapeHtml(account.username || '—')}</td><td>${escapeHtml(account.email)}</td><td>${escapeHtml(roleNames[account.role] || account.role)}</td><td>${active ? 'Active' : 'Awaiting approval / inactive'}</td><td>${action}</td></tr>`
     }).join('')
-    transferForm.querySelector('[name="userId"]').innerHTML = '<option value="">Choose an active account</option>' + users
-      .filter((account) => Number(account.is_active) === 1 && Number(account.id) !== Number(user.id))
-      .map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(account.full_name)} · ${escapeHtml(roleNames[account.role] || account.role)}</option>`).join('')
   }
-  try { await refresh() } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
+  async function refreshTransfer(shareUrl = '', emailed = null) {
+    const { invite } = await api.adminTransfer()
+    const shareBlock = shareUrl
+      ? `<div class="invite-link"><p>${emailed ? 'The invitation was emailed.' : 'Email could not be sent (SMTP not configured), so share this link yourself.'} The link is shown only once and expires in 72 hours.</p><input readonly value="${escapeHtml(shareUrl)}" aria-label="Invitation link"><div class="invite-actions"><button class="small-action" type="button" id="copy-invite">Copy link</button><a class="csv-link" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`You have been invited to become the Flouri Farm LFMIS admin. Confirm here: ${shareUrl}`)}">Share on WhatsApp</a></div></div>`
+      : ''
+    if (!invite) {
+      transferPanel.innerHTML = `<p class="intro">Invite anyone — a farm member or someone new — by email. They confirm through a secure link, then you verify it is the right person and approve. Admin access only changes after your approval.</p><form id="invite-form" class="entry-form"><label>New admin's email<input name="email" type="email" required maxlength="190"></label><label>Your user type afterwards<select name="newRole" required>${roleOptions}</select></label><label>Your current password<input name="password" type="password" required autocomplete="current-password"></label><button class="primary-button" type="submit">Send invitation</button><p class="form-message" role="alert" hidden></p></form>`
+      const inviteForm = transferPanel.querySelector('#invite-form')
+      inviteForm.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        try {
+          const result = await api.inviteAdmin(Object.fromEntries(new FormData(inviteForm)))
+          await refreshTransfer(result.inviteUrl, result.emailed)
+        } catch (error) { showMessage(inviteForm.querySelector('.form-message'), error.message, true) }
+      })
+      return
+    }
+    if (invite.status === 'pending') {
+      transferPanel.innerHTML = `<div class="invite-status"><p class="eyebrow">Step 2 of 3 · waiting for confirmation</p><p>Invitation sent to <strong>${escapeHtml(invite.email)}</strong>. Expires ${escapeHtml(invite.expires_at)}.</p>${shareBlock}<button class="text-link" type="button" id="cancel-invite">Cancel invitation</button></div>`
+    } else {
+      transferPanel.innerHTML = `<div class="invite-status"><p class="eyebrow">Step 3 of 3 · your approval</p><p>The invitation was confirmed on ${escapeHtml(invite.confirmed_at)} by:</p><dl class="invite-details"><dt>Name</dt><dd>${escapeHtml(invite.recipient_name || '—')}</dd><dt>Username</dt><dd>${escapeHtml(invite.recipient_username || '—')}</dd><dt>Email</dt><dd>${escapeHtml(invite.email)}</dd><dt>You become</dt><dd>${escapeHtml(roleNames[invite.new_role_for_current] || invite.new_role_for_current)}</dd></dl><p>Check with them directly that these details are theirs before approving.</p><form id="approve-form" class="entry-form"><label>Your current password<input name="password" type="password" required autocomplete="current-password"></label><button class="primary-button danger-button" type="submit">Approve and hand over admin</button><p class="form-message" role="alert" hidden></p></form><button class="text-link" type="button" id="cancel-invite">Not the right person — reject</button></div>`
+      const approveForm = transferPanel.querySelector('#approve-form')
+      approveForm.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        if (!window.confirm(`Hand over admin to ${invite.recipient_name}? You will lose admin access immediately.`)) return
+        try {
+          const result = await api.approveAdminTransfer(Object.fromEntries(new FormData(approveForm)))
+          renderHome(result.user)
+        } catch (error) { showMessage(approveForm.querySelector('.form-message'), error.message, true) }
+      })
+    }
+    transferPanel.querySelector('#copy-invite')?.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(shareUrl)
+      toast('Invitation link copied')
+    })
+    transferPanel.querySelector('#cancel-invite').addEventListener('click', async () => {
+      if (!window.confirm('Cancel this admin invitation?')) return
+      try { await api.cancelAdminInvite(); toast('Invitation cancelled'); await refreshTransfer() }
+      catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
+    })
+  }
+  try { await Promise.all([refresh(), refreshTransfer()]) } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
@@ -635,15 +690,33 @@ async function renderUsers(user) {
       await refresh()
     } catch (error) { showMessage(root.querySelector('#page-error'), error.message, true) }
   })
-  transferForm.addEventListener('submit', async (event) => {
+}
+
+async function renderAdminInvite(token) {
+  root.innerHTML = '<main class="auth-shell"><section class="auth-panel" aria-labelledby="invite-title"><div class="brand auth-brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div><p class="eyebrow">Admin handover</p><h1 id="invite-title">Confirm admin invitation</h1><div id="invite-body"><p class="intro">Checking invitation…</p></div><button class="text-link" type="button" id="back-to-login">Go to sign in</button></section></main>'
+  root.querySelector('#back-to-login').addEventListener('click', () => renderAuth('login'))
+  const body = root.querySelector('#invite-body')
+  let invite
+  try { invite = await api.adminInvite(token) } catch (error) {
+    body.innerHTML = `<p class="form-message">${escapeHtml(error.message)}</p>`
+    return
+  }
+  const fields = invite.hasAccount
+    ? '<p class="intro">An account already exists for this email. Enter its password to confirm it is you.</p><label>Password<input type="password" name="password" autocomplete="current-password" required></label>'
+    : `<p class="intro">Create your account to accept. It stays inactive until the current admin approves the handover.</p><label>Full name<input name="fullName" autocomplete="name" required maxlength="120"></label><label>Username${usernameInput}</label><label>Password<input type="password" name="password" autocomplete="new-password" minlength="12" required></label>`
+  body.innerHTML = `<p class="intro"><strong>${escapeHtml(invite.invitedBy)}</strong> invited <strong>${escapeHtml(invite.email)}</strong> to become the farm administrator.</p><form id="invite-accept-form" class="form-stack">${fields}<p class="form-message" role="alert" hidden></p><button class="primary-button" type="submit">Confirm invitation</button></form>`
+  const form = body.querySelector('#invite-accept-form')
+  form.addEventListener('submit', async (event) => {
     event.preventDefault()
-    const data = Object.fromEntries(new FormData(transferForm))
-    const target = transferForm.querySelector('[name="userId"]').selectedOptions[0]?.textContent
-    if (!window.confirm(`Make ${target} the farm admin? You will lose admin access immediately.`)) return
+    const button = form.querySelector('button[type="submit"]')
+    button.disabled = true
     try {
-      const result = await api.transferAdmin({ ...data, userId: Number(data.userId) })
-      renderHome(result.user)
-    } catch (error) { showMessage(transferForm.querySelector('.form-message'), error.message, true) }
+      const result = await api.acceptAdminInvite({ ...Object.fromEntries(new FormData(form)), token })
+      body.innerHTML = `<p class="form-message success">${escapeHtml(result.message)}</p>`
+    } catch (error) {
+      showMessage(form.querySelector('.form-message'), error.message, true)
+      button.disabled = false
+    }
   })
 }
 
@@ -840,6 +913,12 @@ function renderHome(user) {
 async function start() {
   root.innerHTML = '<main class="auth-shell"><p class="intro">Connecting to the farm database…</p></main>'
   const resetToken = new URLSearchParams(window.location.hash.slice(1)).get('reset_token')
+  const inviteToken = new URLSearchParams(window.location.hash.slice(1)).get('admin_invite')
+  if (inviteToken) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    renderAdminInvite(inviteToken)
+    return
+  }
   if (resetToken) {
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
     renderResetPassword(resetToken)

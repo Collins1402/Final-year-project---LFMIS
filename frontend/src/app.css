@@ -46,6 +46,27 @@ td { color:#58655d; }
 .header-logout { min-width:34px; height:34px; padding:0 10px; border:1px solid var(--line); border-radius:6px; color:var(--green); background:white; font-size:12px; font-weight:700; cursor:pointer; }
 .auth-switch { margin:14px 0 0; color:#78847c; font-size:12px; }
 .danger-button { background:#b4533c !important; }
+.auth-layout { display:grid; grid-template-columns:minmax(0,440px) minmax(0,420px); gap:24px; align-items:stretch; }
+.about-panel { display:grid; align-content:start; gap:12px; padding:34px; background:#2f5e45; color:#e8f0ea; border-radius:10px; }
+.about-panel .eyebrow { margin:0; color:#b9d3c1; }
+.about-panel h2 { margin:0; color:white; font:700 24px Manrope,sans-serif; }
+.about-panel p { margin:0; font-size:13px; line-height:1.6; }
+.about-list { margin:4px 0; padding-left:18px; display:grid; gap:6px; font-size:13px; }
+.about-contact { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:8px; padding-top:16px; border-top:1px solid rgba(255,255,255,.18); }
+.about-contact div { display:grid; gap:4px; }
+.about-contact span { color:#b9d3c1; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.about-contact strong,.about-contact a { color:white; font-size:14px; text-decoration:none; }
+@media (max-width:900px) { .auth-layout { grid-template-columns:1fr; max-width:460px; } }
+.transfer-panel { margin-bottom:24px; }
+.invite-status { display:grid; gap:10px; padding:18px 20px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
+.invite-status .eyebrow { margin:0; }
+.invite-status p { margin:0; color:#4f5d54; font-size:13px; }
+.invite-link { display:grid; gap:8px; padding:12px; background:#f8faf7; border:1px dashed var(--line); border-radius:6px; }
+.invite-link input { width:100%; min-height:34px; padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:11px; }
+.invite-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.invite-details { display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; margin:0; font-size:13px; }
+.invite-details dt { color:#78847c; }
+.invite-details dd { margin:0; color:#29372f; font-weight:700; }
 .password-field { position:relative; display:block; }
 .password-field input { width:100%; padding-right:40px !important; }
 .password-toggle { position:absolute; top:50%; right:6px; transform:translateY(-50%); display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:4px; color:#78847c; background:transparent; cursor:pointer; }

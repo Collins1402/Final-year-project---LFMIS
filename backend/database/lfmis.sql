@@ -31,6 +31,23 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS admin_transfer_invites (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  invited_by BIGINT UNSIGNED NOT NULL,
+  email VARCHAR(190) NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  new_role_for_current VARCHAR(40) NOT NULL,
+  status ENUM('pending', 'confirmed', 'approved', 'cancelled') NOT NULL DEFAULT 'pending',
+  recipient_user_id BIGINT UNSIGNED NULL,
+  created_user TINYINT(1) NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  confirmed_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_admin_invites_status (status, expires_at),
+  CONSTRAINT fk_admin_invites_by FOREIGN KEY (invited_by) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_admin_invites_recipient FOREIGN KEY (recipient_user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS animals (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   tag_number VARCHAR(80) NULL UNIQUE,
