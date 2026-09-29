@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Sheep">
+  <circle cx="50" cy="50" r="50" fill="#e4eef3"/>
+  <g fill="#ffffff" stroke="#d6dde1" stroke-width="1.5">
+    <circle cx="30" cy="34" r="12"/><circle cx="50" cy="26" r="13"/><circle cx="70" cy="34" r="12"/>
+    <circle cx="24" cy="54" r="11"/><circle cx="76" cy="54" r="11"/>
+    <circle cx="32" cy="72" r="11"/><circle cx="68" cy="72" r="11"/><circle cx="50" cy="78" r="11"/>
+  </g>
+  <ellipse cx="25" cy="50" rx="10" ry="5" fill="#4a4540" transform="rotate(-25 25 50)"/>
+  <ellipse cx="75" cy="50" rx="10" ry="5" fill="#4a4540" transform="rotate(25 75 50)"/>
+  <ellipse cx="50" cy="55" rx="16" ry="20" fill="#4a4540"/>
+  <circle cx="50" cy="36" r="9" fill="#fff" stroke="#d6dde1" stroke-width="1.5"/>
+  <circle cx="43" cy="52" r="3.4" fill="#fff"/><circle cx="43.5" cy="52.5" r="1.8" fill="#1d1a17"/>
+  <circle cx="57" cy="52" r="3.4" fill="#fff"/><circle cx="56.5" cy="52.5" r="1.8" fill="#1d1a17"/>
+  <ellipse cx="46" cy="65" rx="1.6" ry="2.2" fill="#1d1a17"/>
+  <ellipse cx="54" cy="65" rx="1.6" ry="2.2" fill="#1d1a17"/>
+</svg>

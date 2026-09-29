@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Rabbit">
+  <circle cx="50" cy="50" r="50" fill="#efe8f3"/>
+  <ellipse cx="38" cy="24" rx="7" ry="20" fill="#cfc7cf" transform="rotate(-8 38 24)"/>
+  <ellipse cx="62" cy="24" rx="7" ry="20" fill="#cfc7cf" transform="rotate(8 62 24)"/>
+  <ellipse cx="38" cy="25" rx="3.5" ry="14" fill="#f3bfc7" transform="rotate(-8 38 25)"/>
+  <ellipse cx="62" cy="25" rx="3.5" ry="14" fill="#f3bfc7" transform="rotate(8 62 25)"/>
+  <ellipse cx="50" cy="60" rx="24" ry="22" fill="#dcd5dc"/>
+  <circle cx="41" cy="55" r="3.2" fill="#2a2330"/>
+  <circle cx="59" cy="55" r="3.2" fill="#2a2330"/>
+  <path d="M46 64 L54 64 L50 68 Z" fill="#e58a9a"/>
+  <path d="M50 68 v4 M50 72 q-4 3 -7 0 M50 72 q4 3 7 0" stroke="#7a6f7a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M30 64 h-12 M30 68 h-11 M70 64 h12 M70 68 h11" stroke="#9b929b" stroke-width="1.4" stroke-linecap="round"/>
+  <circle cx="36" cy="66" r="4" fill="#f3bfc7" opacity=".6"/>
+  <circle cx="64" cy="66" r="4" fill="#f3bfc7" opacity=".6"/>
+</svg>

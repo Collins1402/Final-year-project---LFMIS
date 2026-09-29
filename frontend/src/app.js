@@ -21,6 +21,9 @@ const aboutSection = `
   <section class="about-panel" aria-labelledby="about-title">
     <p class="eyebrow">About us</p>
     <h2 id="about-title">Flouri Farm</h2>
+    <div class="about-animals">
+      ${[['cow', 'Cattle'], ['goat', 'Goats'], ['sheep', 'Sheep'], ['chicken', 'Chickens'], ['rabbit', 'Rabbits']].map(([file, label]) => `<figure><img src="/animals/${file}.svg" alt="" width="64" height="64"><figcaption>${label}</figcaption></figure>`).join('')}
+    </div>
     <p>Flouri Farm is a mixed livestock farm raising dairy cattle, goats, sheep, rabbits and chickens, and producing fresh milk, eggs and wool.</p>
     <p>This Livestock Farm Management Information System (LFMIS) replaces paper notebooks with one simple, shared record of animal health, daily produce, stock and sales, so the farm can care for its animals better and serve customers reliably.</p>
     <ul class="about-list">

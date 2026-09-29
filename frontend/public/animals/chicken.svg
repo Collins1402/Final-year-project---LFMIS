@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Chicken">
+  <circle cx="50" cy="50" r="50" fill="#fbf0dc"/>
+  <path d="M40 22 q2 -10 8 -4 q4 -9 9 0 q6 -6 7 5 q-12 4 -24 -1z" fill="#d9483b"/>
+  <ellipse cx="50" cy="52" rx="24" ry="28" fill="#fff" stroke="#e6d6bf" stroke-width="2"/>
+  <path d="M28 60 q-8 6 -4 16 q10 -2 14 -10z" fill="#f1e6d4"/>
+  <path d="M72 60 q8 6 4 16 q-10 -2 -14 -10z" fill="#f1e6d4"/>
+  <circle cx="42" cy="44" r="3.2" fill="#2a2320"/>
+  <circle cx="58" cy="44" r="3.2" fill="#2a2320"/>
+  <path d="M44 52 L56 52 L50 62 Z" fill="#f2a93b"/>
+  <path d="M47 62 q3 9 6 0z" fill="#d9483b"/>
+  <path d="M42 80 v8 M38 88 h8 M58 80 v8 M54 88 h8" stroke="#f2a93b" stroke-width="3" stroke-linecap="round"/>
+</svg>

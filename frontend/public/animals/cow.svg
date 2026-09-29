@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Cow">
+  <circle cx="50" cy="50" r="50" fill="#e7f1e2"/>
+  <path d="M34 30 Q27 17 37 13" stroke="#d8c39a" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M66 30 Q73 17 63 13" stroke="#d8c39a" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <ellipse cx="22" cy="42" rx="13" ry="6.5" fill="#fff" stroke="#3a3a3a" stroke-width="2" transform="rotate(-20 22 42)"/>
+  <ellipse cx="78" cy="42" rx="13" ry="6.5" fill="#fff" stroke="#3a3a3a" stroke-width="2" transform="rotate(20 78 42)"/>
+  <ellipse cx="50" cy="50" rx="22" ry="26" fill="#fff" stroke="#3a3a3a" stroke-width="2"/>
+  <path d="M33 36 q7 -9 16 -2 q-1 11 -12 10 q-5 -2 -4 -8z" fill="#3a3a3a"/>
+  <path d="M60 28 q9 1 10 10 q-7 3 -11 -3z" fill="#3a3a3a"/>
+  <circle cx="42" cy="48" r="3.2" fill="#222"/>
+  <circle cx="58" cy="48" r="3.2" fill="#222"/>
+  <ellipse cx="50" cy="66" rx="17" ry="11" fill="#f4b8b0" stroke="#3a3a3a" stroke-width="2"/>
+  <ellipse cx="44" cy="66" rx="2.4" ry="3.4" fill="#a45f57"/>
+  <ellipse cx="56" cy="66" rx="2.4" ry="3.4" fill="#a45f57"/>
+</svg>
