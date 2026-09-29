@@ -364,6 +364,7 @@ function toast(message) {
 async function renderDashboard(user) {
   shell(user, 'Overview', `<section class="welcome-row"><div><p class="eyebrow">Farm overview</p><h1>Welcome, <span id="welcome-name"></span></h1><p class="intro">Live figures from your farm records.</p></div><div class="welcome-actions"><button class="primary-button" id="add-animal"><span>＋</span> Register animal</button>${user.role === 'admin' ? '<button class="text-button" id="load-demo-data">Load demo records</button>' : ''}</div></section><p class="page-error" id="page-error" role="alert" hidden></p><section class="stat-grid" aria-label="Farm summary"><article class="stat-card"><div class="stat-top"><span class="stat-icon green">♧</span></div><p>Active livestock</p><strong id="stat-animals">—</strong><small>From registered animal records</small></article><article class="stat-card"><div class="stat-top"><span class="stat-icon amber">◌</span></div><p>Today\'s milk</p><strong><span id="stat-milk">—</span> <em>litres</em></strong><small>Recorded for today</small></article><article class="stat-card"><div class="stat-top"><span class="stat-icon blue">▣</span></div><p>Monthly sales</p><strong id="stat-sales">—</strong><small>Recorded sales</small></article><article class="stat-card"><div class="stat-top"><span class="stat-icon coral">!</span></div><p>Open tasks</p><strong id="stat-tasks">—</strong><small>Planned tasks due</small></article></section><section class="content-grid"><article class="panel"><div class="panel-heading"><div><p class="eyebrow">Livestock inventory</p><h2>Herd overview</h2></div><button class="text-button" data-section="Livestock">View records →</button></div><div class="herd-list" id="herd-list"><p class="empty-state">Loading farm records…</p></div></article><article class="panel alerts-panel"><div class="panel-heading"><div><p class="eyebrow">Needs attention</p><h2>Stock alerts</h2></div><span class="alert-count" id="alert-count">0</span></div><div class="alert-list" id="stock-alerts"><p class="empty-state">Loading stock levels…</p></div></article></section>`)
   root.querySelector('.welcome-row').insertAdjacentHTML('afterend', '<section class="weekly-strip" aria-label="Last seven days production"><div><span>Milk · last 7 days</span><strong id="week-milk">—</strong><small>litres recorded</small></div><div><span>Eggs · last 7 days</span><strong id="week-eggs">—</strong><small>trays recorded</small></div><div><span>Wool · last 7 days</span><strong id="week-wool">—</strong><small>kg recorded</small></div></section>')
+  root.querySelector('.weekly-strip').insertAdjacentHTML('afterend', '<section class="insight-grid"><article class="panel predictive-panel"><div class="panel-heading"><div><p class="eyebrow">Predictive AI</p><h2>What to check next</h2></div><span class="signal-badge">Decision support</span></div><p id="insight-summary" class="insight-summary">Inspecting production and farm signals…</p><div id="prediction-checks" class="prediction-checks"><p class="empty-state">Loading predictive checks…</p></div></article><article class="panel trend-panel"><div class="panel-heading"><div><p class="eyebrow">Production signal</p><h2>Milk trend</h2></div><span class="chart-key"><i></i>litres</span></div><div id="milk-trend-chart" class="line-chart"><p class="empty-state">Loading trend…</p></div></article><article class="panel composition-panel"><div class="panel-heading"><div><p class="eyebrow">Herd mix</p><h2>Active animals</h2></div></div><div id="herd-composition" class="herd-composition"><p class="empty-state">Loading herd mix…</p></div></article></section>')
   root.querySelector('#welcome-name').textContent = user.fullName.split(/\s+/)[0]
   root.querySelector('#add-animal').addEventListener('click', () => navigate(user, 'Livestock'))
   root.querySelector('#load-demo-data')?.addEventListener('click', async (event) => {
@@ -397,6 +398,33 @@ async function renderDashboard(user) {
       : '<p class="empty-state">No items are below their reorder level.</p>'
   } catch (error) {
     showMessage(root.querySelector('#page-error'), error.message, true)
+  }
+  try {
+    const insights = await api.predictiveChecks()
+    root.querySelector('#insight-summary').textContent = insights.summary
+    root.querySelector('#prediction-checks').innerHTML = insights.checks.map((check) => `<article class="prediction-check ${escapeHtml(check.priority)}"><div><span class="priority-dot"></span><strong>${escapeHtml(check.title)}</strong></div><p>${escapeHtml(check.detail)}</p><small>${escapeHtml(check.action)}</small></article>`).join('')
+    const trend = insights.trend || []
+    if (trend.length > 1) {
+      const values = trend.map((item) => Number(item.litres))
+      const min = Math.min(...values)
+      const max = Math.max(...values)
+      const range = max - min || 1
+      const points = values.map((value, index) => `${(index / (values.length - 1)) * 100},${92 - ((value - min) / range) * 76}`).join(' ')
+      root.querySelector('#milk-trend-chart').innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Milk production trend"><line x1="0" y1="92" x2="100" y2="92"></line><polyline points="${points}"></polyline>${values.map((value, index) => `<circle cx="${(index / (values.length - 1)) * 100}" cy="${92 - ((value - min) / range) * 76}" r="1.7"><title>${escapeHtml(trend[index].date)}: ${escapeHtml(value)} litres</title></circle>`).join('')}</svg><div class="chart-axis"><span>${escapeHtml(trend[0].date)}</span><span>${escapeHtml(trend[trend.length - 1].date)}</span></div>`
+    } else {
+      root.querySelector('#milk-trend-chart').innerHTML = '<p class="empty-state">More records are needed for a trend line.</p>'
+    }
+    const totalAnimals = data.herdBySpecies.reduce((sum, item) => sum + Number(item.total), 0)
+    const palette = ['#e07a5f', '#3d7ea6', '#d9a441', '#6b5ca5', '#4f9a63', '#8b6f47']
+    let angle = 0
+    const slices = data.herdBySpecies.map((item, index) => {
+      const start = angle
+      angle += totalAnimals ? (Number(item.total) / totalAnimals) * 360 : 0
+      return `${palette[index % palette.length]} ${start}deg ${angle}deg`
+    }).join(', ')
+    root.querySelector('#herd-composition').innerHTML = totalAnimals ? `<div class="pie-chart" style="background:conic-gradient(${slices})"><span>${totalAnimals}<small>active</small></span></div><div class="pie-legend">${data.herdBySpecies.map((item, index) => `<span><i style="background:${palette[index % palette.length]}"></i>${escapeHtml(item.species)} <b>${escapeHtml(item.total)}</b></span>`).join('')}</div>` : '<p class="empty-state">No active animals yet.</p>'
+  } catch (error) {
+    root.querySelector('#insight-summary').textContent = error.message
   }
 }
 
@@ -548,13 +576,38 @@ async function renderReports(user) {
 }
 
 async function renderAssistant(user) {
-  shell(user, 'Old Mark Donald', `<section class="welcome-row"><div><p class="eyebrow">Farm intelligence</p><h1>Old Mark Donald</h1><p class="intro">A practical assistant for your daily farm decisions.</p></div></section><section class="panel assistant-panel"><div class="assistant-intro"><span class="assistant-mark">✦</span><div><h2>Ask about the farm</h2><p>Use plain language to ask about production, livestock records, or planned work.</p></div></div><div id="assistant-messages" class="assistant-messages" aria-live="polite"><div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>Hello. I can help you make sense of the farm records. What would you like to check?</p></div></div><form id="assistant-form" class="assistant-form"><label class="sr-only" for="assistant-input">Message Old Mark Donald</label><textarea id="assistant-input" maxlength="2000" rows="2" placeholder="Ask about today\'s milk, active animals, or open tasks..." required></textarea><button class="primary-button" type="submit">Send <span>→</span></button></form><p id="assistant-status" class="assistant-note">For animal illness, use this as decision support and contact the veterinarian.</p></section>`)
+  shell(user, 'Old Mark Donald', `<section class="welcome-row"><div><p class="eyebrow">Farm intelligence</p><h1>Old Mark Donald</h1><p class="intro">A practical assistant for your daily farm decisions.</p></div></section><section class="panel assistant-panel"><div class="assistant-intro"><span class="assistant-mark">✦</span><div><h2>Ask about the farm</h2><p>Use plain language to ask about production, livestock records, or planned work.</p></div></div><div id="assistant-messages" class="assistant-messages" aria-live="polite"><div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>Hello. I can help you make sense of the farm records. What would you like to check?</p></div></div><form id="assistant-form" class="assistant-form"><label class="sr-only" for="assistant-input">Message Old Mark Donald</label><textarea id="assistant-input" maxlength="2000" rows="2" placeholder="Ask about today\'s milk, active animals, or open tasks..." required></textarea><button class="primary-button" type="submit">Send <span>→</span></button></form><p id="assistant-suggestion" class="assistant-suggestion" aria-live="polite"></p><p id="assistant-status" class="assistant-note">For animal illness, use this as decision support and contact the veterinarian.</p></section>`)
   const messages = root.querySelector('#assistant-messages')
   const form = root.querySelector('#assistant-form')
   const input = root.querySelector('#assistant-input')
   const status = root.querySelector('#assistant-status')
+  const suggestionHint = root.querySelector('#assistant-suggestion')
   let previousMessage = ''
+  let suggestion = ''
+  let suggestionRequest = 0
+  input.addEventListener('input', () => {
+    const prefix = input.value.trim()
+    suggestion = ''
+    suggestionHint.textContent = ''
+    if (!prefix) return
+    const requestId = ++suggestionRequest
+    window.setTimeout(async () => {
+      try {
+        const response = await api.assistantSuggest({ prefix })
+        if (requestId !== suggestionRequest || input.value.trim() !== prefix) return
+        suggestion = response.suggestion || ''
+        suggestionHint.textContent = suggestion ? `Tab to accept: ${prefix}${suggestion}` : ''
+      } catch {}
+    }, 220)
+  })
   input.addEventListener('keydown', (event) => {
+    if (event.key === 'Tab' && suggestion) {
+      event.preventDefault()
+      input.value = `${input.value}${suggestion}`
+      suggestion = ''
+      suggestionHint.textContent = ''
+      return
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       form.requestSubmit()
@@ -566,6 +619,8 @@ async function renderAssistant(user) {
     if (!message) return
     messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-user"><strong>You</strong><p>${escapeHtml(message)}</p></div>`)
     input.value = ''
+    suggestion = ''
+    suggestionHint.textContent = ''
     input.disabled = true
     form.querySelector('button').disabled = true
     status.textContent = 'Old Mark Donald is thinking…'

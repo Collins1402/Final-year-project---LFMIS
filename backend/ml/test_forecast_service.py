@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, timedelta
 
-from forecast_service import forecast_production
+from forecast_service import forecast_production, predictive_checks
 
 
 class ForecastProductionTests(unittest.TestCase):
@@ -29,6 +29,20 @@ class ForecastProductionTests(unittest.TestCase):
         self.observations[10]["date"] = "2026-01-12"
         with self.assertRaisesRegex(ValueError, "without gaps"):
             forecast_production(self.observations)
+
+    def test_predictive_checks_prioritize_production_drop_and_signals(self) -> None:
+        observations = [
+            {"date": (date(2026, 2, 1) + timedelta(days=day)).isoformat(), "litres": 120 if day < 7 else 80}
+            for day in range(14)
+        ]
+
+        result = predictive_checks(observations, {"openTasks": 2, "stockAlerts": 1})
+        titles = {check["title"] for check in result["checks"]}
+
+        self.assertIn("Investigate the milk production drop", titles)
+        self.assertIn("Review planned farm activities", titles)
+        self.assertIn("Check low inventory", titles)
+        self.assertEqual(len(result["trend"]), 14)
 
 
 if __name__ == "__main__":

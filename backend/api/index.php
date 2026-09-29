@@ -597,6 +597,51 @@ try {
         respond($status ?: 502, $forecast);
     }
 
+    if ($method === 'GET' && $path === '/api/predictive-checks') {
+        $user = requireUser();
+        requireRole($user, ['admin', 'worker', 'veterinarian']);
+        $observations = $db->query(
+            'SELECT production_date AS date, SUM(quantity_litres) AS litres
+             FROM milk_production
+             WHERE production_date >= CURRENT_DATE() - INTERVAL 120 DAY
+             GROUP BY production_date
+             ORDER BY production_date ASC'
+        )->fetchAll();
+        $signals = [
+            'openTasks' => (int) $db->query(
+                "SELECT COUNT(*) FROM farm_activities WHERE status = 'planned' AND DATE(activity_at) <= CURRENT_DATE()"
+            )->fetchColumn(),
+            'stockAlerts' => (int) $db->query(
+                'SELECT COUNT(*) FROM inventory_items WHERE quantity_on_hand <= reorder_level'
+            )->fetchColumn(),
+            'healthDue' => (int) $db->query(
+                "SELECT COUNT(*) FROM health_records WHERE next_due_at IS NOT NULL AND next_due_at <= CURRENT_TIMESTAMP"
+            )->fetchColumn(),
+        ];
+        $curl = curl_init('http://127.0.0.1:5000/insights');
+        curl_setopt_array($curl, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode(['observations' => $observations, 'signals' => $signals]),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 2,
+            CURLOPT_TIMEOUT => 5,
+        ]);
+        $response = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $curlError = curl_error($curl);
+        curl_close($curl);
+        if ($response === false) {
+            error_log($curlError);
+            respond(503, ['error' => 'The predictive check service is unavailable.']);
+        }
+        $insights = json_decode($response, true);
+        if (!is_array($insights)) {
+            respond(502, ['error' => 'The predictive check service returned an invalid response.']);
+        }
+        respond($status ?: 502, $insights);
+    }
+
     if ($method === 'POST' && $path === '/api/demo-data') {
         $user = requireUser();
         requireRole($user, ['admin']);
@@ -734,6 +779,56 @@ try {
             $reply = "I can help with production, livestock records, planned activities, and farm reports. Ask me about today's milk, your active animals, or open tasks.";
         }
         respond(200, ['reply' => $reply, 'source' => 'local']);
+    }
+
+    if ($method === 'POST' && $path === '/api/assistant/suggest') {
+        $user = requireUser();
+        requireRole($user, ['admin', 'worker', 'veterinarian']);
+        $prefix = trim((string) ($body['prefix'] ?? ''));
+        if ($prefix === '' || strlen($prefix) > 300) {
+            respond(200, ['suggestion' => '']);
+        }
+
+        $apiUrl = rtrim(getenv('LFMIS_AI_API_URL') ?: '', '/');
+        $apiKey = getenv('LFMIS_AI_API_KEY') ?: '';
+        $model = getenv('LFMIS_AI_MODEL') ?: 'gpt-4o-mini';
+        if ($apiUrl !== '' && $apiKey !== '') {
+            $curl = curl_init($apiUrl . '/chat/completions');
+            curl_setopt_array($curl, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode([
+                    'model' => $model,
+                    'messages' => [[
+                        'role' => 'system',
+                        'content' => 'Complete the farm assistant user message. Return only the missing words to append, with no quotes, explanation, or punctuation at the beginning. Return an empty string when unsure. Keep it under 80 characters.',
+                    ], ['role' => 'user', 'content' => $prefix]],
+                    'temperature' => 0.2,
+                    'max_tokens' => 40,
+                ]),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $apiKey],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 2,
+                CURLOPT_TIMEOUT => 8,
+            ]);
+            $response = curl_exec($curl);
+            curl_close($curl);
+            $decoded = is_string($response) ? json_decode($response, true) : null;
+            $suggestion = trim((string) ($decoded['choices'][0]['message']['content'] ?? ''));
+            if (strlen($suggestion) <= 80) {
+                respond(200, ['suggestion' => $suggestion, 'source' => 'model']);
+            }
+        }
+
+        $lowerPrefix = strtolower($prefix);
+        $suggestion = match (true) {
+            str_starts_with($lowerPrefix, 'check') => " today's milk production",
+            str_starts_with($lowerPrefix, 'what') => ' should I check today?',
+            str_starts_with($lowerPrefix, 'how much') => ' milk did we produce today?',
+            str_starts_with($lowerPrefix, 'show') => ' me the latest farm activity',
+            str_starts_with($lowerPrefix, 'do a chart') => ' for milk production',
+            default => '',
+        };
+        respond(200, ['suggestion' => $suggestion, 'source' => 'local']);
     }
 
     if ($path === '/api/health-records' && $method === 'GET') {

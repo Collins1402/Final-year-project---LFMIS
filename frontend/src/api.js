@@ -96,7 +96,9 @@ export const api = {
   acceptAdminInvite: (data) => post('/api/admin-invite/accept', data),
   setUsername: (data) => post('/api/account/username', data),
   productionForecast: () => request('/api/production/forecast'),
+  predictiveChecks: () => request('/api/predictive-checks'),
   loadDemoData: () => post('/api/demo-data'),
   assistantChat: (data) => post('/api/assistant/chat', data),
+  assistantSuggest: (data) => post('/api/assistant/suggest', data),
   financeReport: () => request('/api/reports/finance'),
 }
