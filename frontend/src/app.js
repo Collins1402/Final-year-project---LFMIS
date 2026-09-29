@@ -74,7 +74,7 @@ function showMessage(element, message, isError = false) {
 function renderAuth(mode, notice = '') {
   const setup = mode === 'setup'
   root.innerHTML = `
-    <main class="auth-shell"><div class="${setup ? '' : 'auth-layout'}"><section class="auth-panel" aria-labelledby="auth-title">
+    <main class="auth-shell"><div class="${setup ? '' : 'auth-layout'}">${setup ? '' : '<button class="text-link auth-home" type="button" id="back-home">← Back to home</button>'}<section class="auth-panel" aria-labelledby="auth-title">
       <div class="brand auth-brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div>
       <p class="eyebrow">${setup ? 'Initial setup' : 'Farm workspace'}</p>
       <h1 id="auth-title">${setup ? 'Create the farm owner account' : 'Welcome back'}</h1>
@@ -90,6 +90,7 @@ function renderAuth(mode, notice = '') {
 
   const form = root.querySelector('#auth-form')
   root.querySelector('#forgot-password')?.addEventListener('click', renderForgotPassword)
+  root.querySelector('#back-home')?.addEventListener('click', renderLanding)
   root.querySelector('#open-register')?.addEventListener('click', renderRegister)
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
@@ -107,6 +108,95 @@ function renderAuth(mode, notice = '') {
       button.textContent = setup ? 'Create account' : 'Sign in'
     }
   })
+}
+
+function renderLanding() {
+  const animals = [['cow', 'Cattle'], ['goat', 'Goats'], ['sheep', 'Sheep'], ['chicken', 'Chickens'], ['rabbit', 'Rabbits']]
+  const services = [
+    ['◉', 'Livestock records', 'Every animal registered with tag, breed, age, weight and status.'],
+    ['♡', 'Animal health', 'Vaccinations, treatments and due dates tracked so nothing is missed.'],
+    ['◌', 'Daily produce', 'Milk, eggs and wool recorded daily with weekly progress and WhatsApp sharing.'],
+    ['▣', 'Inventory', 'Feed and supplies tracked with automatic low-stock alerts.'],
+    ['↗', 'Farm shop', 'Customers order fresh milk, eggs and wool straight from the farm.'],
+    ['♥', 'Livestock sales', 'Buyers check live availability, choose how many animals and download details as CSV.'],
+  ]
+  const faqs = [
+    ['How do I buy produce or livestock?', 'Click Get Started and create a Customer account for milk, eggs and wool, or a Buyer account for cattle, sheep, goats and chickens. The farm confirms each request before fulfilment.'],
+    ['How is availability checked?', 'Livestock availability comes from the farm\'s live herd records, and produce stock updates as workers record each day\'s production.'],
+    ['I work on the farm. How do I get access?', 'Create an account as a Farm worker or Veterinarian. The farm administrator approves it before you can sign in.'],
+    ['How do I pay?', 'Once the farm accepts your order, it records payment by cash, bank transfer or M-Pesa.'],
+  ]
+  root.innerHTML = `
+    <div class="landing">
+      <header class="landing-header">
+        <a class="landing-logo" href="#top"><span class="brand-mark">F</span>Flouri Farm</a>
+        <nav class="landing-nav" aria-label="Website">
+          <a href="#services">Services</a><a href="#about">About Us</a><a href="#faq">FAQ</a><a href="#contacts">Contacts</a>
+        </nav>
+        <div class="landing-actions"><button class="landing-login" type="button" data-go="login">Log In</button><button class="landing-cta" type="button" data-go="register">Get Started</button></div>
+      </header>
+      <main id="top">
+        <section class="landing-hero">
+          <p class="eyebrow">Livestock Farm Management Information System</p>
+          <h1>Healthier animals.<br>Better records. <span>Fresh from the farm.</span></h1>
+          <p class="landing-lead">Flouri Farm manages its herd, health care, daily produce and sales in one simple system — and lets you buy directly from the farm.</p>
+          <div class="landing-hero-actions"><button class="landing-cta" type="button" data-go="register">Get Started</button><a class="landing-secondary" href="#services">See what we do →</a></div>
+        </section>
+        <section class="landing-showcase" aria-label="Farm highlights">
+          <article class="showcase-card">
+            <div class="showcase-thumb"><img src="/animals/cow.svg" alt=""><span>Daily</span></div>
+            <p class="showcase-quote">Every litre of milk, every tray of eggs and every animal — recorded in one place.</p>
+            <p class="showcase-meta"><strong>Flouri Farm</strong>, Nairobi</p>
+            <button class="showcase-play" type="button" data-go="register" aria-label="Get started">▶</button>
+            <span class="showcase-link">Shop the farm</span>
+          </article>
+          <div class="showcase-visual">
+            <div class="showcase-panel showcase-dashboard" aria-hidden="true">
+              <div class="mock-top"><span></span><span></span><span></span></div>
+              <p class="mock-title">Weekly production</p>
+              <div class="mock-bars">${[45, 62, 58, 74, 69, 83, 90].map((height) => `<i style="height:${height}%"></i>`).join('')}</div>
+              <div class="mock-legend"><span>Milk</span><span>Eggs</span><span>Wool</span></div>
+            </div>
+            <div class="showcase-panel showcase-farm">
+              <img class="farm-scene" src="/farm-scene.svg" alt="Illustrated farm with a red barn and green hills">
+              ${animals.slice(0, 4).map(([file], index) => `<img class="farm-animal farm-animal-${index}" src="/animals/${file}.svg" alt="">`).join('')}
+            </div>
+          </div>
+        </section>
+        <section class="landing-section" id="services">
+          <p class="eyebrow">Services</p><h2>Everything the farm runs on</h2>
+          <div class="service-grid">${services.map(([icon, title, text]) => `<article class="service-card"><span class="service-icon">${icon}</span><h3>${title}</h3><p>${text}</p></article>`).join('')}</div>
+        </section>
+        <section class="landing-section landing-about" id="about">
+          <div>
+            <p class="eyebrow">About Us</p><h2>A mixed livestock farm in Nairobi</h2>
+            <p>Flouri Farm raises dairy cattle, goats, sheep, rabbits and chickens, and produces fresh milk, eggs and wool.</p>
+            <p>Our Livestock Farm Management Information System replaces paper notebooks with one shared record of animal health, daily produce, stock and sales — so we can care for our animals better and serve customers reliably.</p>
+          </div>
+          <div class="landing-animals">${animals.map(([file, label]) => `<figure><img src="/animals/${file}.svg" alt=""><figcaption>${label}</figcaption></figure>`).join('')}</div>
+        </section>
+        <section class="landing-section" id="faq">
+          <p class="eyebrow">FAQ</p><h2>Common questions</h2>
+          <div class="faq-list">${faqs.map(([question, answer]) => `<details><summary>${question}</summary><p>${answer}</p></details>`).join('')}</div>
+        </section>
+        <section class="landing-section landing-contact" id="contacts">
+          <div><p class="eyebrow">Contacts</p><h2>Visit or call the farm</h2></div>
+          <div class="contact-cards">
+            <div><span>Location</span><strong>Nairobi, Kenya</strong></div>
+            <div><span>Phone</span><strong><a href="tel:+254701004028">0701 004 028</a></strong></div>
+          </div>
+        </section>
+      </main>
+      <footer class="landing-footer">© ${new Date().getFullYear()} Flouri Farm · LFMIS</footer>
+    </div>`
+  root.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => {
+    if (button.dataset.go === 'register') renderRegister()
+    else renderAuth('login')
+  }))
+  root.querySelectorAll('.landing a[href^="#"]').forEach((link) => link.addEventListener('click', (event) => {
+    event.preventDefault()
+    root.querySelector(link.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' })
+  }))
 }
 
 function renderRegister() {
@@ -937,7 +1027,7 @@ async function start() {
     renderHome(user)
   } catch (error) {
     if (error.status === 401) {
-      renderAuth('login')
+      renderLanding()
       return
     }
     root.innerHTML = `<main class="auth-shell"><section class="auth-panel"><h1>Can't connect to LFMIS</h1><p class="intro">${escapeHtml(error.message)} Start the PHP API and confirm the MySQL service is running.</p></section></main>`
