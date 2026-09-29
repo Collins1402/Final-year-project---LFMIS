@@ -573,10 +573,11 @@ async function renderAssistant(user) {
     try {
       const response = await api.assistantChat({ message, previousMessage })
       previousMessage = message
-      const chart = response.chart
-        ? `<div class="assistant-chart" role="img" aria-label="${escapeHtml(chart.title)}"><strong>${escapeHtml(chart.title)}</strong>${chart.points.map((point) => `<div class="chart-row"><span>${escapeHtml(point.date.slice(5))}</span><div class="chart-track"><i style="width:${Math.max(4, (Number(point.litres) / Math.max(...chart.points.map((item) => Number(item.litres)), 1)) * 100)}%"></i></div><b>${escapeHtml(point.litres)} ${escapeHtml(chart.unit)}</b></div>`).join('')}</div>`
+      const chartData = response.chart
+      const chartHtml = chartData
+        ? `<div class="assistant-chart" role="img" aria-label="${escapeHtml(chartData.title)}"><strong>${escapeHtml(chartData.title)}</strong>${chartData.points.map((point) => `<div class="chart-row"><span>${escapeHtml(point.date.slice(5))}</span><div class="chart-track"><i style="width:${Math.max(4, (Number(point.litres) / Math.max(...chartData.points.map((item) => Number(item.litres)), 1)) * 100)}%"></i></div><b>${escapeHtml(point.litres)} ${escapeHtml(chartData.unit)}</b></div>`).join('')}</div>`
         : ''
-      messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>${escapeHtml(response.reply)}</p>${chart}</div>`)
+      messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>${escapeHtml(response.reply)}</p>${chartHtml}</div>`)
       status.textContent = response.source === 'model' ? 'Connected to the configured AI model.' : 'Using the local farm assistant until an AI model is configured.'
     } catch (error) {
       messages.insertAdjacentHTML('beforeend', `<div class="assistant-message assistant-message-bot"><strong>Old Mark Donald</strong><p>${escapeHtml(error.message)}</p></div>`)
