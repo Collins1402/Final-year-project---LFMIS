@@ -15,6 +15,8 @@
 .page-error:not([hidden]),.form-message:not([hidden]) { display:block; }
 .primary-button:disabled { opacity:.65; cursor:wait; }
 .role-label { color:#78847c; font-size:12px; text-transform:capitalize; }
+.welcome-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.welcome-actions .text-button:disabled { opacity:.6; cursor:wait; }
 .entry-form { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); align-items:end; gap:14px; padding:19px; margin-bottom:18px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
 .entry-form[hidden] { display:none; }
 .entry-form .primary-button { min-height:40px; justify-content:center; }

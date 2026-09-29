@@ -111,6 +111,8 @@ $env:LFMIS_AI_MODEL = 'gpt-4o-mini'
 
 The API key is server-side only and must never be placed in frontend code or committed to the repository. Without these variables, the assistant answers common production, livestock, and task questions from the live database summary.
 
+On an empty database, an administrator can use **Load demo records** on the Overview page to create sample animals, 28 consecutive days of milk and egg production, and planned activities. It does not overwrite existing animals or records. The **Register animal** action remains available for adding real farm animals later.
+
 ### Start the services
 
 Open three terminals at the repository root and leave each running:
