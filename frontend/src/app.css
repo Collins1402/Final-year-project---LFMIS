@@ -10,6 +10,8 @@
 .wide-field { grid-column:1/-1; }
 .form-stack .primary-button { justify-content:center; min-height:42px; }
 .form-message,.page-error { color:var(--coral); font-size:12px; }
+.form-message.success { color:var(--green); }
+.text-link { display:block; margin:17px auto 0; padding:4px 0; border:0; color:var(--green); background:transparent; font-size:12px; font-weight:700; text-decoration:underline; text-underline-offset:3px; }
 .page-error:not([hidden]),.form-message:not([hidden]) { display:block; }
 .primary-button:disabled { opacity:.65; cursor:wait; }
 .role-label { color:#78847c; font-size:12px; text-transform:capitalize; }

@@ -104,7 +104,7 @@ The development defaults use MySQL at `127.0.0.1:3306`, database `lfmis`, and th
 Open three terminals at the repository root and leave each running:
 
 ```powershell
-php -S 127.0.0.1:8000 backend/api/index.php
+& 'C:\Program Files\Git\bin\bash.exe' backend/start-dev.sh
 ```
 
 ```powershell
@@ -119,9 +119,16 @@ npm --prefix frontend run dev -- --host 127.0.0.1
 
 Open `http://127.0.0.1:5173/`. On a new database, create the first farm-owner account on the initial setup screen. It requires a password with at least 12 characters. An administrator can create staff and customer accounts under **User accounts**.
 
+### Password recovery
+
+The sign-in page has a **Forgot password?** flow. Reset links are single-use, expire after 30 minutes, and are stored as token hashes. Requests use the same response whether or not the email matches an active account.
+
+For email delivery, configure PHP's `mail()` transport to use your SMTP relay, set `LFMIS_MAIL_FROM` to a valid sender address, and set `LFMIS_APP_URL` to the frontend origin. For local testing without email, set `LFMIS_DEV_LOG_PASSWORD_RESET_LINK=true` in the environment before running `backend/start-dev.sh`; the reset URL is then written to the PHP server terminal. This option is for local development only and must remain disabled in production.
+
 ### Current working modules
 
 - First-admin setup, password-hashed login, logout, sessions, role checks, and audit entries.
+- Forgot-password requests and single-use, expiring reset links.
 - Admin, farm-worker, veterinarian, and customer roles, with staff/customer account creation.
 - Livestock registration, health records, farm activities/tasks, milk and egg production, and stock movements.
 - Sales and expenses, admin order quoting/status updates, customer order requests, and payment ledger.
@@ -141,5 +148,5 @@ python -m unittest discover -s backend/ml -p "test_*.py"
 ### Not yet integrated
 
 - M-Pesa STK prompts, signed payment callbacks, and automated payment confirmation need real Daraja credentials and a reachable callback URL. M-Pesa payments are stored as pending; non-M-Pesa payments entered by an admin are recorded as confirmed.
-- Payment receipts, notification delivery, supplier workflows, offline synchronization, password reset/account deactivation, and broader reporting remain follow-up work.
+- Payment receipts, notification delivery, supplier workflows, offline synchronization, account deactivation, and broader reporting remain follow-up work.
 - The forecast is a baseline decision-support model, not a veterinary diagnosis. Its measured error must be reviewed against real farm data before relying on it.

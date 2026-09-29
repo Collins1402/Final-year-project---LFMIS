@@ -133,6 +133,96 @@ try {
         respond(200, ['user' => $user]);
     }
 
+    if ($method === 'POST' && $path === '/api/password/forgot') {
+        $email = filter_var(trim((string) ($body['email'] ?? '')), FILTER_VALIDATE_EMAIL);
+        if ($email === false) {
+            respond(422, ['error' => 'Enter a valid email address.']);
+        }
+
+        $statement = $db->prepare(
+            'SELECT id, full_name, email FROM users WHERE email = ? AND is_active = 1 LIMIT 1'
+        );
+        $statement->execute([$email]);
+        $user = $statement->fetch();
+        if ($user) {
+            $recent = $db->prepare(
+                'SELECT 1 FROM password_reset_tokens
+                 WHERE user_id = ? AND created_at > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 MINUTE)'
+            );
+            $recent->execute([$user['id']]);
+            if (!$recent->fetchColumn()) {
+                $token = bin2hex(random_bytes(32));
+                $tokenHash = hash('sha256', $token);
+                $saveToken = $db->prepare(
+                    'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+                     VALUES (?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 30 MINUTE))
+                     ON DUPLICATE KEY UPDATE token_hash = VALUES(token_hash),
+                         expires_at = VALUES(expires_at), created_at = CURRENT_TIMESTAMP'
+                );
+                $saveToken->execute([$user['id'], $tokenHash]);
+
+                $appUrl = rtrim(getenv('LFMIS_APP_URL') ?: 'http://127.0.0.1:5173', '/');
+                $appParts = parse_url($appUrl);
+                if (!is_array($appParts) || !in_array($appParts['scheme'] ?? '', ['http', 'https'], true)
+                    || empty($appParts['host'])) {
+                    throw new RuntimeException('LFMIS_APP_URL must be an HTTP or HTTPS origin.');
+                }
+                $resetUrl = $appUrl . '/#reset_token=' . rawurlencode($token);
+                $subject = 'Reset your Flouri Farm LFMIS password';
+                $message = "Hello {$user['full_name']},\n\n"
+                    . "Use this link to choose a new password. It expires in 30 minutes and can only be used once:\n\n"
+                    . "{$resetUrl}\n\nIf you did not request this change, you can ignore this email.\n";
+                $from = getenv('LFMIS_MAIL_FROM') ?: 'no-reply@localhost';
+                if (!filter_var($from, FILTER_VALIDATE_EMAIL)) {
+                    $from = 'no-reply@localhost';
+                }
+                $headers = "From: Flouri Farm LFMIS <{$from}>\r\nContent-Type: text/plain; charset=UTF-8";
+                $devLogLink = filter_var(getenv('LFMIS_DEV_LOG_PASSWORD_RESET_LINK') ?: 'false', FILTER_VALIDATE_BOOLEAN);
+                if ($devLogLink) {
+                    error_log("Development password reset link for account {$user['id']}: {$resetUrl}");
+                } elseif (!@mail($email, $subject, $message, $headers)) {
+                    error_log("Password reset email delivery failed for account {$user['id']}.");
+                }
+            }
+        }
+
+        respond(202, ['message' => 'If an active account uses that email, password reset instructions will be sent.']);
+    }
+
+    if ($method === 'POST' && $path === '/api/password/reset') {
+        $token = (string) ($body['token'] ?? '');
+        $password = (string) ($body['password'] ?? '');
+        if (!preg_match('/^[a-f0-9]{64}$/', $token) || strlen($password) < 12) {
+            respond(422, ['error' => 'Use a valid reset link and a password with at least 12 characters.']);
+        }
+
+        $db->beginTransaction();
+        $statement = $db->prepare(
+            'SELECT user_id FROM password_reset_tokens
+             WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP FOR UPDATE'
+        );
+        $statement->execute([hash('sha256', $token)]);
+        $userId = $statement->fetchColumn();
+        if ($userId === false) {
+            $db->rollBack();
+            respond(422, ['error' => 'This reset link is invalid or has expired. Request a new one.']);
+        }
+
+        $updatePassword = $db->prepare(
+            'UPDATE users SET password_hash = ? WHERE id = ? AND is_active = 1'
+        );
+        $updatePassword->execute([password_hash($password, PASSWORD_DEFAULT), $userId]);
+        if ($updatePassword->rowCount() === 0) {
+            $db->rollBack();
+            respond(422, ['error' => 'This reset link is invalid or has expired. Request a new one.']);
+        }
+        $deleteToken = $db->prepare('DELETE FROM password_reset_tokens WHERE user_id = ?');
+        $deleteToken->execute([$userId]);
+        audit($db, (int) $userId, 'password_reset', 'user', (int) $userId);
+        $db->commit();
+        respond(200, ['ok' => true, 'message' => 'Password updated. Sign in with your new password.']);
+    }
+
     if ($method === 'POST' && $path === '/api/logout') {
         $user = requireUser();
         audit($db, $user['id'], 'logout', 'user', $user['id']);

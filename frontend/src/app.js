@@ -19,10 +19,11 @@ const formatMoney = (value) => new Intl.NumberFormat('en-KE', {
 function showMessage(element, message, isError = false) {
   element.textContent = message
   element.classList.toggle('error', isError)
+  element.classList.remove('success')
   element.hidden = !message
 }
 
-function renderAuth(mode) {
+function renderAuth(mode, notice = '') {
   const setup = mode === 'setup'
   root.innerHTML = `
     <main class="auth-shell"><section class="auth-panel" aria-labelledby="auth-title">
@@ -34,12 +35,14 @@ function renderAuth(mode) {
         ${setup ? '<label>Full name<input name="fullName" autocomplete="name" required maxlength="120"></label>' : ''}
         <label>Email<input type="email" name="email" autocomplete="username" required maxlength="190"></label>
         <label>Password<input type="password" name="password" autocomplete="${setup ? 'new-password' : 'current-password'}" minlength="${setup ? '12' : '1'}" required></label>
-        <p class="form-message" role="alert" hidden></p>
+        <p class="form-message ${notice ? 'success' : ''}" role="status" ${notice ? '' : 'hidden'}>${escapeHtml(notice)}</p>
         <button class="primary-button" type="submit">${setup ? 'Create account' : 'Sign in'}</button>
       </form>
+      ${setup ? '' : '<button class="text-link" type="button" id="forgot-password">Forgot password?</button>'}
     </section></main>`
 
   const form = root.querySelector('#auth-form')
+  root.querySelector('#forgot-password')?.addEventListener('click', renderForgotPassword)
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(form))
@@ -54,6 +57,76 @@ function renderAuth(mode) {
       showMessage(feedback, error.message, true)
       button.disabled = false
       button.textContent = setup ? 'Create account' : 'Sign in'
+    }
+  })
+}
+
+function renderForgotPassword() {
+  root.innerHTML = `
+    <main class="auth-shell"><section class="auth-panel" aria-labelledby="forgot-title">
+      <div class="brand auth-brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div>
+      <p class="eyebrow">Account recovery</p><h1 id="forgot-title">Reset your password</h1>
+      <p class="intro">Enter the email address on your account. If it matches an active account, reset instructions will be sent.</p>
+      <form id="forgot-form" class="form-stack">
+        <label>Email<input type="email" name="email" autocomplete="email" required maxlength="190"></label>
+        <p class="form-message" role="status" hidden></p>
+        <button class="primary-button" type="submit">Send reset link</button>
+      </form>
+      <button class="text-link" type="button" id="back-to-login">Back to sign in</button>
+    </section></main>`
+  root.querySelector('#back-to-login').addEventListener('click', () => renderAuth('login'))
+  const form = root.querySelector('#forgot-form')
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const feedback = form.querySelector('.form-message')
+    const button = form.querySelector('button')
+    button.disabled = true
+    button.textContent = 'Sending…'
+    try {
+      const result = await api.forgotPassword(Object.fromEntries(new FormData(form)))
+      showMessage(feedback, result.message)
+      button.textContent = 'Send another link'
+      button.disabled = false
+    } catch (error) {
+      showMessage(feedback, error.message, true)
+      button.textContent = 'Send reset link'
+      button.disabled = false
+    }
+  })
+}
+
+function renderResetPassword(token) {
+  root.innerHTML = `
+    <main class="auth-shell"><section class="auth-panel" aria-labelledby="reset-title">
+      <div class="brand auth-brand"><span class="brand-mark">F</span><div><strong>Flouri Farm</strong><small>LFMIS workspace</small></div></div>
+      <p class="eyebrow">Account recovery</p><h1 id="reset-title">Choose a new password</h1>
+      <p class="intro">Use at least 12 characters. The reset link can only be used once.</p>
+      <form id="reset-form" class="form-stack">
+        <label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+        <label>Confirm password<input type="password" name="confirmPassword" autocomplete="new-password" minlength="12" required></label>
+        <p class="form-message" role="alert" hidden></p>
+        <button class="primary-button" type="submit">Update password</button>
+      </form>
+    </section></main>`
+  const form = root.querySelector('#reset-form')
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const feedback = form.querySelector('.form-message')
+    const button = form.querySelector('button')
+    const data = Object.fromEntries(new FormData(form))
+    if (data.password !== data.confirmPassword) {
+      showMessage(feedback, 'The passwords do not match.', true)
+      return
+    }
+    button.disabled = true
+    button.textContent = 'Updating…'
+    try {
+      await api.resetPassword({ token, password: data.password })
+      renderAuth('login', 'Password updated. Sign in with your new password.')
+    } catch (error) {
+      showMessage(feedback, error.message, true)
+      button.disabled = false
+      button.textContent = 'Update password'
     }
   })
 }
@@ -459,6 +532,12 @@ function renderHome(user) {
 
 async function start() {
   root.innerHTML = '<main class="auth-shell"><p class="intro">Connecting to the farm database…</p></main>'
+  const resetToken = new URLSearchParams(window.location.hash.slice(1)).get('reset_token')
+  if (resetToken) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    renderResetPassword(resetToken)
+    return
+  }
   try {
     const status = await api.setupStatus()
     if (status.setupRequired) {
