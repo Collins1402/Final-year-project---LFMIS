@@ -541,6 +541,12 @@ async function renderAssistant(user) {
   const form = root.querySelector('#assistant-form')
   const input = root.querySelector('#assistant-input')
   const status = root.querySelector('#assistant-status')
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      form.requestSubmit()
+    }
+  })
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const message = input.value.trim()
