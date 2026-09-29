@@ -20,7 +20,7 @@ The system will cover:
 - Livestock and produce sales, including the sale of male and old cows, hens and chicks, and rabbits.
 - Reports that support farm performance, profitability, and decision-making.
 
-The frontend will be developed with React and JavaScript. The backend will use PHP, with MySQL as the database during development through XAMPP. The design will also consider a future mobile application and low-bandwidth or offline use by farm workers.
+The current prototype frontend uses Vite and JavaScript. The backend uses PHP, with MySQL during development through XAMPP. The design will also consider a future mobile application and low-bandwidth or offline use by farm workers.
 
 ## Users and External Systems
 
@@ -80,3 +80,66 @@ The second semester will use progressive sprints:
 - **Sprint 3:** approximately 90% of the final system, refining customer service, notifications, analytics or machine learning, testing, usability, and final documentation.
 
 The final evaluation will consider whether LFMIS provides a better solution than fragmented manual methods by measuring record accessibility, traceability, transaction efficiency, reporting usefulness, usability, and the quality of decisions supported by the system.
+
+## Run the Local System
+
+### Prerequisites
+
+- Node.js and npm.
+- XAMPP with Apache/PHP and MySQL. Start MySQL from the XAMPP Control Panel.
+- Python 3.10 or later for the milk forecast service.
+
+### Database
+
+Import the schema once into the local MySQL server:
+
+```powershell
+Get-Content -Raw backend/database/lfmis.sql | C:\xampp\mysql\bin\mysql.exe -u root
+```
+
+The development defaults use MySQL at `127.0.0.1:3306`, database `lfmis`, and the XAMPP `root` account with no password. For a configured account, set `LFMIS_DB_HOST`, `LFMIS_DB_PORT`, `LFMIS_DB_NAME`, `LFMIS_DB_USER`, and `LFMIS_DB_PASSWORD` in the PHP server terminal before starting it. Never commit real credentials.
+
+### Start the services
+
+Open three terminals at the repository root and leave each running:
+
+```powershell
+php -S 127.0.0.1:8000 backend/api/index.php
+```
+
+```powershell
+python -m pip install -r backend/ml/requirements.txt
+python backend/ml/forecast_service.py
+```
+
+```powershell
+npm --prefix frontend install
+npm --prefix frontend run dev -- --host 127.0.0.1
+```
+
+Open `http://127.0.0.1:5173/`. On a new database, create the first farm-owner account on the initial setup screen. It requires a password with at least 12 characters. An administrator can create staff and customer accounts under **User accounts**.
+
+### Current working modules
+
+- First-admin setup, password-hashed login, logout, sessions, role checks, and audit entries.
+- Admin, farm-worker, veterinarian, and customer roles, with staff/customer account creation.
+- Livestock registration, health records, farm activities/tasks, milk and egg production, and stock movements.
+- Sales and expenses, admin order quoting/status updates, customer order requests, and payment ledger.
+- Customer feedback, live dashboard totals, monthly financial summaries, and milk forecasts with a seven-day backtest.
+
+The ML service requires at least 21 consecutive daily production records. It rejects missing-day histories rather than treating unrecorded days as zero. No sample farm data is seeded.
+
+### Tests
+
+```powershell
+npm --prefix frontend run build
+php -l backend/api/index.php
+php -l backend/config/database.php
+python -m unittest discover -s backend/ml -p "test_*.py"
+```
+
+### Not yet integrated
+
+- M-Pesa STK prompts, signed payment callbacks, and automated payment confirmation need real Daraja credentials and a reachable callback URL. M-Pesa payments are stored as pending; non-M-Pesa payments entered by an admin are recorded as confirmed.
+- Payment receipts, notification delivery, supplier workflows, offline synchronization, password reset/account deactivation, and broader reporting remain follow-up work.
+- The forecast is a baseline decision-support model, not a veterinary diagnosis. Its measured error must be reviewed against real farm data before relying on it.

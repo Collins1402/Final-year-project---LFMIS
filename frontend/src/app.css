@@ -1,0 +1,46 @@
+.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24px; background:radial-gradient(ellipse at 10% 15%,#e6efe6 0,transparent 42%),radial-gradient(ellipse at 90% 85%,#f6ead8 0,transparent 38%),var(--canvas); }
+.auth-panel { width:min(100%,440px); padding:34px; background:var(--paper); border:1px solid var(--line); border-radius:8px; box-shadow:0 18px 55px #27372d12; }
+.auth-brand { margin:0 0 35px; }
+.auth-panel > .eyebrow { margin:0 0 10px; }
+.auth-panel h1 { font-size:24px; }
+.form-stack { display:grid; gap:15px; margin-top:26px; }
+.form-stack label,.entry-form label { display:grid; gap:6px; color:#68766d; font-size:12px; font-weight:600; }
+.form-stack input,.entry-form input,.entry-form select { width:100%; min-height:40px; padding:9px 11px; border:1px solid var(--line); border-radius:5px; outline-color:var(--green); background:#fff; color:var(--ink); }
+.entry-form textarea { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:5px; outline-color:var(--green); background:#fff; color:var(--ink); font:inherit; resize:vertical; }
+.wide-field { grid-column:1/-1; }
+.form-stack .primary-button { justify-content:center; min-height:42px; }
+.form-message,.page-error { color:var(--coral); font-size:12px; }
+.page-error:not([hidden]),.form-message:not([hidden]) { display:block; }
+.primary-button:disabled { opacity:.65; cursor:wait; }
+.role-label { color:#78847c; font-size:12px; text-transform:capitalize; }
+.entry-form { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); align-items:end; gap:14px; padding:19px; margin-bottom:18px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
+.entry-form[hidden] { display:none; }
+.entry-form .primary-button { min-height:40px; justify-content:center; }
+.entry-form .form-message { grid-column:1/-1; margin:0; }
+.table-wrap { overflow-x:auto; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
+table { width:100%; border-collapse:collapse; text-align:left; font-size:12px; }
+th,td { padding:13px 16px; border-bottom:1px solid #f0f2ee; white-space:nowrap; }
+th { color:#738078; background:#f9faf8; font-size:10px; text-transform:uppercase; }
+tbody tr:last-child td { border-bottom:0; }
+td { color:#58655d; }
+.empty-state { color:#89958c; font-size:12px; padding:10px 0; }
+.alerts-panel .alert-count { min-width:25px; text-align:center; }
+.forecast-panel { max-width:900px; }
+.forecast-values { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:9px; margin:20px 0; }
+.forecast-day { display:grid; gap:8px; padding:12px 10px; border:1px solid var(--line); border-radius:6px; }
+.forecast-day span { color:#849087; font-size:10px; }
+.forecast-day strong { color:var(--green); font:700 14px Manrope,sans-serif; }
+.forecast-evaluation { color:#58655d; font-size:12px; }
+.forecast-note { color:#89958c; font-size:11px; }
+.section-title { margin:22px 0 12px; font-size:14px; }
+.finance-panel { margin:0 0 18px; }
+.finance-values { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:20px; }
+.finance-values div { display:grid; gap:7px; padding:13px; background:#f8faf7; border:1px solid var(--line); border-radius:6px; }
+.finance-values span { color:#89958c; font-size:10px; }
+.finance-values strong { color:#29372f; font:700 15px Manrope,sans-serif; }
+.order-update { display:flex; align-items:center; gap:6px; }
+.order-update select,.order-update input { min-height:30px; max-width:112px; padding:4px 6px; border:1px solid var(--line); border-radius:4px; background:white; color:var(--ink); font-size:11px; }
+.small-action { border:0; border-radius:4px; padding:7px 9px; color:white; background:var(--green); font-size:10px; font-weight:700; }
+@media (max-width:700px) { .auth-panel { padding:25px 20px; } .entry-form { grid-template-columns:1fr; } .table-wrap { margin-inline:-2px; } th,td { padding:11px 12px; } }
+@media (max-width:700px) { .forecast-values { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:700px) { .finance-values { grid-template-columns:repeat(2,minmax(0,1fr)); } .order-update { flex-wrap:wrap; } }
