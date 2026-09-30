@@ -8,7 +8,7 @@ use PDO;
 
 final class UserService
 {
-    private const ROLES = ['admin', 'worker', 'veterinarian', 'customer'];
+    private const ROLES = ['admin', 'worker', 'veterinarian', 'customer', 'buyer'];
 
     public function __construct(private PDO $db)
     {

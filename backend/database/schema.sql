@@ -448,4 +448,5 @@ INSERT IGNORE INTO roles (name, description) VALUES
   ('admin', 'Farm owner: full management access'),
   ('worker', 'Daily farm activities, production and stock records'),
   ('veterinarian', 'Animal health records and follow-ups'),
-  ('customer', 'Buys farm produce and livestock, tracks orders and payments');
+  ('customer', 'Buys farm produce and tracks orders and payments'),
+  ('buyer', 'Purchases livestock and tracks livestock orders');

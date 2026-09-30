@@ -47,7 +47,11 @@ final class VerificationService
             throw new \InvalidArgumentException('The confirmation link is invalid or has expired.');
         }
         $this->db->beginTransaction();
-        $this->db->prepare('UPDATE users SET email_verified_at = NOW(), is_active = 1 WHERE id = ?')->execute([(int) $userId]);
+        $this->db->prepare(
+            "UPDATE users JOIN roles ON roles.id = users.role_id
+             SET users.email_verified_at = NOW(), users.is_active = IF(roles.name IN ('admin', 'customer', 'buyer'), 1, 0)
+             WHERE users.id = ?"
+        )->execute([(int) $userId]);
         $this->db->prepare('DELETE FROM email_verification_tokens WHERE user_id = ?')->execute([(int) $userId]);
         $this->db->commit();
         return ['verified' => true];

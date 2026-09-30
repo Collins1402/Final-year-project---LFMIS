@@ -79,6 +79,19 @@ try {
         $token = (string) ($_GET['token'] ?? '');
         Response::json($verification->confirm($token));
     }
+    if ($method === 'POST' && $path === '/api/register') {
+        $user = $auth->register($request->body());
+        $link = $verification->issue($user['id'], $user['email'], $user['fullName']);
+        Response::json([
+            'user' => $user,
+            'verificationRequired' => true,
+            'approvalRequired' => in_array($user['role'], ['worker', 'veterinarian'], true),
+            'devVerificationLink' => $link,
+            'message' => in_array($user['role'], ['worker', 'veterinarian'], true)
+                ? 'Confirm your email, then wait for the farm administrator to approve your staff account.'
+                : 'Check your email to confirm the account before signing in.',
+        ], 201);
+    }
     if ($method === 'POST' && $path === '/api/login') {
         $body = $request->body();
         Response::json(['user' => $auth->login((string) ($body['login'] ?? ''), (string) ($body['password'] ?? ''))]);

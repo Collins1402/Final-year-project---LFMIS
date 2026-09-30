@@ -10,8 +10,9 @@ const message = (text, danger = false) => `<p class="message ${danger ? 'danger'
 
 function renderAuth(mode = 'login', notice = '') {
   const setup = mode === 'setup'
-  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<form id="login-form"><label>Username or email<input name="login" required></label><label>Password<span class="password-field"><input name="password" type="password" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form>`}</section></main>`
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<form id="login-form"><label>Username or email<input name="login" required></label><label>Password<span class="password-field"><input name="password" type="password" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form><button id="register-link" class="text-link" type="button">Create a farm account</button>`}</section></main>`
   const form = app.querySelector('form')
+  app.querySelector('#register-link')?.addEventListener('click', renderRegister)
   app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
     const input = toggle.parentElement.querySelector('input')
     const visible = input.type === 'text'
@@ -35,7 +36,29 @@ function renderAuth(mode = 'login', notice = '') {
   })
 }
 
+function renderRegister(notice = '') {
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>Create a farm account</h1><p class="muted">Choose the workspace that matches what you do.</p>${notice}<form id="register-form"><label>Account type<select name="role"><option value="customer">Customer · produce and payments</option><option value="buyer">Buyer · livestock orders</option><option value="worker">Worker · daily farm operations</option><option value="veterinarian">Veterinarian · animal health</option></select></label><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create account</button></form><button id="back-login" class="text-link" type="button">Back to sign in</button></section></main>`
+  app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
+    const input = toggle.parentElement.querySelector('input')
+    input.type = input.type === 'password' ? 'text' : 'password'
+    toggle.setAttribute('aria-label', input.type === 'password' ? 'Show password' : 'Hide password')
+  }))
+  app.querySelector('#back-login').addEventListener('click', () => renderAuth('login'))
+  app.querySelector('#register-form').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    try {
+      const result = await api.register(Object.fromEntries(new FormData(event.target)))
+      const approval = result.approvalRequired ? ' The farm administrator must approve your staff account after email confirmation.' : ''
+      renderAuth('login', `${result.message}${approval}${result.devVerificationLink ? ` Open the development confirmation link: ${result.devVerificationLink}` : ''}`)
+    } catch (error) { renderRegister(`<p class="message danger">${escapeHtml(error.message)}</p>`) }
+  })
+}
+
 async function renderApp() {
+  if (['customer', 'buyer', 'worker', 'veterinarian'].includes(currentUser.role)) {
+    renderRoleWorkspace()
+    return
+  }
   let animals = []
   let healthRecords = []
   try {
@@ -50,6 +73,17 @@ async function renderApp() {
   app.querySelector('#logout').addEventListener('click', async () => { await api.logout(); currentUser = null; renderAuth() })
   app.querySelector('#animal-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createAnimal(Object.fromEntries(new FormData(event.target))); await renderApp() } catch (error) { alert(error.message) } })
   app.querySelector('#health-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createHealthRecord(Object.fromEntries(new FormData(event.target))); await renderApp() } catch (error) { alert(error.message) } })
+}
+
+function renderRoleWorkspace() {
+  const roleContent = {
+    worker: ['Daily operations', 'Record milk and eggs, complete activities, check stock and notify the farm owner about shortages.', ['Production', 'Activities', 'Inventory']],
+    veterinarian: ['Animal health', 'Review animal records, record treatments and follow up vaccinations and due care.', ['Livestock', 'Health records', 'Due follow-ups']],
+    customer: ['Farm shop', 'Browse produce, place orders, follow your payment status and send feedback.', ['Farm shop', 'My orders', 'Payments']],
+    buyer: ['Livestock buying', 'Review available livestock, request animals and follow your order status.', ['Livestock catalogue', 'My orders', 'Payments']],
+  }[currentUser.role]
+  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>${escapeHtml(roleContent[0])}</h2><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">YOUR WORKSPACE</p><h1>${escapeHtml(roleContent[0])}</h1><p class="muted">${escapeHtml(roleContent[1])}</p></div><span class="health-pill">Role protected</span></header><div class="role-grid">${roleContent[2].map((item) => `<section class="panel"><p class="kicker">MODULE</p><h2>${escapeHtml(item)}</h2><p class="muted">This workspace is limited to information relevant to your role.</p></section>`).join('')}</div></main></div>`
+  app.querySelector('#logout').addEventListener('click', async () => { await api.logout(); currentUser = null; renderLanding(app, () => renderAuth('login'), () => renderAuth('login')) })
 }
 
 async function start() {
