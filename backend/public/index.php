@@ -18,6 +18,7 @@ require_once __DIR__ . '/../src/Services/InventoryService.php';
 require_once __DIR__ . '/../src/Services/CommerceService.php';
 require_once __DIR__ . '/../src/Services/AssistantService.php';
 require_once __DIR__ . '/../src/Services/NotificationService.php';
+require_once __DIR__ . '/../src/Services/FeedbackService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -36,6 +37,7 @@ use Lfmis\Services\InventoryService;
 use Lfmis\Services\CommerceService;
 use Lfmis\Services\AssistantService;
 use Lfmis\Services\NotificationService;
+use Lfmis\Services\FeedbackService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -67,6 +69,7 @@ try {
     $commerce = new CommerceService($db);
     $assistant = new AssistantService($db);
     $notifications = new NotificationService($db);
+    $feedback = new FeedbackService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -319,6 +322,19 @@ try {
         if ($current === null) Response::error('Please sign in to continue.', 401);
         $notifications->markRead((int) $matches[1], $current['id']);
         Response::json(['ok' => true]);
+    }
+    if ($path === '/api/feedback') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($method === 'GET' && in_array($current['role'], ['admin', 'customer', 'buyer'], true)) Response::json(['feedback' => $feedback->list()]);
+        if ($method === 'POST' && in_array($current['role'], ['customer', 'buyer'], true)) Response::json(['feedback' => $feedback->create($request->body(), $current['id'])], 201);
+        Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($method === 'PATCH' && preg_match('#^/api/feedback/(\d+)/resolve$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        $feedback->resolve((int)$matches[1], $current['id']); Response::json(['ok'=>true]);
     }
     Response::error('Endpoint not found.', 404);
 } catch (DomainException $error) {

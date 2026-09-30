@@ -11,14 +11,15 @@ final class ActivityService
 
     public function list(?int $userId, string $role): array
     {
-        $sql = 'SELECT farm_activities.id, activity_type, description, animal_id, assigned_to, activity_at, status, completed_at,
+        $sql = 'SELECT farm_activities.id, farm_activities.activity_type, farm_activities.description, farm_activities.animal_id,
+                   farm_activities.assigned_to, farm_activities.activity_at, farm_activities.status, farm_activities.completed_at,
                        animals.tag_number, users.full_name AS assigned_name
                 FROM farm_activities LEFT JOIN animals ON animals.id = farm_activities.animal_id
                 LEFT JOIN users ON users.id = farm_activities.assigned_to';
         if ($role === 'worker') {
-            $sql .= ' WHERE assigned_to = ? OR assigned_to IS NULL';
+            $sql .= ' WHERE farm_activities.assigned_to = ? OR farm_activities.assigned_to IS NULL';
         }
-        $sql .= ' ORDER BY activity_at DESC LIMIT 300';
+        $sql .= ' ORDER BY farm_activities.activity_at DESC LIMIT 300';
         $statement = $this->db->prepare($sql);
         $statement->execute($role === 'worker' ? [$userId] : []);
         return $statement->fetchAll();
