@@ -1,11 +1,18 @@
 .env
 .env.*
 !.env.example
+.env.local
+node_modules/
+dist/
+vendor/
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 .pytest_cache/
-backend/ml/models/backend/start-dev.sh
-backend/config/mail.local.php
+.phpunit.cache/
+ml/models/
+ml/data/
+scripts/dev-all.sh
+backup_*.sql
 
