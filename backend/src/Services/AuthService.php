@@ -88,7 +88,7 @@ final class AuthService
         $username = trim((string) ($input['username'] ?? ''));
         $email = filter_var(trim((string) ($input['email'] ?? '')), FILTER_VALIDATE_EMAIL);
         $password = (string) ($input['password'] ?? '');
-        $role = (string) ($input['role'] ?? 'customer');
+        $role = 'customer';
         if ($name === '' || !preg_match('/^[A-Za-z0-9_.]{3,30}$/', $username) || $email === false || strlen($password) < 12 || !in_array($role, ['customer', 'buyer', 'worker', 'veterinarian'], true)) {
             throw new \InvalidArgumentException('Enter valid details, choose a supported account type and use a password of at least 12 characters.');
         }
