@@ -12,6 +12,9 @@ require_once __DIR__ . '/../src/Services/AnimalService.php';
 require_once __DIR__ . '/../src/Services/HealthService.php';
 require_once __DIR__ . '/../src/Services/VerificationService.php';
 require_once __DIR__ . '/../src/Services/PasswordResetService.php';
+require_once __DIR__ . '/../src/Services/ActivityService.php';
+require_once __DIR__ . '/../src/Services/ProductionService.php';
+require_once __DIR__ . '/../src/Services/InventoryService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -24,6 +27,9 @@ use Lfmis\Services\AnimalService;
 use Lfmis\Services\HealthService;
 use Lfmis\Services\VerificationService;
 use Lfmis\Services\PasswordResetService;
+use Lfmis\Services\ActivityService;
+use Lfmis\Services\ProductionService;
+use Lfmis\Services\InventoryService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -49,6 +55,9 @@ try {
     $health = new HealthService($db);
     $verification = new VerificationService($db);
     $passwordReset = new PasswordResetService($db);
+    $activities = new ActivityService($db);
+    $production = new ProductionService($db);
+    $inventory = new InventoryService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -196,6 +205,52 @@ try {
         $updated = $users->update((int) $matches[1], $request->body());
         $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update', 'user', $updated['id']]);
         Response::json(['user' => $updated]);
+    }
+    if ($path === '/api/activities' || preg_match('#^/api/activities/(\d+)/complete$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($method === 'GET' && $path === '/api/activities' && in_array($current['role'], ['admin', 'worker', 'veterinarian'], true)) {
+            Response::json(['activities' => $activities->list($current['id'], $current['role'])]);
+        }
+        if ($method === 'POST' && $path === '/api/activities' && in_array($current['role'], ['admin', 'worker'], true)) {
+            $item = $activities->create($request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'activity', $item['id']]);
+            Response::json(['activity' => $item], 201);
+        }
+        if ($method === 'PATCH' && isset($matches[1]) && in_array($current['role'], ['admin', 'worker'], true)) {
+            $item = $activities->complete((int) $matches[1], $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'complete', 'activity', $item['id']]);
+            Response::json(['activity' => $item]);
+        }
+        Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($path === '/api/production/milk' || $path === '/api/production/eggs') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        $allowedRead = in_array($current['role'], ['admin', 'worker'], true);
+        if ($method === 'GET' && $allowedRead) Response::json([$path === '/api/production/milk' ? 'milk' : 'eggs' => $path === '/api/production/milk' ? $production->milk() : $production->eggs()]);
+        if ($method === 'POST' && $allowedRead) {
+            $item = $path === '/api/production/milk' ? $production->recordMilk($request->body(), $current['id']) : $production->recordEggs($request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', $path === '/api/production/milk' ? 'milk_production' : 'egg_production', $item['id']]);
+            Response::json(['production' => $item], 201);
+        }
+        Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($path === '/api/inventory' || $path === '/api/inventory/items' || preg_match('#^/api/inventory/\d+/transactions$#', $path)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($method === 'GET' && $path === '/api/inventory' && in_array($current['role'], ['admin', 'worker'], true)) Response::json(['items' => $inventory->list()]);
+        if ($method === 'POST' && $path === '/api/inventory/items' && $current['role'] === 'admin') {
+            $item = $inventory->create($request->body());
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'inventory_item', $item['id']]);
+            Response::json(['item' => $item], 201);
+        }
+        if ($method === 'POST' && preg_match('#^/api/inventory/(\d+)/transactions$#', $path, $matches) && in_array($current['role'], ['admin', 'worker'], true)) {
+            $item = $inventory->transact((int) $matches[1], $request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'transaction', 'inventory_item', (int) $matches[1]]);
+            Response::json(['item' => $item]);
+        }
+        Response::error('You do not have permission to perform this action.', 403);
     }
     Response::error('Endpoint not found.', 404);
 } catch (DomainException $error) {

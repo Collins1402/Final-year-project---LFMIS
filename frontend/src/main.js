@@ -123,6 +123,9 @@ async function renderApp() {
 }
 
 function renderAdminModule(module) {
+  if (module === 'Activities') return renderActivitiesModule()
+  if (module === 'Production') return renderProductionModule()
+  if (module === 'Inventory') return renderInventoryModule()
   const details = {
     Livestock: ['Livestock register', 'Register animals, update their status and review the herd.'],
     'Animal health': ['Animal health', 'Record vaccinations, treatments and follow-up dates.'],
@@ -139,6 +142,35 @@ function renderAdminModule(module) {
   const [title, description] = details
   app.querySelector('.content').innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>${escapeHtml(title)}</h1><p class="muted">${escapeHtml(description)}</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel module-intro"><p class="kicker">WORKSPACE</p><h2>${escapeHtml(title)}</h2><p class="muted">This module is now part of the admin workspace. Its records and actions will appear here as the backend slice is connected.</p><button class="primary-action" data-module="Overview">Back to overview</button></section><section class="panel"><p class="kicker">NEXT ACTION</p><h2>Keep records complete</h2><p class="muted">Use the overview for the currently connected livestock and animal-health records.</p></section></section>`
   app.querySelector('[data-module="Overview"]').addEventListener('click', renderApp)
+}
+
+async function renderActivitiesModule() {
+  const content = app.querySelector('.content')
+  try {
+    const data = await api.activities()
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Activities</h1><p class="muted">Plan and complete daily farm work.</p></div><span class="health-pill">Live records</span></header><section class="module-grid"><section class="panel"><h2>Plan activity</h2><form id="activity-form" class="compact-form"><select name="activityType"><option value="feeding">Feeding</option><option value="milking">Milking</option><option value="cleaning">Cleaning</option><option value="health">Health follow-up</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select><input name="description" placeholder="What needs to happen?" required><input name="activityAt" type="datetime-local" required><button>Save activity</button></form></section><section class="panel"><h2>Activity list</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.length ? data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${item.status === 'planned' ? `<button class="small-action" data-complete="${item.id}">Complete</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No activities yet.</td></tr>'}</tbody></table></div></section></section>`
+    content.querySelector('#activity-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createActivity(Object.fromEntries(new FormData(event.target))); await renderActivitiesModule() })
+    content.querySelectorAll('[data-complete]').forEach((button) => button.addEventListener('click', async () => { await api.completeActivity(button.dataset.complete); await renderActivitiesModule() }))
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderProductionModule() {
+  const content = app.querySelector('.content')
+  try {
+    const [milk, eggs] = await Promise.all([api.milkProduction(), api.eggProduction()])
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Production</h1><p class="muted">Record milk and egg production as it happens.</p></div><span class="health-pill">Daily records</span></header><section class="module-grid"><section class="panel"><h2>Record milk</h2><form id="milk-form" class="compact-form"><input name="productionDate" type="date" required><select name="session"><option value="morning">Morning</option><option value="evening">Evening</option></select><input name="quantityLitres" type="number" min="0" step="0.01" placeholder="Litres" required><button>Save milk</button></form><h2>Recent milk</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Session</th><th>Litres</th></tr></thead><tbody>${milk.milk.length ? milk.milk.slice(0, 12).map((item) => `<tr><td>${item.production_date}</td><td>${item.milking_session}</td><td>${item.quantity_litres}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">No milk records yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record eggs</h2><form id="egg-form" class="compact-form"><input name="productionDate" type="date" required><input name="eggsCollected" type="number" min="0" placeholder="Collected" required><input name="eggsBroken" type="number" min="0" placeholder="Broken" value="0"><button>Save eggs</button></form><h2>Recent eggs</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Collected</th><th>Broken</th></tr></thead><tbody>${eggs.eggs.length ? eggs.eggs.slice(0, 12).map((item) => `<tr><td>${item.production_date}</td><td>${item.eggs_collected}</td><td>${item.eggs_broken}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">No egg records yet.</td></tr>'}</tbody></table></div></section></section>`
+    content.querySelector('#milk-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.recordMilk(Object.fromEntries(new FormData(event.target))); await renderProductionModule() })
+    content.querySelector('#egg-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.recordEggs(Object.fromEntries(new FormData(event.target))); await renderProductionModule() })
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderInventoryModule() {
+  const content = app.querySelector('.content')
+  try {
+    const data = await api.inventory()
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Inventory</h1><p class="muted">Track supplies and see what needs replenishing.</p></div><span class="health-pill">Stock control</span></header><section class="module-grid"><section class="panel"><h2>Add stock item</h2><form id="inventory-form" class="compact-form"><input name="name" placeholder="Item name" required><select name="category"><option value="feed">Feed</option><option value="medicine">Medicine</option><option value="equipment">Equipment</option><option value="supplies">Supplies</option><option value="other">Other</option></select><input name="unit" placeholder="Unit" required><input name="quantityOnHand" type="number" min="0" step="0.01" placeholder="Quantity" required><input name="reorderLevel" type="number" min="0" step="0.01" placeholder="Reorder level" required><button>Add item</button></form></section><section class="panel"><h2>Stock list</h2><div class="table-wrap"><table><thead><tr><th>Item</th><th>Category</th><th>On hand</th><th>Reorder at</th></tr></thead><tbody>${data.items.length ? data.items.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.category)}</td><td>${item.quantity_on_hand} ${escapeHtml(item.unit)}</td><td>${item.reorder_level}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No stock items yet.</td></tr>'}</tbody></table></div></section></section>`
+    content.querySelector('#inventory-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createInventoryItem(Object.fromEntries(new FormData(event.target))); await renderInventoryModule() })
+  } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
 function renderRoleWorkspace() {
