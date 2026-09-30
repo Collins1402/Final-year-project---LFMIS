@@ -5,6 +5,13 @@ import { renderLanding } from './landing.js'
 const app = document.querySelector('#app')
 let currentUser = null
 
+const adminNavigation = [
+  ['Operations', ['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory']],
+  ['Commerce', ['Sales & orders', 'Feedback']],
+  ['Insights', ['Reports', 'Assistant']],
+  ['Administration', ['User accounts']],
+]
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
 
@@ -121,6 +128,8 @@ async function renderApp() {
     try { const result = await api.loadDemoData(); alert(result.message); await renderApp() } catch (error) { alert(error.message) }
   })
   app.querySelector('.content header').append(demoButton)
+  const navigation = app.querySelector('.workspace-nav')
+  navigation.innerHTML = adminNavigation.map(([group, items]) => `<div class="nav-group"><p>${group}</p>${items.map((item) => `<button class="workspace-nav-item ${item === 'Overview' ? 'active' : ''}" data-module="${item}">${item}</button>`).join('')}</div>`).join('')
   app.querySelectorAll('[data-module]').forEach((item) => item.addEventListener('click', () => {
     if (item.dataset.module === 'Overview') return renderApp()
     renderAdminModule(item.dataset.module)
