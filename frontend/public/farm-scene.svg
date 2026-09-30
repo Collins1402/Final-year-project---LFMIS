@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 420" role="img" aria-label="Illustrated farm with a barn, hills and fence">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#bfe3f2"/>
+      <stop offset="1" stop-color="#eef7ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="420" fill="url(#sky)"/>
+  <circle cx="500" cy="80" r="38" fill="#ffd66b"/>
+  <g fill="#fff" opacity=".9">
+    <ellipse cx="120" cy="70" rx="42" ry="14"/><ellipse cx="150" cy="60" rx="30" ry="16"/>
+    <ellipse cx="330" cy="50" rx="36" ry="12"/><ellipse cx="356" cy="42" rx="24" ry="12"/>
+  </g>
+  <path d="M0 250 Q150 170 320 230 T600 210 V420 H0Z" fill="#9fcf87"/>
+  <path d="M0 290 Q180 230 360 280 T600 270 V420 H0Z" fill="#7dbb68"/>
+  <g transform="translate(370 150)">
+    <rect x="0" y="50" width="150" height="110" fill="#b8453a"/>
+    <path d="M-12 56 L75 0 L162 56Z" fill="#8f2f27"/>
+    <rect x="50" y="95" width="50" height="65" fill="#f5efe6"/>
+    <path d="M50 95 L100 160 M100 95 L50 160" stroke="#b8453a" stroke-width="5"/>
+    <rect x="62" y="62" width="26" height="20" fill="#f5efe6"/>
+    <rect x="-40" y="80" width="34" height="80" rx="17" fill="#d9d2c4"/>
+    <path d="M-40 96 h34" stroke="#bdb4a3" stroke-width="3"/>
+  </g>
+  <g stroke="#e8dcc2" stroke-width="6" stroke-linecap="round">
+    <path d="M20 330 H580"/><path d="M20 355 H580"/>
+    <path d="M40 315 V375 M110 315 V375 M180 315 V375 M250 315 V375 M320 315 V375 M390 315 V375 M460 315 V375 M530 315 V375"/>
+  </g>
+  <path d="M0 380 Q300 350 600 380 V420 H0Z" fill="#5fa451"/>
+</svg>

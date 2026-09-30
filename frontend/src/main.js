@@ -1,5 +1,6 @@
 import './style.css'
 import { api } from './api.js'
+import { renderLanding } from './landing.js'
 
 const app = document.querySelector('#app')
 let currentUser = null
@@ -68,7 +69,7 @@ async function start() {
   } catch {
     try {
       const status = await api.setupStatus()
-      renderAuth(status.setupRequired ? 'setup' : 'login')
+      renderLanding(app, () => renderAuth(status.setupRequired ? 'setup' : 'login'), () => renderAuth('login'))
     } catch (error) { app.innerHTML = message(`Backend unavailable: ${error.message}`, true) }
   }
 }
