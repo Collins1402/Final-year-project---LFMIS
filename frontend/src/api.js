@@ -55,6 +55,7 @@ export const api = {
   assistantChat: (message) => post('/api/assistant/chat', { message }),
   notifications: () => request('/api/notifications'),
   markNotificationRead: (id) => request(`/api/notifications/${id}`, { method: 'PATCH', body: '{}' }),
+  loadDemoData: () => post('/api/demo-data', {}),
   feedback: () => request('/api/feedback'),
   createFeedback: (data) => post('/api/feedback', data),
   resolveFeedback: (id) => request(`/api/feedback/${id}/resolve`, { method: 'PATCH', body: '{}' }),

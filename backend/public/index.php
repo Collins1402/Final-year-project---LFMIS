@@ -19,6 +19,7 @@ require_once __DIR__ . '/../src/Services/CommerceService.php';
 require_once __DIR__ . '/../src/Services/AssistantService.php';
 require_once __DIR__ . '/../src/Services/NotificationService.php';
 require_once __DIR__ . '/../src/Services/FeedbackService.php';
+require_once __DIR__ . '/../src/Services/DemoService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -38,6 +39,7 @@ use Lfmis\Services\CommerceService;
 use Lfmis\Services\AssistantService;
 use Lfmis\Services\NotificationService;
 use Lfmis\Services\FeedbackService;
+use Lfmis\Services\DemoService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -70,6 +72,7 @@ try {
     $assistant = new AssistantService($db);
     $notifications = new NotificationService($db);
     $feedback = new FeedbackService($db);
+    $demo = new DemoService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -310,6 +313,12 @@ try {
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if (!in_array($current['role'], ['admin', 'worker', 'veterinarian', 'customer', 'buyer'], true)) Response::error('You do not have permission to use the assistant.', 403);
         Response::json($assistant->answer((string) ($request->body()['message'] ?? ''), $current));
+    }
+    if ($path === '/api/demo-data' && $method === 'POST') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('Only an administrator can load demo data.', 403);
+        Response::json($demo->seed($current['id']), 201);
     }
     if ($path === '/api/notifications' && $method === 'GET') {
         $current = $auth->currentUser();

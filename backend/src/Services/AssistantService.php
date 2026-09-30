@@ -17,7 +17,9 @@ final class AssistantService
         $openTasks = (int) $this->db->query("SELECT COUNT(*) FROM farm_activities WHERE status='planned'")->fetchColumn();
         $stock = (int) $this->db->query('SELECT COUNT(*) FROM inventory_items WHERE is_active=1 AND quantity_on_hand <= reorder_level')->fetchColumn();
         $healthDue = (int) $this->db->query("SELECT COUNT(*) FROM health_records WHERE next_due_date IS NOT NULL AND next_due_date <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)")->fetchColumn();
-        if (str_contains($question, 'not eating') || str_contains($question, 'sick') || str_contains($question, 'ill')) {
+        if ($question === '' || preg_match('/^(hi|hello|hey|how are you|how are u|good morning)/', $question)) {
+            $answer = 'Hello. I am the Flouri Farm assistant, and I am ready to help with farm records.';
+        } elseif (str_contains($question, 'not eating') || str_contains($question, 'sick') || str_contains($question, 'ill') || str_contains($question, 'diagnos')) {
             $answer = 'I cannot diagnose an animal. Record the signs and contact the veterinarian for an examination.';
         } elseif (str_contains($question, 'milk')) {
             $answer = sprintf('The farm has recorded %.2f litres of milk today.', $milk);
