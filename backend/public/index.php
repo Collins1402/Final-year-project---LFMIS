@@ -8,6 +8,8 @@ require_once __DIR__ . '/../src/Core/Response.php';
 require_once __DIR__ . '/../src/Core/Session.php';
 require_once __DIR__ . '/../src/Services/AuthService.php';
 require_once __DIR__ . '/../src/Services/UserService.php';
+require_once __DIR__ . '/../src/Services/AnimalService.php';
+require_once __DIR__ . '/../src/Services/HealthService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -16,6 +18,8 @@ use Lfmis\Core\Response;
 use Lfmis\Core\Session;
 use Lfmis\Services\AuthService;
 use Lfmis\Services\UserService;
+use Lfmis\Services\AnimalService;
+use Lfmis\Services\HealthService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -37,6 +41,8 @@ try {
     $db = Database::connection();
     $auth = new AuthService($db);
     $users = new UserService($db);
+    $animals = new AnimalService($db);
+    $health = new HealthService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -70,6 +76,49 @@ try {
     if ($method === 'GET' && $path === '/api/session') {
         $user = $auth->currentUser();
         Response::json($user ? ['user' => $user] : ['user' => null], $user ? 200 : 401);
+    }
+    if ($path === '/api/animals') {
+        $current = $auth->currentUser();
+        if ($current === null) {
+            Response::error('Please sign in to continue.', 401);
+        }
+        if ($method === 'GET' && in_array($current['role'], ['admin', 'worker', 'veterinarian'], true)) {
+            Response::json(['animals' => $animals->list()]);
+        }
+        if ($method === 'POST' && in_array($current['role'], ['admin', 'worker'], true)) {
+            $animal = $animals->create($request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'animal', $animal['id']]);
+            Response::json(['animal' => $animal], 201);
+        }
+        Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($method === 'PATCH' && preg_match('#^/api/animals/(\d+)/status$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) {
+            Response::error('Please sign in to continue.', 401);
+        }
+        if (!in_array($current['role'], ['admin', 'worker'], true)) {
+            Response::error('You do not have permission to perform this action.', 403);
+        }
+        $body = $request->body();
+        $animal = $animals->updateStatus((int) $matches[1], (string) ($body['status'] ?? ''));
+        $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update_status', 'animal', $animal['id']]);
+        Response::json(['animal' => $animal]);
+    }
+    if ($path === '/api/health-records') {
+        $current = $auth->currentUser();
+        if ($current === null) {
+            Response::error('Please sign in to continue.', 401);
+        }
+        if ($method === 'GET' && in_array($current['role'], ['admin', 'worker', 'veterinarian'], true)) {
+            Response::json(['records' => $health->list(), 'dueSoon' => $health->dueSoon()]);
+        }
+        if ($method === 'POST' && in_array($current['role'], ['admin', 'veterinarian'], true)) {
+            $record = $health->create($request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'health_record', $record['id']]);
+            Response::json(['record' => $record], 201);
+        }
+        Response::error('You do not have permission to perform this action.', 403);
     }
     if ($path === '/api/users') {
         $current = $auth->currentUser();
