@@ -224,7 +224,7 @@ async function renderAssistantModule() {
     const input = form.querySelector('input')
     const messages = content.querySelector('#assistant-messages')
     messages.insertAdjacentHTML('beforeend', `<p class="assistant-question">${escapeHtml(input.value)}</p>`)
-    try { const result = await api.assistantChat(input.value); messages.insertAdjacentHTML('beforeend', `<p class="message success">${escapeHtml(result.answer)}</p>`) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
+    try { const result = await api.assistantChat(input.value); content.querySelector('.health-pill').textContent = result.mode; messages.insertAdjacentHTML('beforeend', `<p class="message success">${escapeHtml(result.answer)}</p>`) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
     input.value = ''
   })
 }
