@@ -11,6 +11,7 @@ require_once __DIR__ . '/../src/Services/UserService.php';
 require_once __DIR__ . '/../src/Services/AnimalService.php';
 require_once __DIR__ . '/../src/Services/HealthService.php';
 require_once __DIR__ . '/../src/Services/VerificationService.php';
+require_once __DIR__ . '/../src/Services/PasswordResetService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -22,6 +23,7 @@ use Lfmis\Services\UserService;
 use Lfmis\Services\AnimalService;
 use Lfmis\Services\HealthService;
 use Lfmis\Services\VerificationService;
+use Lfmis\Services\PasswordResetService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -46,6 +48,7 @@ try {
     $animals = new AnimalService($db);
     $health = new HealthService($db);
     $verification = new VerificationService($db);
+    $passwordReset = new PasswordResetService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -95,6 +98,24 @@ try {
     if ($method === 'POST' && $path === '/api/login') {
         $body = $request->body();
         Response::json(['user' => $auth->login((string) ($body['login'] ?? ''), (string) ($body['password'] ?? ''))]);
+    }
+    if ($method === 'POST' && $path === '/api/password/forgot') {
+        $body = $request->body();
+        $email = filter_var(trim((string) ($body['email'] ?? '')), FILTER_VALIDATE_EMAIL);
+        if ($email === false) {
+            Response::error('Enter a valid email address.', 422);
+        }
+        $link = $passwordReset->request((string) $email);
+        $response = ['message' => 'If an active account matches that email, reset instructions have been sent.'];
+        if ($link !== null) {
+            $response['devResetLink'] = $link;
+        }
+        Response::json($response);
+    }
+    if ($method === 'POST' && $path === '/api/password/reset') {
+        $body = $request->body();
+        $passwordReset->reset((string) ($body['token'] ?? ''), (string) ($body['password'] ?? ''));
+        Response::json(['message' => 'Password updated. You can now sign in.']);
     }
     if ($method === 'POST' && $path === '/api/logout') {
         Session::logout();

@@ -21,6 +21,8 @@ export const api = {
   setup: (data) => post('/api/setup', data),
   register: (data) => post('/api/register', data),
   verifyEmail: (token) => request(`/api/verify-email?token=${encodeURIComponent(token)}`),
+  forgotPassword: (data) => post('/api/password/forgot', data),
+  resetPassword: (data) => post('/api/password/reset', data),
   login: (data) => post('/api/login', data),
   logout: () => post('/api/logout', {}),
   session: () => request('/api/session'),

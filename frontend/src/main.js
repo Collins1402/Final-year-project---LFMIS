@@ -10,9 +10,10 @@ const message = (text, danger = false) => `<p class="message ${danger ? 'danger'
 
 function renderAuth(mode = 'login', notice = '') {
   const setup = mode === 'setup'
-  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<form id="login-form"><label>Username or email<input name="login" required></label><label>Password<span class="password-field"><input name="password" type="password" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form><button id="register-link" class="text-link" type="button">Create a farm account</button>`}</section></main>`
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<form id="login-form"><label>Username or email<input name="login" required></label><label>Password<span class="password-field"><input name="password" type="password" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form><button id="forgot-link" class="text-link" type="button">Forgot password?</button><button id="register-link" class="text-link" type="button">Create a farm account</button>`}</section></main>`
   const form = app.querySelector('form')
   app.querySelector('#register-link')?.addEventListener('click', renderRegister)
+  app.querySelector('#forgot-link')?.addEventListener('click', renderForgotPassword)
   app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
     const input = toggle.parentElement.querySelector('input')
     const visible = input.type === 'text'
@@ -34,6 +35,48 @@ function renderAuth(mode = 'login', notice = '') {
       renderApp()
     } catch (error) { renderAuth(mode, message(error.message, true)) }
   })
+}
+
+function renderForgotPassword(notice = '') {
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">ACCOUNT RECOVERY</p><h1>Reset your password</h1><p class="muted">Enter your account email. We will send a one-time reset link if it matches an active account.</p>${notice}<form id="forgot-form"><label>Email<input name="email" type="email" required autocomplete="email"></label><button>Send reset link</button></form><button id="back-login" class="text-link" type="button">Back to sign in</button></section></main>`
+  app.querySelector('#back-login').addEventListener('click', () => renderAuth('login'))
+  app.querySelector('#forgot-form').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    try {
+      const result = await api.forgotPassword(Object.fromEntries(new FormData(event.target)))
+      const link = result.devResetLink ? ` <a href="${escapeHtml(result.devResetLink)}">Open development reset link</a>` : ''
+      renderForgotPassword(`<p class="message success">${escapeHtml(result.message)}${link}</p>`)
+    } catch (error) { renderForgotPassword(`<p class="message danger">${escapeHtml(error.message)}</p>`) }
+  })
+}
+
+function renderResetPassword(token) {
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">ACCOUNT RECOVERY</p><h1>Choose a new password</h1><p class="muted">Use at least 12 characters. This link works once and expires after one hour.</p><form id="reset-form"><label>New password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><label>Confirm password<span class="password-field"><input name="confirmPassword" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Update password</button></form></section></main>`
+  app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
+    const input = toggle.parentElement.querySelector('input')
+    input.type = input.type === 'password' ? 'text' : 'password'
+  }))
+  app.querySelector('#reset-form').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const data = Object.fromEntries(new FormData(event.target))
+    if (data.password !== data.confirmPassword) {
+      renderResetPasswordWithNotice(token, 'The passwords do not match.')
+      return
+    }
+    try {
+      await api.resetPassword({ token, password: data.password })
+      history.replaceState({}, '', '/')
+      renderAuth('login', 'Password updated. You can now sign in.')
+    } catch (error) { renderResetPasswordWithNotice(token, error.message) }
+  })
+}
+
+function renderResetPasswordWithNotice(token, text) {
+  renderResetPassword(token)
+  const notice = document.createElement('p')
+  notice.className = 'message danger'
+  notice.textContent = text
+  app.querySelector('#reset-form').before(notice)
 }
 
 function renderRegister(notice = '') {
@@ -87,6 +130,11 @@ function renderRoleWorkspace() {
 }
 
 async function start() {
+  const resetToken = new URLSearchParams(window.location.search).get('reset')
+  if (resetToken) {
+    renderResetPassword(resetToken)
+    return
+  }
   const verificationToken = new URLSearchParams(window.location.search).get('verify')
   if (verificationToken) {
     try {
