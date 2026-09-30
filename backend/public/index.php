@@ -16,6 +16,8 @@ require_once __DIR__ . '/../src/Services/ActivityService.php';
 require_once __DIR__ . '/../src/Services/ProductionService.php';
 require_once __DIR__ . '/../src/Services/InventoryService.php';
 require_once __DIR__ . '/../src/Services/CommerceService.php';
+require_once __DIR__ . '/../src/Services/AssistantService.php';
+require_once __DIR__ . '/../src/Services/NotificationService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -32,6 +34,8 @@ use Lfmis\Services\ActivityService;
 use Lfmis\Services\ProductionService;
 use Lfmis\Services\InventoryService;
 use Lfmis\Services\CommerceService;
+use Lfmis\Services\AssistantService;
+use Lfmis\Services\NotificationService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -61,6 +65,8 @@ try {
     $production = new ProductionService($db);
     $inventory = new InventoryService($db);
     $commerce = new CommerceService($db);
+    $assistant = new AssistantService($db);
+    $notifications = new NotificationService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -295,6 +301,24 @@ try {
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
         Response::json($commerce->finance());
+    }
+    if ($path === '/api/assistant/chat' && $method === 'POST') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!in_array($current['role'], ['admin', 'worker', 'veterinarian', 'customer', 'buyer'], true)) Response::error('You do not have permission to use the assistant.', 403);
+        Response::json($assistant->answer((string) ($request->body()['message'] ?? ''), $current));
+    }
+    if ($path === '/api/notifications' && $method === 'GET') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] === 'admin') $notifications->generateForUser($current['id']);
+        Response::json(['notifications' => $notifications->list($current['id'])]);
+    }
+    if ($method === 'PATCH' && preg_match('#^/api/notifications/(\d+)$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        $notifications->markRead((int) $matches[1], $current['id']);
+        Response::json(['ok' => true]);
     }
     Response::error('Endpoint not found.', 404);
 } catch (DomainException $error) {

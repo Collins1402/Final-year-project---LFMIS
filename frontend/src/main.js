@@ -128,6 +128,7 @@ function renderAdminModule(module) {
   if (module === 'Inventory') return renderInventoryModule()
   if (module === 'Sales & orders') return renderCommerceModule()
   if (module === 'Reports') return renderReportsModule()
+  if (module === 'Assistant') return renderAssistantModule()
   const details = {
     Livestock: ['Livestock register', 'Register animals, update their status and review the herd.'],
     'Animal health': ['Animal health', 'Record vaccinations, treatments and follow-up dates.'],
@@ -191,6 +192,20 @@ async function renderReportsModule() {
     const finance = await api.financeReport()
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Reports</h1><p class="muted">Monthly financial performance from recorded sales and expenses.</p></div><span class="health-pill">Current month</span></header><section class="stats"><div><small>Sales</small><strong>KES ${Number(finance.salesThisMonth).toLocaleString()}</strong></div><div><small>Confirmed payments</small><strong>KES ${Number(finance.confirmedPaymentsThisMonth).toLocaleString()}</strong></div><div><small>Expenses</small><strong>KES ${Number(finance.expensesThisMonth).toLocaleString()}</strong></div><div><small>Estimated net</small><strong>KES ${Number(finance.estimatedNet).toLocaleString()}</strong></div></section><section class="panel"><h2>Finance summary</h2><p class="muted">These totals are calculated from the records entered in Sales, Payments and Expenses.</p></section>`
   } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderAssistantModule() {
+  const content = app.querySelector('.content')
+  content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Farm assistant</h1><p class="muted">Role-limited, rule-based decision support from your records.</p></div><span class="health-pill">Rule-based mode</span></header><section class="panel assistant-panel"><div id="assistant-messages" class="assistant-messages"><p class="message success">Ask about milk, animals, tasks, stock or health follow-ups.</p></div><form id="assistant-form" class="assistant-form"><input name="message" placeholder="Ask a farm question..." required><button>Ask assistant</button></form></section>`
+  content.querySelector('#assistant-form').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const form = event.target
+    const input = form.querySelector('input')
+    const messages = content.querySelector('#assistant-messages')
+    messages.insertAdjacentHTML('beforeend', `<p class="assistant-question">${escapeHtml(input.value)}</p>`)
+    try { const result = await api.assistantChat(input.value); messages.insertAdjacentHTML('beforeend', `<p class="message success">${escapeHtml(result.answer)}</p>`) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
+    input.value = ''
+  })
 }
 
 function renderRoleWorkspace() {

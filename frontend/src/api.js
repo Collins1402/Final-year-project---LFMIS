@@ -52,4 +52,7 @@ export const api = {
   payments: () => request('/api/payments'),
   createPayment: (data) => post('/api/payments', data),
   financeReport: () => request('/api/reports/finance'),
+  assistantChat: (message) => post('/api/assistant/chat', { message }),
+  notifications: () => request('/api/notifications'),
+  markNotificationRead: (id) => request(`/api/notifications/${id}`, { method: 'PATCH', body: '{}' }),
 }
