@@ -20,9 +20,10 @@ final class AuthService
             return null;
         }
         $statement = $this->db->prepare(
-            'SELECT users.id, users.full_name, users.username, users.email, users.phone, roles.name AS role
+            'SELECT users.id, users.full_name, users.username, users.email, users.phone,
+                    users.email_verified_at, roles.name AS role
              FROM users JOIN roles ON roles.id = users.role_id
-             WHERE users.id = ? AND users.is_active = 1'
+             WHERE users.id = ? AND users.is_active = 1 AND users.email_verified_at IS NOT NULL'
         );
         $statement->execute([$userId]);
         $user = $statement->fetch();
@@ -45,12 +46,11 @@ final class AuthService
         $this->validateIdentity($name, $username, $email, $password);
         $roleId = $this->roleId('admin');
         $statement = $this->db->prepare(
-            'INSERT INTO users (role_id, full_name, username, email, password_hash) VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO users (role_id, full_name, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, 0)'
         );
         $statement->execute([$roleId, $name, $username, $email, password_hash($password, PASSWORD_DEFAULT)]);
         $id = (int) $this->db->lastInsertId();
-        Session::login($id);
-        return $this->currentUser() ?? throw new \RuntimeException('Could not load the new account.');
+        return $this->findUser($id);
     }
 
     public function login(string $login, string $password): array
@@ -73,6 +73,9 @@ final class AuthService
         }
         if (!(int) $user['is_active']) {
             throw new \RuntimeException('This account is inactive. Contact the farm administrator.');
+        }
+        if ($user['email_verified_at'] === null) {
+            throw new \RuntimeException('Confirm your email address before signing in.');
         }
         $this->db->prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW() WHERE id = ?')->execute([$user['id']]);
         Session::login((int) $user['id']);
@@ -107,8 +110,24 @@ final class AuthService
             'fullName' => $user['full_name'],
             'username' => $user['username'],
             'email' => $user['email'],
+            'emailVerified' => $user['email_verified_at'] !== null,
             'phone' => $user['phone'],
             'role' => $user['role'],
         ];
+    }
+
+    private function findUser(int $id): array
+    {
+        $statement = $this->db->prepare(
+            'SELECT users.id, users.full_name, users.username, users.email, users.phone,
+                    users.email_verified_at, roles.name AS role
+             FROM users JOIN roles ON roles.id = users.role_id WHERE users.id = ?'
+        );
+        $statement->execute([$id]);
+        $user = $statement->fetch();
+        if (!$user) {
+            throw new \RuntimeException('Could not load the account.');
+        }
+        return $this->formatUser($user);
     }
 }

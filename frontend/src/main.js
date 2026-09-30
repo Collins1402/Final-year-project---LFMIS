@@ -9,13 +9,25 @@ const message = (text, danger = false) => `<p class="message ${danger ? 'danger'
 
 function renderAuth(mode = 'login', notice = '') {
   const setup = mode === 'setup'
-  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="12" required></label><button>Create owner account</button></form>` : `<form id="login-form"><label>Username or email<input name="login" required></label><label>Password<input name="password" type="password" required></label><button>Sign in</button></form>`}</section></main>`
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<form id="login-form"><label>Username or email<input name="login" required></label><label>Password<span class="password-field"><input name="password" type="password" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form>`}</section></main>`
   const form = app.querySelector('form')
+  app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
+    const input = toggle.parentElement.querySelector('input')
+    const visible = input.type === 'text'
+    input.type = visible ? 'password' : 'text'
+    toggle.setAttribute('aria-label', visible ? 'Show password' : 'Hide password')
+    toggle.textContent = visible ? '👁' : '🙈'
+  }))
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(form))
     try {
       const result = setup ? await api.setup(data) : await api.login(data)
+      if (setup && result.verificationRequired) {
+        const devLink = result.devVerificationLink ? `<p class="message success">${escapeHtml(result.message)} <a href="${escapeHtml(result.devVerificationLink)}">Open development confirmation link</a></p>` : message(result.message, false)
+        renderAuth('login', devLink)
+        return
+      }
       currentUser = result.user
       renderApp()
     } catch (error) { renderAuth(mode, message(error.message, true)) }
@@ -40,6 +52,15 @@ async function renderApp() {
 }
 
 async function start() {
+  const verificationToken = new URLSearchParams(window.location.search).get('verify')
+  if (verificationToken) {
+    try {
+      await api.verifyEmail(verificationToken)
+      history.replaceState({}, '', '/')
+      renderAuth('login', message('Email confirmed. You can now sign in.', false))
+    } catch (error) { renderAuth('login', message(error.message, true)) }
+    return
+  }
   try {
     const session = await api.session()
     currentUser = session.user

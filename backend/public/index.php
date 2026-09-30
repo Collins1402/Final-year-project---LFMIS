@@ -10,6 +10,7 @@ require_once __DIR__ . '/../src/Services/AuthService.php';
 require_once __DIR__ . '/../src/Services/UserService.php';
 require_once __DIR__ . '/../src/Services/AnimalService.php';
 require_once __DIR__ . '/../src/Services/HealthService.php';
+require_once __DIR__ . '/../src/Services/VerificationService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -20,6 +21,7 @@ use Lfmis\Services\AuthService;
 use Lfmis\Services\UserService;
 use Lfmis\Services\AnimalService;
 use Lfmis\Services\HealthService;
+use Lfmis\Services\VerificationService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -43,6 +45,7 @@ try {
     $users = new UserService($db);
     $animals = new AnimalService($db);
     $health = new HealthService($db);
+    $verification = new VerificationService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -63,7 +66,18 @@ try {
         Response::json(['setupRequired' => (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0]);
     }
     if ($method === 'POST' && $path === '/api/setup') {
-        Response::json(['user' => $auth->createFirstAdmin($request->body())], 201);
+        $user = $auth->createFirstAdmin($request->body());
+        $link = $verification->issue($user['id'], $user['email'], $user['fullName']);
+        Response::json([
+            'user' => $user,
+            'verificationRequired' => true,
+            'devVerificationLink' => $link,
+            'message' => 'Check the email address to confirm the account before signing in.',
+        ], 201);
+    }
+    if ($method === 'GET' && $path === '/api/verify-email') {
+        $token = (string) ($_GET['token'] ?? '');
+        Response::json($verification->confirm($token));
     }
     if ($method === 'POST' && $path === '/api/login') {
         $body = $request->body();

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   full_name VARCHAR(120) NOT NULL,
   username VARCHAR(30) NOT NULL,
   email VARCHAR(190) NOT NULL,
+  email_verified_at DATETIME NULL,
   phone VARCHAR(20) NULL,
   password_hash VARCHAR(255) NOT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -33,8 +34,18 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT uq_users_username UNIQUE (username),
   CONSTRAINT uq_users_email UNIQUE (email),
+  INDEX idx_users_email_verified (email_verified_at, is_active),
   INDEX idx_users_role_active (role_id, is_active),
   CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  user_id BIGINT UNSIGNED PRIMARY KEY,
+  token_hash CHAR(64) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_email_verification_token UNIQUE (token_hash),
+  CONSTRAINT fk_email_verification_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (

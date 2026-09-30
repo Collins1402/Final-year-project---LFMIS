@@ -19,6 +19,7 @@ export const api = {
   health: () => request('/api/health'),
   setupStatus: () => request('/api/setup-status'),
   setup: (data) => post('/api/setup', data),
+  verifyEmail: (token) => request(`/api/verify-email?token=${encodeURIComponent(token)}`),
   login: (data) => post('/api/login', data),
   logout: () => post('/api/logout', {}),
   session: () => request('/api/session'),
