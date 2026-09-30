@@ -126,6 +126,8 @@ function renderAdminModule(module) {
   if (module === 'Activities') return renderActivitiesModule()
   if (module === 'Production') return renderProductionModule()
   if (module === 'Inventory') return renderInventoryModule()
+  if (module === 'Sales & orders') return renderCommerceModule()
+  if (module === 'Reports') return renderReportsModule()
   const details = {
     Livestock: ['Livestock register', 'Register animals, update their status and review the herd.'],
     'Animal health': ['Animal health', 'Record vaccinations, treatments and follow-up dates.'],
@@ -170,6 +172,24 @@ async function renderInventoryModule() {
     const data = await api.inventory()
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Inventory</h1><p class="muted">Track supplies and see what needs replenishing.</p></div><span class="health-pill">Stock control</span></header><section class="module-grid"><section class="panel"><h2>Add stock item</h2><form id="inventory-form" class="compact-form"><input name="name" placeholder="Item name" required><select name="category"><option value="feed">Feed</option><option value="medicine">Medicine</option><option value="equipment">Equipment</option><option value="supplies">Supplies</option><option value="other">Other</option></select><input name="unit" placeholder="Unit" required><input name="quantityOnHand" type="number" min="0" step="0.01" placeholder="Quantity" required><input name="reorderLevel" type="number" min="0" step="0.01" placeholder="Reorder level" required><button>Add item</button></form></section><section class="panel"><h2>Stock list</h2><div class="table-wrap"><table><thead><tr><th>Item</th><th>Category</th><th>On hand</th><th>Reorder at</th></tr></thead><tbody>${data.items.length ? data.items.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.category)}</td><td>${item.quantity_on_hand} ${escapeHtml(item.unit)}</td><td>${item.reorder_level}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No stock items yet.</td></tr>'}</tbody></table></div></section></section>`
     content.querySelector('#inventory-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createInventoryItem(Object.fromEntries(new FormData(event.target))); await renderInventoryModule() })
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderCommerceModule() {
+  const content = app.querySelector('.content')
+  try {
+    const [orders, sales, payments] = await Promise.all([api.orders(), api.sales(), api.payments()])
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Sales & orders</h1><p class="muted">Create orders, record sales and track payments.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create order</h2><form id="order-form" class="compact-form"><input name="customerName" placeholder="Customer name" required><input name="customerPhone" placeholder="Phone"><input name="itemName" placeholder="Item" required><input name="quantity" type="number" min=".01" step=".01" placeholder="Quantity" required><input name="unit" placeholder="Unit" required><input name="unitPrice" type="number" min="0" step=".01" placeholder="Unit price" required><button>Create order</button></form><h2>Orders</h2><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Status</th><th>Total</th></tr></thead><tbody>${orders.orders.length ? orders.orders.map((item) => `<tr><td>${escapeHtml(item.customer)}</td><td>${escapeHtml(item.status)}</td><td>${item.total_amount}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record sale</h2><form id="sale-form" class="compact-form"><input name="description" placeholder="Description" required><input name="quantity" type="number" min=".01" step=".01" placeholder="Quantity" required><input name="unit" placeholder="Unit" required><input name="unitPrice" type="number" min="0" step=".01" placeholder="Unit price" required><input name="soldAt" type="datetime-local" required><button>Save sale</button></form><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${payments.payments.length ? payments.payments.map((item) => `<tr><td>#${item.order_id}</td><td>${item.method}</td><td>${item.status}</td><td>${item.amount}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No payments yet.</td></tr>'}</tbody></table></div></section></section>`
+    content.querySelector('#order-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createOrder(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
+    content.querySelector('#sale-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createSale(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderReportsModule() {
+  const content = app.querySelector('.content')
+  try {
+    const finance = await api.financeReport()
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Reports</h1><p class="muted">Monthly financial performance from recorded sales and expenses.</p></div><span class="health-pill">Current month</span></header><section class="stats"><div><small>Sales</small><strong>KES ${Number(finance.salesThisMonth).toLocaleString()}</strong></div><div><small>Confirmed payments</small><strong>KES ${Number(finance.confirmedPaymentsThisMonth).toLocaleString()}</strong></div><div><small>Expenses</small><strong>KES ${Number(finance.expensesThisMonth).toLocaleString()}</strong></div><div><small>Estimated net</small><strong>KES ${Number(finance.estimatedNet).toLocaleString()}</strong></div></section><section class="panel"><h2>Finance summary</h2><p class="muted">These totals are calculated from the records entered in Sales, Payments and Expenses.</p></section>`
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 

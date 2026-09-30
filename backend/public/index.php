@@ -15,6 +15,7 @@ require_once __DIR__ . '/../src/Services/PasswordResetService.php';
 require_once __DIR__ . '/../src/Services/ActivityService.php';
 require_once __DIR__ . '/../src/Services/ProductionService.php';
 require_once __DIR__ . '/../src/Services/InventoryService.php';
+require_once __DIR__ . '/../src/Services/CommerceService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -30,6 +31,7 @@ use Lfmis\Services\PasswordResetService;
 use Lfmis\Services\ActivityService;
 use Lfmis\Services\ProductionService;
 use Lfmis\Services\InventoryService;
+use Lfmis\Services\CommerceService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -58,6 +60,7 @@ try {
     $activities = new ActivityService($db);
     $production = new ProductionService($db);
     $inventory = new InventoryService($db);
+    $commerce = new CommerceService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -251,6 +254,47 @@ try {
             Response::json(['item' => $item]);
         }
         Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($path === '/api/products' || $path === '/api/store/products') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($method === 'GET') Response::json(['products' => $commerce->products()]);
+        if ($method === 'POST' && $current['role'] === 'admin') Response::json(['product' => $commerce->createProduct($request->body())], 201);
+        Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($path === '/api/orders') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($method === 'GET' && in_array($current['role'], ['admin', 'customer', 'buyer'], true)) Response::json(['orders' => $commerce->orders()]);
+        if ($method === 'POST' && $current['role'] === 'admin') Response::json(['order' => $commerce->createOrder($request->body(), $current['id'])], 201);
+        Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($method === 'PATCH' && preg_match('#^/api/orders/(\d+)$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        Response::json(['order' => $commerce->updateOrder((int) $matches[1], $request->body(), $current['id'])]);
+    }
+    if ($path === '/api/sales' || $path === '/api/expenses' || $path === '/api/payments') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($method === 'GET' && $current['role'] === 'admin') {
+            if ($path === '/api/sales') Response::json(['sales' => $commerce->sales()]);
+            if ($path === '/api/expenses') Response::json(['expenses' => $commerce->expenses()]);
+            Response::json(['payments' => $commerce->payments()]);
+        }
+        if ($method === 'POST' && $current['role'] === 'admin') {
+            if ($path === '/api/sales') Response::json(['sale' => $commerce->createSale($request->body(), $current['id'])], 201);
+            if ($path === '/api/expenses') Response::json(['expense' => $commerce->createExpense($request->body(), $current['id'])], 201);
+            Response::json(['payment' => $commerce->createPayment($request->body(), $current['id'])], 201);
+        }
+        Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($method === 'GET' && $path === '/api/reports/finance') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        Response::json($commerce->finance());
     }
     Response::error('Endpoint not found.', 404);
 } catch (DomainException $error) {
