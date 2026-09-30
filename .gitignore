@@ -11,6 +11,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .phpunit.cache/
+.phpunit.result.cache
 ml/models/
 ml/data/
 scripts/dev-all.sh

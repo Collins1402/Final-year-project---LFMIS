@@ -1,0 +1,114 @@
+<?php
+declare(strict_types=1);
+
+namespace Lfmis\Services;
+
+use Lfmis\Core\Database;
+use Lfmis\Core\Session;
+use PDO;
+
+final class AuthService
+{
+    public function __construct(private PDO $db)
+    {
+    }
+
+    public function currentUser(): ?array
+    {
+        $userId = Session::userId();
+        if ($userId === null) {
+            return null;
+        }
+        $statement = $this->db->prepare(
+            'SELECT users.id, users.full_name, users.username, users.email, users.phone, roles.name AS role
+             FROM users JOIN roles ON roles.id = users.role_id
+             WHERE users.id = ? AND users.is_active = 1'
+        );
+        $statement->execute([$userId]);
+        $user = $statement->fetch();
+        if (!$user) {
+            Session::logout();
+            return null;
+        }
+        return $this->formatUser($user);
+    }
+
+    public function createFirstAdmin(array $input): array
+    {
+        if ((int) $this->db->query('SELECT COUNT(*) FROM users')->fetchColumn() !== 0) {
+            throw new \DomainException('Initial setup has already been completed.');
+        }
+        $name = trim((string) ($input['fullName'] ?? ''));
+        $username = trim((string) ($input['username'] ?? ''));
+        $email = filter_var(trim((string) ($input['email'] ?? '')), FILTER_VALIDATE_EMAIL);
+        $password = (string) ($input['password'] ?? '');
+        $this->validateIdentity($name, $username, $email, $password);
+        $roleId = $this->roleId('admin');
+        $statement = $this->db->prepare(
+            'INSERT INTO users (role_id, full_name, username, email, password_hash) VALUES (?, ?, ?, ?, ?)'
+        );
+        $statement->execute([$roleId, $name, $username, $email, password_hash($password, PASSWORD_DEFAULT)]);
+        $id = (int) $this->db->lastInsertId();
+        Session::login($id);
+        return $this->currentUser() ?? throw new \RuntimeException('Could not load the new account.');
+    }
+
+    public function login(string $login, string $password): array
+    {
+        $login = trim($login);
+        if ($login === '' || $password === '') {
+            throw new \InvalidArgumentException('Enter your username or email and password.');
+        }
+        $column = strpos($login, '@') !== false ? 'email' : 'username';
+        $statement = $this->db->prepare(
+            "SELECT users.*, roles.name AS role FROM users JOIN roles ON roles.id = users.role_id WHERE users.{$column} = ? LIMIT 1"
+        );
+        $statement->execute([$login]);
+        $user = $statement->fetch();
+        if (!$user || ($user['locked_until'] !== null && strtotime($user['locked_until']) > time()) || !password_verify($password, (string) ($user['password_hash'] ?? ''))) {
+            if ($user) {
+                $this->recordFailedLogin($user);
+            }
+            throw new \RuntimeException('Username/email or password is incorrect.');
+        }
+        if (!(int) $user['is_active']) {
+            throw new \RuntimeException('This account is inactive. Contact the farm administrator.');
+        }
+        $this->db->prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW() WHERE id = ?')->execute([$user['id']]);
+        Session::login((int) $user['id']);
+        return $this->currentUser() ?? throw new \RuntimeException('Could not load your account.');
+    }
+
+    private function recordFailedLogin(array $user): void
+    {
+        $attempts = (int) $user['failed_login_attempts'] + 1;
+        $lockedUntil = $attempts >= 5 ? date('Y-m-d H:i:s', time() + 900) : null;
+        $this->db->prepare('UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE id = ?')->execute([$attempts, $lockedUntil, $user['id']]);
+    }
+
+    private function validateIdentity(string $name, string $username, mixed $email, string $password): void
+    {
+        if ($name === '' || !preg_match('/^[A-Za-z0-9_.]{3,30}$/', $username) || $email === false || strlen($password) < 12) {
+            throw new \InvalidArgumentException('Enter a name, valid username, valid email and a password of at least 12 characters.');
+        }
+    }
+
+    private function roleId(string $role): int
+    {
+        $statement = $this->db->prepare('SELECT id FROM roles WHERE name = ?');
+        $statement->execute([$role]);
+        return (int) $statement->fetchColumn();
+    }
+
+    private function formatUser(array $user): array
+    {
+        return [
+            'id' => (int) $user['id'],
+            'fullName' => $user['full_name'],
+            'username' => $user['username'],
+            'email' => $user['email'],
+            'phone' => $user['phone'],
+            'role' => $user['role'],
+        ];
+    }
+}
