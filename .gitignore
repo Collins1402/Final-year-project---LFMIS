@@ -16,5 +16,4 @@ ml/models/
 ml/data/
 scripts/dev-all.sh
 backup_*.sql
-recovery-before-original-schema.sql
 
