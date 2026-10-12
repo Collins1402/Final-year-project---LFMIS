@@ -9,39 +9,31 @@ final class ProductionService
 {
     public function __construct(private PDO $db) {}
 
-    public function milk(): array
+    public function records(): array
     {
-        return $this->db->query('SELECT id, production_date, milking_session, animal_id, quantity_litres, notes FROM milk_production ORDER BY production_date DESC, milking_session DESC LIMIT 200')->fetchAll();
+        return $this->db->query('SELECT id, produce_name, production_date, production_session, quantity_produced, quantity_sold, quantity_damaged, unit, notes FROM farm_produce ORDER BY production_date DESC, id DESC LIMIT 300')->fetchAll();
     }
 
-    public function eggs(): array
+    public function record(array $input, int $userId): array
     {
-        return $this->db->query('SELECT id, production_date, eggs_collected, eggs_broken, notes FROM egg_production ORDER BY production_date DESC LIMIT 200')->fetchAll();
-    }
-
-    public function recordMilk(array $input, int $userId): array
-    {
+        $name = trim((string) ($input['produceName'] ?? ''));
         $date = $this->date($input['productionDate'] ?? '');
-        $session = (string) ($input['session'] ?? '');
-        $quantity = filter_var($input['quantityLitres'] ?? null, FILTER_VALIDATE_FLOAT);
-        if (!in_array($session, ['morning', 'evening'], true) || $quantity === false || $quantity < 0 || $date > date('Y-m-d')) {
-            throw new \InvalidArgumentException('Enter a valid past or current production date, session and quantity.');
+        $session = trim((string) ($input['session'] ?? ''));
+        $quantity = filter_var($input['quantityProduced'] ?? null, FILTER_VALIDATE_FLOAT);
+        $sold = filter_var($input['quantitySold'] ?? 0, FILTER_VALIDATE_FLOAT);
+        $damaged = filter_var($input['quantityDamaged'] ?? 0, FILTER_VALIDATE_FLOAT);
+        $unit = trim((string) ($input['unit'] ?? ''));
+        if (
+            $name === '' || strlen($name) > 120 || $unit === '' || strlen($unit) > 30 ||
+            !in_array($session, ['', 'morning', 'evening', 'other'], true) ||
+            $quantity === false || $quantity < 0 || $sold === false || $sold < 0 ||
+            $damaged === false || $damaged < 0 || $sold + $damaged > $quantity ||
+            $date > date('Y-m-d')
+        ) {
+            throw new \InvalidArgumentException('Enter a valid produce name, date, quantity, sold amount, damaged amount and unit.');
         }
-        $statement = $this->db->prepare('INSERT INTO milk_production (production_date, milking_session, quantity_litres, notes, recorded_by) VALUES (?, ?, ?, ?, ?)');
-        $statement->execute([$date, $session, $quantity, trim((string) ($input['notes'] ?? '')) ?: null, $userId]);
-        return ['id' => (int) $this->db->lastInsertId(), 'date' => $date];
-    }
-
-    public function recordEggs(array $input, int $userId): array
-    {
-        $date = $this->date($input['productionDate'] ?? '');
-        $collected = filter_var($input['eggsCollected'] ?? null, FILTER_VALIDATE_INT);
-        $broken = filter_var($input['eggsBroken'] ?? 0, FILTER_VALIDATE_INT);
-        if ($collected === false || $collected < 0 || $broken === false || $broken < 0 || $broken > $collected || $date > date('Y-m-d')) {
-            throw new \InvalidArgumentException('Enter valid egg counts and a past or current date.');
-        }
-        $statement = $this->db->prepare('INSERT INTO egg_production (production_date, eggs_collected, eggs_broken, notes, recorded_by) VALUES (?, ?, ?, ?, ?)');
-        $statement->execute([$date, $collected, $broken, trim((string) ($input['notes'] ?? '')) ?: null, $userId]);
+        $statement = $this->db->prepare('INSERT INTO farm_produce (produce_name, production_date, production_session, quantity_produced, quantity_sold, quantity_damaged, unit, notes, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $statement->execute([$name, $date, $session !== '' ? $session : null, $quantity, $sold, $damaged, $unit, trim((string) ($input['notes'] ?? '')) ?: null, $userId]);
         return ['id' => (int) $this->db->lastInsertId(), 'date' => $date];
     }
 

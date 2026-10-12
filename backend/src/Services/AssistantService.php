@@ -17,7 +17,7 @@ final class AssistantService
         $greeting = $question === '' || preg_match('/^(hi|hello|hey|how are you|how are u|good morning|good afternoon|good evening)\b/', $question);
         $agricultureTerms = '/\b(agricultur|agronom|farm|crop|plant|soil|seed|fertili|irrigat|harvest|pest|disease|livestock|animal|cattle|cow|goat|sheep|chicken|poultry|rabbit|milk|egg|wool|feed|pasture|vet|vaccin|deworm|breeding|inventory|stock|weather|rain|maize|corn|bean|vegetable|fruit|greenhouse|beekeep|fish|aquaculture|tractor|compost|weed|yield)\w*\b/i';
         $animalCount = (int) $this->db->query("SELECT COUNT(*) FROM animals WHERE status='active'")->fetchColumn();
-        $milk = (float) $this->db->query('SELECT COALESCE(SUM(quantity_litres),0) FROM milk_production WHERE production_date=CURRENT_DATE()')->fetchColumn();
+        $milk = (float) $this->db->query("SELECT COALESCE(SUM(quantity_produced),0) FROM farm_produce WHERE LOWER(produce_name) = 'milk' AND production_date = CURRENT_DATE() AND LOWER(unit) IN ('litre', 'litres', 'l')")->fetchColumn();
         $openTasks = (int) $this->db->query("SELECT COUNT(*) FROM farm_activities WHERE status='planned'")->fetchColumn();
         $stock = (int) $this->db->query('SELECT COUNT(*) FROM inventory_items WHERE is_active=1 AND quantity_on_hand <= reorder_level')->fetchColumn();
         $healthDue = (int) $this->db->query("SELECT COUNT(*) FROM health_records WHERE next_due_date IS NOT NULL AND next_due_date <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)")->fetchColumn();

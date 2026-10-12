@@ -12,13 +12,16 @@ final class Database
     public static function connection(): PDO
     {
         if (self::$connection === null) {
+            $password = Env::get('LFMIS_DB_PASSWORD_EMPTY') === '1'
+                ? ''
+                : Env::required('LFMIS_DB_PASSWORD');
             $dsn = sprintf(
                 'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
                 Env::get('LFMIS_DB_HOST', '127.0.0.1'),
                 Env::get('LFMIS_DB_PORT', '4321'),
                 Env::required('LFMIS_DB_NAME')
             );
-            self::$connection = new PDO($dsn, Env::required('LFMIS_DB_USER'), Env::required('LFMIS_DB_PASSWORD'), [
+            self::$connection = new PDO($dsn, Env::required('LFMIS_DB_USER'), $password, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,

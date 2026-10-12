@@ -239,15 +239,15 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
-    if ($path === '/api/production/milk' || $path === '/api/production/eggs') {
+    if ($path === '/api/production') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         $allowedRead = in_array($current['role'], ['admin', 'worker'], true);
-        if ($method === 'GET' && $allowedRead) Response::json([$path === '/api/production/milk' ? 'milk' : 'eggs' => $path === '/api/production/milk' ? $production->milk() : $production->eggs()]);
+        if ($method === 'GET' && $allowedRead) Response::json(['records' => $production->records()]);
         if ($method === 'POST' && $allowedRead) {
-            $item = $path === '/api/production/milk' ? $production->recordMilk($request->body(), $current['id']) : $production->recordEggs($request->body(), $current['id']);
-            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', $path === '/api/production/milk' ? 'milk_production' : 'egg_production', $item['id']]);
-            Response::json(['production' => $item], 201);
+            $record = $production->record($request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'farm_produce', $record['id']]);
+            Response::json(['record' => $record], 201);
         }
         Response::error('You do not have permission to perform this action.', 403);
     }

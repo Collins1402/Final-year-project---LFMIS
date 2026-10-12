@@ -158,47 +158,23 @@ CREATE TABLE IF NOT EXISTS maintenance_records (
 
 -- ---------------------------------------------------------------- Produce
 
-CREATE TABLE IF NOT EXISTS milk_production (
+CREATE TABLE IF NOT EXISTS farm_produce (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  produce_name VARCHAR(120) NOT NULL,
   production_date DATE NOT NULL,
-  milking_session ENUM('morning', 'evening') NOT NULL,
+  production_session VARCHAR(30) NULL,
   animal_id BIGINT UNSIGNED NULL,
-  -- 0 means a herd-level total, so the unique key also blocks duplicate herd entries.
-  animal_key BIGINT UNSIGNED AS (IFNULL(animal_id, 0)) STORED,
-  quantity_litres DECIMAL(8,2) NOT NULL,
+  quantity_produced DECIMAL(12,2) NOT NULL,
+  quantity_sold DECIMAL(12,2) NOT NULL DEFAULT 0,
+  quantity_damaged DECIMAL(12,2) NOT NULL DEFAULT 0,
+  unit VARCHAR(30) NOT NULL,
   notes VARCHAR(500) NULL,
   recorded_by BIGINT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT uq_milk_date_session_animal UNIQUE (production_date, milking_session, animal_key),
-  CONSTRAINT chk_milk_quantity CHECK (quantity_litres >= 0),
-  INDEX idx_milk_date (production_date),
-  CONSTRAINT fk_milk_animal FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_milk_recorded_by FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS egg_production (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  production_date DATE NOT NULL,
-  eggs_collected INT UNSIGNED NOT NULL,
-  eggs_broken INT UNSIGNED NOT NULL DEFAULT 0,
-  notes VARCHAR(500) NULL,
-  recorded_by BIGINT UNSIGNED NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT uq_egg_date UNIQUE (production_date),
-  CONSTRAINT chk_egg_broken CHECK (eggs_broken <= eggs_collected),
-  CONSTRAINT fk_egg_recorded_by FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS wool_production (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  production_date DATE NOT NULL,
-  quantity_kg DECIMAL(8,2) NOT NULL,
-  notes VARCHAR(500) NULL,
-  recorded_by BIGINT UNSIGNED NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT chk_wool_quantity CHECK (quantity_kg > 0),
-  INDEX idx_wool_date (production_date),
-  CONSTRAINT fk_wool_recorded_by FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
+  CONSTRAINT chk_farm_produce_amounts CHECK (quantity_produced >= 0 AND quantity_sold >= 0 AND quantity_damaged >= 0 AND quantity_sold + quantity_damaged <= quantity_produced),
+  INDEX idx_farm_produce_date_name (production_date, produce_name),
+  CONSTRAINT fk_farm_produce_animal FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE SET NULL,
+  CONSTRAINT fk_farm_produce_recorded_by FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------- Stock

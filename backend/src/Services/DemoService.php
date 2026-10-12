@@ -31,13 +31,12 @@ final class DemoService
                 $animalStatement->execute([...$animal, 'TEST DATA - demo record', $userId]);
                 $animalIds[] = (int) $this->db->lastInsertId();
             }
-            $milk = $this->db->prepare('INSERT INTO milk_production (production_date,milking_session,quantity_litres,notes,recorded_by) VALUES (?,?,?,?,?)');
-            $eggs = $this->db->prepare('INSERT INTO egg_production (production_date,eggs_collected,eggs_broken,notes,recorded_by) VALUES (?,?,?,?,?)');
+            $produce = $this->db->prepare('INSERT INTO farm_produce (produce_name,production_date,production_session,quantity_produced,quantity_sold,quantity_damaged,unit,notes,recorded_by) VALUES (?,?,?,?,0,0,?,?,?)');
             for ($day = 27; $day >= 0; $day--) {
                 $date = date('Y-m-d', strtotime("-{$day} days"));
-                $milk->execute([$date, 'morning', round(30 + sin($day * 0.7) * 2, 2), 'TEST DATA - demo record', $userId]);
-                $milk->execute([$date, 'evening', round(24 + sin($day * 0.8 + 1) * 1.5, 2), 'TEST DATA - demo record', $userId]);
-                $eggs->execute([$date, 18 + ($day % 4), $day % 3, 'TEST DATA - demo record', $userId]);
+                $produce->execute(['Milk', $date, 'morning', round(30 + sin($day * 0.7) * 2, 2), 'litres', 'TEST DATA - demo record', $userId]);
+                $produce->execute(['Milk', $date, 'evening', round(24 + sin($day * 0.8 + 1) * 1.5, 2), 'litres', 'TEST DATA - demo record', $userId]);
+                $produce->execute(['Eggs', $date, null, 18 + ($day % 4), 'eggs', 'TEST DATA - demo record', $userId]);
             }
             $health = $this->db->prepare('INSERT INTO health_records (animal_id,record_type,description,record_date,next_due_date,recorded_by) VALUES (?,?,?,?,?,?)');
             $health->execute([$animalIds[0], 'vaccination', 'Routine cattle vaccination - TEST DATA', date('Y-m-d'), date('Y-m-d', strtotime('+5 days')), $userId]);
