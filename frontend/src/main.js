@@ -501,7 +501,32 @@ async function renderLivestockModule() {
 }
 
 async function renderHealthModule() {
-  const content=app.querySelector('.content'); try { const [animals,data]=await Promise.all([api.animals(),api.healthRecords()]); content.innerHTML=`<header><div><p class="kicker">FARM MODULE</p><h1>Animal health</h1><p class="muted">Record treatment, vaccination and follow-ups.</p></div><span class="health-pill">${data.records.length} records</span></header><section class="panel module-panel"><form id="health-module-form" class="compact-form"><select name="animalId" required><option value="">Animal</option>${animals.animals.map((a)=>`<option value="${a.id}">${escapeHtml(a.tag_number)}</option>`).join('')}</select><select name="recordType"><option value="vaccination">Vaccination</option><option value="treatment">Treatment</option><option value="deworming">Deworming</option><option value="checkup">Checkup</option></select><input name="description" placeholder="Description" required><input name="recordDate" type="date" required><button>Save health record</button></form><div class="table-wrap"><table><thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${data.records.map((r)=>`<tr><td>${r.record_date}</td><td>${escapeHtml(r.tag_number)}</td><td>${r.record_type}</td><td>${escapeHtml(r.description)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No health records yet.</td></tr>'}</tbody></table></div></section>`; content.querySelector('form').addEventListener('submit',async(e)=>{e.preventDefault();await api.createHealthRecord(Object.fromEntries(new FormData(e.target)));await renderHealthModule()}) } catch(error){content.innerHTML=message(error.message,true)}
+  const content = app.querySelector('.content')
+  const speciesNames = { cattle: 'Cattle', goat: 'Goat', sheep: 'Sheep', rabbit: 'Rabbit', chicken: 'Chicken', other: 'Other' }
+  try {
+    const [animals, data] = await Promise.all([api.animals(), api.healthRecords()])
+    const animalTypes = [...new Set(animals.animals.map((animal) => animal.species))].sort()
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Animal health</h1><p class="muted">Record treatment, vaccination and follow-ups.</p></div><span class="health-pill" id="health-record-count">${data.records.length} records</span></header><section class="panel module-panel"><form id="health-module-form" class="compact-form"><select name="animalId" required><option value="">Animal</option>${animals.animals.map((animal) => `<option value="${Number(animal.id)}">${escapeHtml(speciesNames[animal.species] || animal.species)} · ${escapeHtml(animal.tag_number)}</option>`).join('')}</select><select name="recordType"><option value="vaccination">Vaccination</option><option value="treatment">Treatment</option><option value="deworming">Deworming</option><option value="checkup">Checkup</option></select><input name="description" placeholder="Description" required><input name="recordDate" type="date" required><button>Save health record</button></form><div class="health-record-toolbar"><label for="health-species-filter">Animal type<select id="health-species-filter"><option value="">All animal types</option>${animalTypes.map((species) => `<option value="${escapeHtml(species)}">${escapeHtml(speciesNames[species] || species)}</option>`).join('')}</select></label></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Animal type</th><th>Animal</th><th>Record type</th><th>Description</th></tr></thead><tbody id="health-record-rows"></tbody></table></div></section>`
+
+    const rows = content.querySelector('#health-record-rows')
+    const filter = content.querySelector('#health-species-filter')
+    const renderRows = () => {
+      const visibleRecords = data.records.filter((record) => !filter.value || record.species === filter.value)
+      content.querySelector('#health-record-count').textContent = `${visibleRecords.length} records`
+      rows.innerHTML = visibleRecords.length
+        ? visibleRecords.map((record) => `<tr><td>${escapeHtml(record.record_date)}</td><td>${escapeHtml(speciesNames[record.species] || record.species)}</td><td>${escapeHtml(record.tag_number)}</td><td>${escapeHtml(record.record_type)}</td><td>${escapeHtml(record.description)}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="empty">No health records for this animal type.</td></tr>'
+    }
+    filter.addEventListener('change', renderRows)
+    renderRows()
+    content.querySelector('#health-module-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      try {
+        await api.createHealthRecord(Object.fromEntries(new FormData(event.target)))
+        await renderHealthModule()
+      } catch (error) { content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(error.message, true) })) }
+    })
+  } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
 async function renderUsersModule() {

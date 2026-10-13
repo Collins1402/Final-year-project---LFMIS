@@ -21,7 +21,7 @@ final class HealthService
     public function list(): array
     {
         return $this->db->query(
-            'SELECT health_records.id, health_records.animal_id, animals.tag_number, animals.name AS animal_name,
+            'SELECT health_records.id, health_records.animal_id, animals.tag_number, animals.species, animals.name AS animal_name,
                     health_records.record_type, health_records.description, health_records.medication,
                     health_records.dosage, health_records.cost, health_records.record_date, health_records.next_due_date
              FROM health_records JOIN animals ON animals.id = health_records.animal_id
