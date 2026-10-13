@@ -20,6 +20,7 @@ require_once __DIR__ . '/../src/Services/AssistantService.php';
 require_once __DIR__ . '/../src/Services/NotificationService.php';
 require_once __DIR__ . '/../src/Services/FeedbackService.php';
 require_once __DIR__ . '/../src/Services/DemoService.php';
+require_once __DIR__ . '/../src/Services/EventService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -40,6 +41,7 @@ use Lfmis\Services\AssistantService;
 use Lfmis\Services\NotificationService;
 use Lfmis\Services\FeedbackService;
 use Lfmis\Services\DemoService;
+use Lfmis\Services\EventService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -48,7 +50,7 @@ if (in_array($origin, [Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'), 'http
     header('Access-Control-Allow-Credentials: true');
     header('Vary: Origin');
 }
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
@@ -73,6 +75,7 @@ try {
     $notifications = new NotificationService($db);
     $feedback = new FeedbackService($db);
     $demo = new DemoService($db);
+    $events = new EventService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -220,6 +223,37 @@ try {
         $updated = $users->update((int) $matches[1], $request->body());
         $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update', 'user', $updated['id']]);
         Response::json(['user' => $updated]);
+    }
+    if ($method === 'GET' && $path === '/api/events') {
+        Response::json(['events' => $events->publicList()]);
+    }
+    if ($path === '/api/events/admin') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        if ($method === 'GET') Response::json(['events' => $events->adminList()]);
+        Response::error('Method not allowed.', 405);
+    }
+    if ($method === 'POST' && $path === '/api/events') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        if ($method === 'POST') {
+            $event = $events->create($request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'event', $event['id']]);
+            Response::json(['event' => $event], 201);
+        }
+    }
+    if ($method === 'PATCH' && preg_match('#^/api/events/(\d+)$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        $body = $request->body();
+        $event = isset($body['status']) && count($body) === 1
+            ? $events->setStatus((int) $matches[1], (string) $body['status'])
+            : $events->update((int) $matches[1], $body);
+        $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update', 'event', $event['id']]);
+        Response::json(['event' => $event]);
     }
     if ($path === '/api/activities' || preg_match('#^/api/activities/(\d+)/complete$#', $path, $matches)) {
         $current = $auth->currentUser();

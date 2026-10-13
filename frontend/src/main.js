@@ -9,7 +9,7 @@ const adminNavigation = [
   ['Operations', ['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory']],
   ['Commerce', ['Sales & orders', 'Feedback']],
   ['Insights', ['Reports', 'Assistant']],
-  ['Administration', ['User accounts']],
+  ['Administration', ['User accounts', 'Events']],
 ]
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
@@ -129,7 +129,7 @@ async function renderApp() {
   })
   app.querySelector('.content header').append(demoButton)
   const navigation = app.querySelector('.workspace-nav')
-  navigation.innerHTML = adminNavigation.map(([group, items]) => `<div class="nav-group"><p>${group}</p>${items.map((item) => `<button class="workspace-nav-item ${item === 'Overview' ? 'active' : ''}" data-module="${item}">${item}</button>`).join('')}</div>`).join('')
+  navigation.innerHTML = adminNavigation.map(([group, items], index) => `<details class="nav-group" ${index === 0 ? 'open' : ''}><summary>${group}</summary>${items.map((item) => `<button class="workspace-nav-item ${item === 'Overview' ? 'active' : ''}" data-module="${item}">${item}</button>`).join('')}</details>`).join('')
   app.querySelectorAll('[data-module]').forEach((item) => item.addEventListener('click', () => {
     if (item.dataset.module === 'Overview') return renderApp()
     renderAdminModule(item.dataset.module)
@@ -140,6 +140,7 @@ async function renderApp() {
 }
 
 function renderAdminModule(module) {
+  if (module === 'Events') return renderEventsModule()
   if (module === 'Activities') return renderActivitiesModule()
   if (module === 'Production') return renderProductionModule()
   if (module === 'Inventory') return renderInventoryModule()
@@ -175,6 +176,65 @@ async function renderActivitiesModule() {
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Activities</h1><p class="muted">Plan and complete daily farm work.</p></div><span class="health-pill">Live records</span></header><section class="module-grid"><section class="panel"><h2>Plan activity</h2><form id="activity-form" class="compact-form"><select name="activityType"><option value="feeding">Feeding</option><option value="milking">Milking</option><option value="cleaning">Cleaning</option><option value="health">Health follow-up</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select><input name="description" placeholder="What needs to happen?" required><input name="activityAt" type="datetime-local" required><button>Save activity</button></form></section><section class="panel"><h2>Activity list</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.length ? data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${item.status === 'planned' ? `<button class="small-action" data-complete="${item.id}">Complete</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No activities yet.</td></tr>'}</tbody></table></div></section></section>`
     content.querySelector('#activity-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createActivity(Object.fromEntries(new FormData(event.target))); await renderActivitiesModule() })
     content.querySelectorAll('[data-complete]').forEach((button) => button.addEventListener('click', async () => { await api.completeActivity(button.dataset.complete); await renderActivitiesModule() }))
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderEventsModule() {
+  const content = app.querySelector('.content')
+  try {
+    const data = await api.adminEvents()
+    const events = data.events
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Events</h1><p class="muted">Publish daytime farm visits, tours and workshops.</p></div><span class="health-pill">Day visits only · Ends by 4:00 p.m.</span></header><section class="module-grid"><section class="panel"><h2 id="event-form-title">Create event</h2><p class="muted">Published events appear on the public website. Overnight stays are not available.</p><div id="events-feedback"></div><form id="event-form" class="compact-form event-form"><input type="hidden" name="id"><label>Event title<input name="title" maxlength="150" required></label><label>Location<input name="location" maxlength="200" value="Flouri Farm" required></label><label>Date<input name="eventDate" type="date" required></label><label>Status<select name="status"><option value="draft">Draft</option><option value="published">Published</option><option value="cancelled">Cancelled</option></select></label><label>Starts at<input name="startTime" type="time" max="16:00" required></label><label>Ends at<input name="endTime" type="time" max="16:00" required></label><label class="event-description">Description<textarea name="description" rows="4" maxlength="2000" required></textarea></label><button id="event-save-button">Save event</button><button type="button" id="event-reset-button" class="secondary-action">Clear form</button></form></section><section class="panel"><div class="panel-head"><h2>Farm events</h2><span>${events.length} records</span></div><div class="event-admin-list">${events.length ? events.map((event) => {
+      const nextStatus = event.status === 'published' ? 'cancelled' : 'published'
+      const statusAction = nextStatus === 'published' ? (event.status === 'cancelled' ? 'Publish again' : 'Publish') : 'Cancel'
+      return `<article class="event-admin-item"><div class="event-admin-copy"><span class="event-status status-${event.status}">${escapeHtml(event.status)}</span><h3>${escapeHtml(event.title)}</h3><p>${formatEventDate(event.event_date)} · ${escapeHtml(event.start_time.slice(0, 5))}–${escapeHtml(event.end_time.slice(0, 5))}</p><p>${escapeHtml(event.location)}</p></div><div class="event-admin-actions"><button type="button" class="small-action" data-event-edit="${event.id}">Edit</button><button type="button" class="small-action" data-event-status="${event.id}" data-status="${nextStatus}">${statusAction}</button></div></article>`
+    }).join('') : '<p class="empty">No events yet. Create a draft or publish your first event.</p>'}</div></section></section>`
+
+    const form = content.querySelector('#event-form')
+    const resetForm = () => {
+      form.reset()
+      form.elements.namedItem('id').value = ''
+      form.elements.namedItem('location').value = 'Flouri Farm'
+      content.querySelector('#event-form-title').textContent = 'Create event'
+      content.querySelector('#event-save-button').textContent = 'Save event'
+    }
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const values = Object.fromEntries(new FormData(form))
+      const id = values.id
+      delete values.id
+      try {
+        if (id) await api.updateEvent(id, values)
+        else await api.createEvent(values)
+        await renderEventsModule()
+      } catch (error) {
+        content.querySelector('#events-feedback').innerHTML = message(error.message, true)
+      }
+    })
+    content.querySelector('#event-reset-button').addEventListener('click', resetForm)
+    content.querySelectorAll('[data-event-edit]').forEach((button) => button.addEventListener('click', () => {
+      const selected = events.find((event) => String(event.id) === button.dataset.eventEdit)
+      if (!selected) return
+      form.elements.namedItem('id').value = selected.id
+      form.elements.namedItem('title').value = selected.title
+      form.elements.namedItem('description').value = selected.description
+      form.elements.namedItem('eventDate').value = selected.event_date
+      form.elements.namedItem('startTime').value = selected.start_time.slice(0, 5)
+      form.elements.namedItem('endTime').value = selected.end_time.slice(0, 5)
+      form.elements.namedItem('location').value = selected.location
+      form.elements.namedItem('status').value = selected.status
+      content.querySelector('#event-form-title').textContent = 'Edit event'
+      content.querySelector('#event-save-button').textContent = 'Save changes'
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }))
+    content.querySelectorAll('[data-event-status]').forEach((button) => button.addEventListener('click', async () => {
+      try {
+        await api.setEventStatus(button.dataset.eventStatus, button.dataset.status)
+        await renderEventsModule()
+      } catch (error) {
+        content.querySelector('#events-feedback').innerHTML = message(error.message, true)
+      }
+    }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
