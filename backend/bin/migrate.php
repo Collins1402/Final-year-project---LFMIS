@@ -20,18 +20,23 @@ function runSqlFile(PDO $db, string $file): void
     $sql = (string) preg_replace('/^\s*--.*$/m', '', $sql);
     foreach (preg_split('/;\s*$/m', $sql) ?: [] as $statement) {
         if (trim($statement) !== '') {
-            $db->exec($statement);
+            $result = $db->query($statement);
+            $result->closeCursor();
         }
     }
 }
 
-$hasSchema = (bool) $db->query("SHOW TABLES LIKE 'schema_migrations'")->fetch();
+$schemaCheck = $db->query("SHOW TABLES LIKE 'schema_migrations'");
+$hasSchema = (bool) $schemaCheck->fetch();
+$schemaCheck->closeCursor();
 if (!$hasSchema) {
     runSqlFile($db, $databaseDir . '/schema.sql');
     fwrite(STDOUT, "Loaded schema.sql\n");
 }
 
-$applied = $db->query('SELECT version FROM schema_migrations')->fetchAll(PDO::FETCH_COLUMN);
+$appliedQuery = $db->query('SELECT version FROM schema_migrations');
+$applied = $appliedQuery->fetchAll(PDO::FETCH_COLUMN);
+$appliedQuery->closeCursor();
 $migrations = glob($databaseDir . '/migrations/[0-9][0-9][0-9]_*.sql') ?: [];
 sort($migrations, SORT_STRING);
 foreach ($migrations as $file) {

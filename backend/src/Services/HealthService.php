@@ -7,6 +7,13 @@ use PDO;
 
 final class HealthService
 {
+    public const OPEN_FOLLOW_UP = "a.status = 'active' AND NOT EXISTS (
+        SELECT 1 FROM health_records newer
+        WHERE newer.animal_id = hr.animal_id
+          AND newer.record_type = hr.record_type
+          AND (newer.record_date > hr.record_date OR (newer.record_date = hr.record_date AND newer.id > hr.id))
+    )";
+
     public function __construct(private PDO $db)
     {
     }
@@ -24,14 +31,20 @@ final class HealthService
 
     public function dueSoon(int $days = 7): array
     {
+        if ($days < 0) {
+            throw new \InvalidArgumentException('The follow-up window cannot be negative.');
+        }
+        $dueThrough = date('Y-m-d', strtotime('+' . $days . ' days'));
         $statement = $this->db->prepare(
-            'SELECT health_records.id, health_records.animal_id, animals.tag_number, animals.name AS animal_name,
-                    health_records.record_type, health_records.description, health_records.next_due_date
-             FROM health_records JOIN animals ON animals.id = health_records.animal_id
-             WHERE health_records.next_due_date BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ? DAY)
-             ORDER BY health_records.next_due_date'
+            'SELECT hr.id, hr.animal_id, a.tag_number, a.name AS animal_name,
+                    hr.record_type, hr.description, hr.next_due_date
+             FROM health_records hr JOIN animals a ON a.id = hr.animal_id
+             WHERE ' . self::OPEN_FOLLOW_UP . '
+               AND hr.next_due_date IS NOT NULL AND hr.next_due_date <= ?
+             ORDER BY hr.next_due_date, hr.id
+             LIMIT 100'
         );
-        $statement->execute([$days]);
+        $statement->execute([$dueThrough]);
         return $statement->fetchAll();
     }
 

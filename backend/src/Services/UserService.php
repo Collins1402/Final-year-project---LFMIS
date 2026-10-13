@@ -36,11 +36,22 @@ final class UserService
         }
         $roleId = $this->db->prepare('SELECT id FROM roles WHERE name = ?');
         $roleId->execute([$role]);
-        $statement = $this->db->prepare(
-            'INSERT INTO users (role_id, full_name, username, email, phone, password_hash) VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        $statement->execute([(int) $roleId->fetchColumn(), $name, $username, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
-        return $this->find((int) $this->db->lastInsertId());
+        $this->db->beginTransaction();
+        try {
+            $statement = $this->db->prepare(
+                'INSERT INTO users (role_id, full_name, username, email, phone, password_hash, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)'
+            );
+            $statement->execute([(int) $roleId->fetchColumn(), $name, $username, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
+            $userId = (int) $this->db->lastInsertId();
+            if (in_array($role, ['customer', 'buyer'], true)) {
+                $this->db->prepare('INSERT INTO customers (user_id, name, phone, email) VALUES (?, ?, ?, ?)')->execute([$userId, $name, $phone, $email]);
+            }
+            $this->db->commit();
+            return $this->find($userId);
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
     }
 
     public function update(int $id, array $input): array

@@ -3,6 +3,7 @@ from datetime import date, timedelta
 import pytest
 
 from ml.evaluate import baseline_predictions, evaluate_observations, metrics, validate_observations
+from ml.forecast_service import forecast
 
 
 def observations(days=28):
@@ -41,6 +42,18 @@ def test_evaluation_returns_model_and_three_baselines():
     results = evaluate_observations(observations())
     assert len(results) == 5
     assert {result["model"] for result in results} >= {"Ridge regression", "Baseline: naive", "Baseline: seven_day_mean", "Baseline: seasonal_naive"}
+
+
+def test_forecast_uses_best_baseline_and_returns_evaluation():
+    result = forecast(observations())
+    best_baseline = min(
+        (item for item in result["evaluation"] if item["model"].startswith("Baseline: ")),
+        key=lambda item: item["maeLitres"],
+    )
+
+    assert result["backtest"]["baselineName"] == best_baseline["model"].removeprefix("Baseline: ")
+    assert result["backtest"]["baselineMaeLitres"] == best_baseline["maeLitres"]
+    assert len(result["evaluation"]) == 5
 
 
 def test_metrics_are_deterministic_and_non_negative():

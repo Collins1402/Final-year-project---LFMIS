@@ -88,16 +88,28 @@ final class AuthService
         $username = trim((string) ($input['username'] ?? ''));
         $email = filter_var(trim((string) ($input['email'] ?? '')), FILTER_VALIDATE_EMAIL);
         $password = (string) ($input['password'] ?? '');
-        $role = 'customer';
-        if ($name === '' || !preg_match('/^[A-Za-z0-9_.]{3,30}$/', $username) || $email === false || strlen($password) < 12 || !in_array($role, ['customer', 'buyer', 'worker', 'veterinarian'], true)) {
-            throw new \InvalidArgumentException('Enter valid details, choose a supported account type and use a password of at least 12 characters.');
+        $role = (string) ($input['role'] ?? 'customer');
+        $phone = trim((string) ($input['phone'] ?? '')) ?: null;
+        if ($name === '' || !preg_match('/^[A-Za-z0-9_.]{3,30}$/', $username) || $email === false || strlen($password) < 12 || !in_array($role, ['customer', 'buyer'], true)) {
+            throw new \InvalidArgumentException('Enter valid details, choose customer or livestock buyer access and use a password of at least 12 characters.');
         }
         $roleId = $this->roleId($role);
-        $statement = $this->db->prepare(
-            'INSERT INTO users (role_id, full_name, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, 0)'
-        );
-        $statement->execute([$roleId, $name, $username, $email, password_hash($password, PASSWORD_DEFAULT)]);
-        return $this->findUser((int) $this->db->lastInsertId());
+        $this->db->beginTransaction();
+        try {
+            $statement = $this->db->prepare(
+                'INSERT INTO users (role_id, full_name, username, email, phone, password_hash, is_active) VALUES (?, ?, ?, ?, ?, ?, 0)'
+            );
+            $statement->execute([$roleId, $name, $username, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
+            $userId = (int) $this->db->lastInsertId();
+            if (in_array($role, ['customer', 'buyer'], true)) {
+                $this->db->prepare('INSERT INTO customers (user_id, name, phone, email) VALUES (?, ?, ?, ?)')->execute([$userId, $name, $phone, $email]);
+            }
+            $this->db->commit();
+            return $this->findUser($userId);
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
     }
 
     private function recordFailedLogin(array $user): void

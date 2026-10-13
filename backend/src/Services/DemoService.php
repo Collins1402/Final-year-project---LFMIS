@@ -11,8 +11,11 @@ final class DemoService
 
     public function seed(int $userId): array
     {
-        $existing = (int) $this->db->query("SELECT COUNT(*) FROM animals WHERE notes LIKE 'TEST DATA%'")->fetchColumn();
-        if ($existing > 0) return ['created' => false, 'message' => 'Demo data is already loaded.'];
+        $existingAnimals = (int) $this->db->query('SELECT COUNT(*) FROM animals')->fetchColumn();
+        $existingProduce = (int) $this->db->query('SELECT COUNT(*) FROM farm_produce')->fetchColumn();
+        if ($existingAnimals > 0 || $existingProduce > 0) {
+            return ['created' => false, 'message' => 'Demo data can only be loaded when the animal register and produce records are empty.'];
+        }
         $this->db->beginTransaction();
         try {
             $animals = [

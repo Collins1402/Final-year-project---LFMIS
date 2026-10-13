@@ -8,9 +8,17 @@ use PDO;
 final class FeedbackService
 {
     public function __construct(private PDO $db) {}
-    public function list(): array
+    public function list(?int $userId = null): array
     {
-        return $this->db->query('SELECT feedback.id, feedback.category, feedback.message, feedback.status, feedback.created_at, users.full_name AS user_name FROM feedback LEFT JOIN users ON users.id=feedback.user_id ORDER BY feedback.created_at DESC LIMIT 300')->fetchAll();
+        $query = 'SELECT feedback.id, feedback.category, feedback.message, feedback.status, feedback.created_at, users.full_name AS user_name
+                  FROM feedback LEFT JOIN users ON users.id=feedback.user_id';
+        if ($userId !== null) {
+            $query .= ' WHERE feedback.user_id = ?';
+        }
+        $query .= ' ORDER BY feedback.created_at DESC LIMIT 300';
+        $statement = $this->db->prepare($query);
+        $statement->execute($userId === null ? [] : [$userId]);
+        return $statement->fetchAll();
     }
     public function create(array $input, int $userId): array
     {

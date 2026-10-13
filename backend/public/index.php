@@ -21,6 +21,10 @@ require_once __DIR__ . '/../src/Services/NotificationService.php';
 require_once __DIR__ . '/../src/Services/FeedbackService.php';
 require_once __DIR__ . '/../src/Services/DemoService.php';
 require_once __DIR__ . '/../src/Services/EventService.php';
+require_once __DIR__ . '/../src/Services/ForecastUnavailableException.php';
+require_once __DIR__ . '/../src/Services/ForecastService.php';
+require_once __DIR__ . '/../src/Services/OverviewService.php';
+require_once __DIR__ . '/../src/Services/ReportService.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\Env;
@@ -42,6 +46,10 @@ use Lfmis\Services\NotificationService;
 use Lfmis\Services\FeedbackService;
 use Lfmis\Services\DemoService;
 use Lfmis\Services\EventService;
+use Lfmis\Services\ForecastService;
+use Lfmis\Services\ForecastUnavailableException;
+use Lfmis\Services\OverviewService;
+use Lfmis\Services\ReportService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -76,6 +84,9 @@ try {
     $feedback = new FeedbackService($db);
     $demo = new DemoService($db);
     $events = new EventService($db);
+    $forecast = new ForecastService($db);
+    $overview = new OverviewService($db);
+    $reports = new ReportService($db);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -273,10 +284,11 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
-    if ($path === '/api/production') {
+    if ($path === '/api/production' || $path === '/api/production/summary') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         $allowedRead = in_array($current['role'], ['admin', 'worker'], true);
+        if ($method === 'GET' && $path === '/api/production/summary' && $allowedRead) Response::json($production->summary());
         if ($method === 'GET' && $allowedRead) Response::json(['records' => $production->records()]);
         if ($method === 'POST' && $allowedRead) {
             $record = $production->record($request->body(), $current['id']);
@@ -285,10 +297,11 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
-    if ($path === '/api/inventory' || $path === '/api/inventory/items' || preg_match('#^/api/inventory/\d+/transactions$#', $path)) {
+    if ($path === '/api/inventory' || $path === '/api/inventory/items' || $path === '/api/inventory/transactions' || preg_match('#^/api/inventory/\d+/transactions$#', $path)) {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if ($method === 'GET' && $path === '/api/inventory' && in_array($current['role'], ['admin', 'worker'], true)) Response::json(['items' => $inventory->list()]);
+        if ($method === 'GET' && $path === '/api/inventory/transactions' && in_array($current['role'], ['admin', 'worker'], true)) Response::json(['transactions' => $inventory->transactions()]);
         if ($method === 'POST' && $path === '/api/inventory/items' && $current['role'] === 'admin') {
             $item = $inventory->create($request->body());
             $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'inventory_item', $item['id']]);
@@ -304,15 +317,20 @@ try {
     if ($path === '/api/products' || $path === '/api/store/products') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
-        if ($method === 'GET') Response::json(['products' => $commerce->products()]);
+        if ($method === 'GET') Response::json(['products' => $commerce->products($current['role'])]);
         if ($method === 'POST' && $current['role'] === 'admin') Response::json(['product' => $commerce->createProduct($request->body())], 201);
         Response::error('You do not have permission to perform this action.', 403);
     }
     if ($path === '/api/orders') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
-        if ($method === 'GET' && in_array($current['role'], ['admin', 'customer', 'buyer'], true)) Response::json(['orders' => $commerce->orders()]);
+        if ($method === 'GET' && in_array($current['role'], ['admin', 'customer', 'buyer'], true)) Response::json(['orders' => $commerce->orders($current['role'] === 'admin' ? null : (int) $current['id'])]);
         if ($method === 'POST' && $current['role'] === 'admin') Response::json(['order' => $commerce->createOrder($request->body(), $current['id'])], 201);
+        if ($method === 'POST' && in_array($current['role'], ['customer', 'buyer'], true)) {
+            $order = $commerce->createCustomerOrder($request->body(), $current);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'order', $order['id']]);
+            Response::json(['order' => $order], 201);
+        }
         Response::error('You do not have permission to perform this action.', 403);
     }
     if ($method === 'PATCH' && preg_match('#^/api/orders/(\d+)$#', $path, $matches)) {
@@ -329,6 +347,9 @@ try {
             if ($path === '/api/expenses') Response::json(['expenses' => $commerce->expenses()]);
             Response::json(['payments' => $commerce->payments()]);
         }
+        if ($method === 'GET' && $path === '/api/payments' && in_array($current['role'], ['customer', 'buyer'], true)) {
+            Response::json(['payments' => $commerce->payments((int) $current['id'])]);
+        }
         if ($method === 'POST' && $current['role'] === 'admin') {
             if ($path === '/api/sales') Response::json(['sale' => $commerce->createSale($request->body(), $current['id'])], 201);
             if ($path === '/api/expenses') Response::json(['expense' => $commerce->createExpense($request->body(), $current['id'])], 201);
@@ -341,6 +362,30 @@ try {
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
         Response::json($commerce->finance());
+    }
+    if ($method === 'GET' && $path === '/api/overview') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        Response::json($overview->summary());
+    }
+    if ($method === 'GET' && $path === '/api/reports/forecast') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        Response::json($forecast->report((int) $current['id']));
+    }
+    if ($method === 'GET' && $path === '/api/reports/operations') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        Response::json($reports->summary());
+    }
+    if ($method === 'GET' && $path === '/api/reports/forecast/history') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
+        Response::json(['runs' => $forecast->history()]);
     }
     if ($path === '/api/assistant/chat' && $method === 'POST') {
         $current = $auth->currentUser();
@@ -369,7 +414,7 @@ try {
     if ($path === '/api/feedback') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
-        if ($method === 'GET' && in_array($current['role'], ['admin', 'customer', 'buyer'], true)) Response::json(['feedback' => $feedback->list()]);
+        if ($method === 'GET' && in_array($current['role'], ['admin', 'customer', 'buyer'], true)) Response::json(['feedback' => $feedback->list($current['role'] === 'admin' ? null : (int) $current['id'])]);
         if ($method === 'POST' && in_array($current['role'], ['customer', 'buyer'], true)) Response::json(['feedback' => $feedback->create($request->body(), $current['id'])], 201);
         Response::error('You do not have permission to perform this action.', 403);
     }
@@ -384,6 +429,8 @@ try {
     Response::error($error->getMessage(), 409);
 } catch (InvalidArgumentException $error) {
     Response::error($error->getMessage(), 422);
+} catch (ForecastUnavailableException $error) {
+    Response::error($error->getMessage(), 503);
 } catch (RuntimeException $error) {
     Response::error($error->getMessage(), 401);
 } catch (Throwable $error) {

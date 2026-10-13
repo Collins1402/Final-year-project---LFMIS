@@ -86,18 +86,20 @@ The final evaluation will consider whether LFMIS provides a better solution than
 ### Prerequisites
 
 - Node.js and npm.
-- XAMPP with Apache/PHP and MySQL. Start MySQL from the XAMPP Control Panel.
+- PHP 8.0 or later with PDO MySQL and cURL extensions.
+- MySQL 8-compatible database. The development Docker container is `flouri-mysql` on host port `4321`.
 - Python 3.10 or later for the milk forecast service.
 
 ### Database
 
-Import the schema once into the local MySQL server:
+Copy `.env.example` to `.env.local` and set the database credentials for your local MySQL instance. Never commit `.env.local` or share its password. Start the Docker database if it is stopped, then apply the schema and migrations:
 
 ```powershell
-Get-Content -Raw backend/database/lfmis.sql | C:\xampp\mysql\bin\mysql.exe -u root
+docker start flouri-mysql
+php backend/bin/migrate.php
 ```
 
-The development defaults use MySQL at `127.0.0.1:3306`, database `lfmis`, and the XAMPP `root` account with no password. For a configured account, set `LFMIS_DB_HOST`, `LFMIS_DB_PORT`, `LFMIS_DB_NAME`, `LFMIS_DB_USER`, and `LFMIS_DB_PASSWORD` in the PHP server terminal before starting it. Never commit real credentials.
+The migration command is idempotent. The schema lives in `backend/database/schema.sql`; later changes are applied from `backend/database/migrations/`.
 
 ### Old Mark Donald assistant
 
@@ -111,19 +113,19 @@ $env:LFMIS_AI_MODEL = 'gpt-4o-mini'
 
 The API key is server-side only and must never be placed in frontend code or committed to the repository. Without these variables, the assistant answers common production, livestock, and task questions from the live database summary.
 
-On an empty database, an administrator can use **Load demo records** on the Overview page to create sample animals, 28 consecutive days of milk and egg production, and planned activities. It does not overwrite existing animals or records. The **Register animal** action remains available for adding real farm animals later.
+On an empty animal register and empty produce table, an administrator can use **Load demo records** on the Overview page for a small labelled sample. For a larger forecast demonstration, generate SQL with `python scripts/seed_demo_data.py`; it writes `seed_data/seed.sql` and `seed_data/reset.sql`. Review and load those files with a MySQL client configured for the database in `.env.local`. The generated records are simulated demo data, not farm results. Run the seed once; use `reset.sql` to remove only its labelled rows before regenerating.
 
 ### Start the services
 
-Open three terminals at the repository root and leave each running:
+After the database is running and migrations are applied, open three terminals at the repository root and leave each running:
 
 ```powershell
-php -S 127.0.0.1:8000 backend/api/index.php
+php -S 127.0.0.1:8000 backend/public/index.php
 ```
 
 ```powershell
-python -m pip install -r backend/ml/requirements.txt
-python backend/ml/forecast_service.py
+python -m pip install -r ml/requirements.txt
+python ml/forecast_service.py
 ```
 
 ```powershell
@@ -131,13 +133,13 @@ npm --prefix frontend install
 npm --prefix frontend run dev -- --host 127.0.0.1
 ```
 
-Open `http://127.0.0.1:5173/`. On a new database, create the first farm-owner account on the initial setup screen. It requires a password with at least 12 characters. An administrator can create staff and customer accounts under **User accounts**.
+Open `http://127.0.0.1:5173/`. On a new database, create the first farm-owner account on the initial setup screen. Passwords must contain at least 12 characters. Public registration is limited to customer and livestock-buyer accounts; administrators create worker and veterinarian accounts under **User accounts**.
 
-To switch roles, sign in as an admin, open **User accounts**, and create a worker or customer login with its own email and password. Use the header sign-out button, then sign in using those new credentials. Customers land in a separate farm shop; they do not see staff, inventory, or finance screens.
+Workers can record production, complete assigned activities and record stock movements. Veterinarians can review animal health history and record care. Customers can browse produce listings; livestock buyers can browse livestock listings. Each customer or buyer sees only their own orders, payments and feedback.
 
-Admins publish items under **Products**. Livestock availability is computed from active animal records, including cattle, sheep, goats, rabbits, and chickens. Milk/egg listings can be linked to production records so daily entries add to listed stock; other produce such as wool can be listed with manually managed stock. Buyers can request only listed products and available quantities. Stock is checked again when the admin accepts an order; accepted livestock orders record the specific animals sold. Buyers can download their requests and assigned animal identifiers as CSV.
+Admins manage listings, quote and accept orders, record payments and expenses, and fulfill or cancel orders. Product stock is checked again at acceptance; livestock orders allocate specific active animals and mark them sold. Milk, egg and wool listings can be linked to production records so new unsold production adds to stock.
 
-Farm workers and admins can enter daily milk/egg production, review the recorded seven-day totals and daily figures, and share that report through WhatsApp. The same seven-day totals appear on their dashboard.
+Farm workers and admins can enter daily production, review seven-day and month-to-date totals with daily figures, and share the summary through WhatsApp. The admin overview includes live production, livestock, tasks, low stock, follow-ups, orders and monthly finance indicators. Reports include 12-month production/finance trends, health follow-ups and the seven-day milk forecast.
 
 ### Password recovery
 
@@ -149,26 +151,26 @@ For email delivery, configure PHP's `mail()` transport to use your SMTP relay, s
 
 - First-admin setup, password-hashed login, logout, sessions, role checks, and audit entries.
 - Forgot-password requests and single-use, expiring reset links.
-- Admin, farm-worker, veterinarian, and customer roles, with staff/customer account creation.
-- Livestock registration, health records, farm activities/tasks, milk and egg production, and stock movements.
-- Product catalog, availability-checked customer orders, admin order acceptance/stock allocation, and buyer CSV exports.
-- Sales and expenses, admin order quoting/status updates, payment ledger, and customer feedback.
-- Daily/weekly production summaries with WhatsApp sharing for farm workers and admins.
-- Customer feedback, live dashboard totals, monthly financial summaries, and milk forecasts with a seven-day backtest.
+- Admin, farm-worker, veterinarian, customer, and livestock-buyer workspaces with role-checked APIs.
+- Livestock registration/status, latest-open health follow-ups, farm activities, production entries, and inventory movement history.
+- Role-filtered product catalogue, customer order requests, order quoting/acceptance/fulfillment/cancellation, stock validation, and animal allocation.
+- Sales, expenses, payment ledger, customer feedback, notifications, and customer-owned data scoping.
+- Live admin overview, seven-day and month-to-date production summaries, daily figures, and WhatsApp sharing.
+- Twelve-month production/finance reports, health follow-up indicators, and milk forecasts with a one-day-ahead backtest.
 
-The ML service requires at least 21 consecutive daily production records. It rejects missing-day histories rather than treating unrecorded days as zero. No sample farm data is seeded.
+The ML service requires at least 21 consecutive daily production totals. It uses the latest gap-free run, excludes today, and does not treat missing days as zero. Forecasts are decision support only; inspect the baseline comparison and simulated-data warning before presenting results.
 
 ### Tests
 
 ```powershell
 npm --prefix frontend run build
-php -l backend/api/index.php
-php -l backend/config/database.php
-python -m unittest discover -s backend/ml -p "test_*.py"
+php -l backend/public/index.php
+Push-Location backend; php vendor/bin/phpunit -c phpunit.xml; Pop-Location
+python -m pytest ml/tests
 ```
 
 ### Not yet integrated
 
-- M-Pesa STK prompts, signed payment callbacks, and automated payment confirmation need real Daraja credentials and a reachable callback URL. M-Pesa payments are stored as pending; non-M-Pesa payments entered by an admin are recorded as confirmed.
-- Live M-Pesa prompts and signed payment callbacks need Daraja credentials and a reachable callback URL. Payment receipts, notification delivery, supplier workflows, offline synchronization, account deactivation, and broader reporting remain follow-up work.
-- The forecast is a baseline decision-support model, not a veterinary diagnosis. Its measured error must be reviewed against real farm data before relying on it.
+- Live M-Pesa STK prompts, signed callbacks, and automated confirmation require Daraja credentials and a reachable callback URL. M-Pesa payments remain pending; manually recorded non-M-Pesa payments are confirmed.
+- Email delivery, supplier workflows, offline synchronization, and mobile support remain follow-up work.
+- Forecast performance must be evaluated with real farm records before operational use. Simulated data is labelled and must not be presented as farm results.

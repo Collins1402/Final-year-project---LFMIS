@@ -27,7 +27,8 @@ def forecast(observations: list[dict[str, Any]], horizon: int = 7) -> dict[str, 
     model = Ridge(alpha=1.0).fit(x_train, values[7:])
     evaluation = evaluate_observations(observations)
     weather_result = next(result for result in evaluation if result["features"].endswith("with weather"))
-    baseline = next(result for result in evaluation if result["model"] == "Baseline: seven_day_mean")
+    baselines = [result for result in evaluation if result["model"].startswith("Baseline: ")]
+    baseline = min(baselines, key=lambda result: result["maeLitres"])
     forecast_values: list[dict[str, Any]] = []
     last_date = date.fromisoformat(str(history[-1]["date"]))
     for step in range(1, horizon + 1):
@@ -46,8 +47,10 @@ def forecast(observations: list[dict[str, Any]], horizon: int = 7) -> dict[str, 
             "maeLitres": weather_result["maeLitres"],
             "rmseLitres": weather_result["rmseLitres"],
             "baselineMaeLitres": baseline["maeLitres"],
+            "baselineName": baseline["model"].removeprefix("Baseline: "),
             "improvementPct": weather_result["improvementPct"],
         },
+        "evaluation": evaluation,
         "forecast": forecast_values,
         "limitations": "Decision support only. Weather is associated with production in this model; this does not establish causation.",
     }
