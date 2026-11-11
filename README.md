@@ -86,7 +86,8 @@ The final evaluation will consider whether LFMIS provides a better solution than
 ### Prerequisites
 
 - Node.js and npm.
-- PHP 8.0 or later with PDO MySQL and cURL extensions.
+- Composer 2 or later.
+- PHP 8.0 or later with PDO MySQL, cURL and OpenSSL extensions.
 - MySQL 8-compatible database. The development Docker container is `flouri-mysql` on host port `4321`.
 - Python 3.10 or later for the milk forecast service.
 
@@ -96,6 +97,7 @@ Copy `.env.example` to `.env.local` and set the database credentials for your lo
 
 ```powershell
 docker start flouri-mysql
+composer install --working-dir=backend
 php backend/bin/migrate.php
 ```
 
@@ -111,7 +113,15 @@ $env:LFMIS_AI_API_KEY = 'replace-with-your-key'
 $env:LFMIS_AI_MODEL = 'gpt-4o-mini'
 ```
 
-The API key is server-side only and must never be placed in frontend code or committed to the repository. Without these variables, the assistant answers common production, livestock, and task questions from the live database summary.
+The API key is server-side only and must never be placed in frontend code or committed to the repository. Without these variables, the assistant gives rule-based operational advice from records allowed by the user's role. It can summarize recent public agriculture headlines, but headlines are signals rather than measured farm results.
+
+The sign-in page includes a public agriculture-news tab. It uses GDELT Project news data for country-level and worldwide coverage, cached for six hours. Defaults are Kenya (`LFMIS_TRENDS_COUNTRY_CODE=KE`, `LFMIS_TRENDS_REGION=Kenya`); these settings can be changed for the farm's country or region. This is not a nearby-farm production feed. A nearby-farm comparison requires participating farms to share data with consent.
+
+Administrators can manage role permissions under **Role permissions**. Current permissions are seeded to preserve the existing admin, worker, veterinarian, customer and buyer access. Administrator permissions cannot be removed. Each user can review their grants and personal-data request options under **Your rights**.
+
+The assistant's 30-day scenario tool compares milk and egg forecasts when additional dairy cattle or laying hens are entered, and estimates feed stock-outs from the last 30 days of inventory movements. Each produce type needs at least 21 consecutive production days. The scenario assumes new animals perform like the existing group; recorded stock-outs may not equal feed consumed. It does not claim that a feed change causes a specific yield change. Simulated demo records are flagged.
+
+Successful sign-ins trigger a security email containing the time, IP address and browser/device string. Email, password-reset, account-confirmation and two-factor messages use the shared SMTP mailer. Configure the SMTP settings described below; PHP's native `mail()` is not a mail server and normally cannot deliver messages on a Windows development machine.
 
 On an empty animal register and empty produce table, an administrator can use **Load demo records** on the Overview page for a small labelled sample. For a larger forecast demonstration, generate SQL with `python scripts/seed_demo_data.py`; it writes `seed_data/seed.sql` and `seed_data/reset.sql`. Review and load those files with a MySQL client configured for the database in `.env.local`. The generated records are simulated demo data, not farm results. Run the seed once; use `reset.sql` to remove only its labelled rows before regenerating.
 
@@ -141,11 +151,45 @@ Admins manage listings, quote and accept orders, record payments and expenses, a
 
 Farm workers and admins can enter daily production, review seven-day and month-to-date totals with daily figures, and share the summary through WhatsApp. The admin overview includes live production, livestock, tasks, low stock, follow-ups, orders and monthly finance indicators. Reports include 12-month production/finance trends, health follow-ups and the seven-day milk forecast.
 
-### Password recovery
+### Password recovery and sign-in alerts
 
-The sign-in page has a **Forgot password?** flow. Reset links are single-use, expire after 30 minutes, and are stored as token hashes. Requests use the same response whether or not the email matches an active account.
+The sign-in page has a **Forgot password?** flow. Reset links are single-use, expire after one hour, and are stored as token hashes. Requests use the same response whether or not the email matches an active account.
 
-For email delivery, configure PHP's `mail()` transport to use your SMTP relay, set `LFMIS_MAIL_FROM` to a valid sender address, and set `LFMIS_APP_URL` to the frontend origin. For local testing without email, set `LFMIS_DEV_LOG_PASSWORD_RESET_LINK=true` in the environment before running `backend/start-dev.sh`; the reset URL is then written to the PHP server terminal. This option is for local development only and must remain disabled in production.
+Configure real email delivery by adding your provider's values to `.env.local`:
+
+```dotenv
+LFMIS_SMTP_HOST=smtp.gmail.com
+LFMIS_SMTP_PORT=587
+LFMIS_SMTP_SECURE=tls
+LFMIS_SMTP_USER=your-account@gmail.com
+LFMIS_SMTP_PASSWORD=your-provider-app-password
+LFMIS_MAIL_FROM=your-account@gmail.com
+LFMIS_MAIL_FROM_NAME=Flouri Farm LFMIS
+LFMIS_APP_URL=http://127.0.0.1:5173
+```
+
+For Gmail, enable Google 2-Step Verification and create an App Password; do not use your regular Google password. Other SMTP services (for example Brevo, Postmark or SendGrid) work with their SMTP host, port, username, password and verified sender address. For local development, Mailpit can capture email without sending it to a real inbox. Never commit `.env.local`. If messages still do not arrive, check the provider's delivery/bounce logs and the recipient's spam folder; production senders may also need SPF/DKIM records. Email confirmation, password reset and login verification now return a service-unavailable error when delivery is not configured rather than silently pretending to send.
+
+Password-reset links expire after one hour and are stored as token hashes. Password-reset requests use the same response whether or not the email matches an active, verified account. `LFMIS_DEV_LOG_PASSWORD_RESET_LINK=1` exposes development links in the API response when delivery is unavailable; use this only locally and keep it disabled in production.
+
+### Optional email/SMS two-factor authentication
+
+Users can enable email codes, SMS codes or both under **Account security** and choose a method after entering their password at sign-in. Email uses the verified account email. SMS is limited to verified Kenyan mobile numbers and uses Africa's Talking. Codes are one-time, expire after 10 minutes, allow five attempts and are rate-limited to three sends per method per hour. SMS is less resistant to SIM-swap attacks than authenticator apps; avoid using it as the only factor for highly sensitive accounts.
+
+Create a 32-byte OTP hashing key with PHP, then add it to `.env.local`:
+
+```powershell
+php -r "echo bin2hex(random_bytes(32));"
+```
+
+```dotenv
+LFMIS_2FA_OTP_KEY=generated-64-character-hex-key
+LFMIS_AT_USERNAME=sandbox
+LFMIS_AT_API_KEY=your-africas-talking-api-key
+LFMIS_AT_BASE_URL=https://api.sandbox.africastalking.com/version1/messaging
+```
+
+Africa's Talking sandbox messages appear in its simulator, not on a real phone. For production, use the production messaging endpoint, account credentials/credits, and a registered sender ID if required by the provider. Keep all API keys server-side in `.env.local`; never put them in frontend code. Apply migration `008_two_factor_email_sms` with `php backend/bin/migrate.php`.
 
 ### Current working modules
 
@@ -157,6 +201,8 @@ For email delivery, configure PHP's `mail()` transport to use your SMTP relay, s
 - Sales, expenses, payment ledger, customer feedback, notifications, and customer-owned data scoping.
 - Live admin overview, seven-day and month-to-date production summaries, daily figures, and WhatsApp sharing.
 - Twelve-month production/finance reports, health follow-up indicators, and milk forecasts with a one-day-ahead backtest.
+- Admin-managed role permissions, user-facing access/data-rights information, and successful-login email alerts.
+- Six-hour cached country/global agriculture news signals and 30-day milk/egg/feed planning scenarios with explicit data limitations.
 
 The ML service requires at least 21 consecutive daily production totals. It uses the latest gap-free run, excludes today, and does not treat missing days as zero. Forecasts are decision support only; inspect the baseline comparison and simulated-data warning before presenting results.
 
@@ -172,5 +218,5 @@ python -m pytest ml/tests
 ### Not yet integrated
 
 - Live M-Pesa STK prompts, signed callbacks, and automated confirmation require Daraja credentials and a reachable callback URL. M-Pesa payments remain pending; manually recorded non-M-Pesa payments are confirmed.
-- Email delivery, supplier workflows, offline synchronization, and mobile support remain follow-up work.
+- Supplier workflows, offline synchronization, and mobile support remain follow-up work. Email features require a configured SMTP relay.
 - Forecast performance must be evaluated with real farm records before operational use. Simulated data is labelled and must not be presented as farm results.

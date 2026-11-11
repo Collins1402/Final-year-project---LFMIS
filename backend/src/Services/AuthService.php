@@ -55,6 +55,7 @@ final class AuthService
 
     public function login(string $login, string $password): array
     {
+        unset($_SESSION['pending_2fa']);
         $login = trim($login);
         if ($login === '' || $password === '') {
             throw new \InvalidArgumentException('Enter your username or email and password.');
@@ -77,8 +78,32 @@ final class AuthService
         if ($user['email_verified_at'] === null) {
             throw new \RuntimeException('Confirm your email address before signing in.');
         }
-        $this->db->prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW() WHERE id = ?')->execute([$user['id']]);
-        Session::login((int) $user['id']);
+        $methods = $this->db->prepare('SELECT method FROM user_two_factor_methods WHERE user_id = ? ORDER BY method');
+        $methods->execute([(int) $user['id']]);
+        $enabledMethods = $methods->fetchAll(PDO::FETCH_COLUMN);
+        if ($enabledMethods !== []) {
+            unset($_SESSION['user_id']);
+            return [
+                'twoFactorRequired' => true,
+                'methods' => $enabledMethods,
+                'pendingUserId' => (int) $user['id'],
+            ];
+        }
+        return $this->completeLogin((int) $user['id']);
+    }
+
+    public function completeLogin(int $userId): array
+    {
+        $account = $this->db->prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1 AND email_verified_at IS NOT NULL');
+        $account->execute([$userId]);
+        if (!$account->fetchColumn()) {
+            throw new \RuntimeException('This account is no longer available for sign-in.');
+        }
+        $this->db->prepare(
+            'UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW()
+             WHERE id = ? AND is_active = 1 AND email_verified_at IS NOT NULL'
+        )->execute([$userId]);
+        Session::login($userId);
         return $this->currentUser() ?? throw new \RuntimeException('Could not load your account.');
     }
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Lfmis\Services;
 
 use Lfmis\Core\Env;
+use Lfmis\Core\DeliveryException;
+use Lfmis\Core\Mailer;
 use PDO;
 
 final class VerificationService
@@ -25,10 +27,12 @@ final class VerificationService
         $link = $appUrl . '/?verify=' . rawurlencode($token);
         $subject = 'Confirm your Flouri Farm LFMIS account';
         $body = "Hello {$name},\n\nConfirm your Flouri Farm account by opening this link:\n{$link}\n\nThe link expires in 24 hours.";
-        $headers = "From: " . (Env::get('LFMIS_MAIL_FROM', 'no-reply@flourifarm.local')) . "\r\n";
-        $sent = @mail($email, $subject, $body, $headers);
-        if (!$sent && Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') !== '1') {
-            throw new \RuntimeException('The confirmation email could not be sent. Configure mail delivery and try again.');
+        try {
+            Mailer::send($email, $subject, $body);
+        } catch (DeliveryException $error) {
+            if (Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') !== '1') {
+                throw $error;
+            }
         }
         return Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') === '1' ? $link : null;
     }

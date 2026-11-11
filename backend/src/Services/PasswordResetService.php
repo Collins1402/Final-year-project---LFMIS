@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Lfmis\Services;
 
 use Lfmis\Core\Env;
+use Lfmis\Core\DeliveryException;
+use Lfmis\Core\Mailer;
 use PDO;
 
 final class PasswordResetService
@@ -30,10 +32,12 @@ final class PasswordResetService
         )->execute([(int) $user['id'], hash('sha256', $token)]);
         $link = rtrim(Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'), '/') . '/?reset=' . rawurlencode($token);
         $body = "Hello {$user['full_name']},\n\nReset your Flouri Farm password here:\n{$link}\n\nThe link expires in one hour.";
-        $headers = 'From: ' . Env::get('LFMIS_MAIL_FROM', 'no-reply@flourifarm.local') . "\r\n";
-        $sent = @mail($user['email'], 'Reset your Flouri Farm password', $body, $headers);
-        if (!$sent && Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') !== '1') {
-            throw new \RuntimeException('The reset email could not be sent. Configure mail delivery and try again.');
+        try {
+            Mailer::send($user['email'], 'Reset your Flouri Farm password', $body);
+        } catch (DeliveryException $error) {
+            if (Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') !== '1') {
+                throw $error;
+            }
         }
         return Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') === '1' ? $link : null;
     }

@@ -4,12 +4,14 @@ import { renderLanding } from './landing.js'
 
 const app = document.querySelector('#app')
 let currentUser = null
+let currentPermissions = {}
+let trendsRefreshTimer = null
 
 const adminNavigation = [
   ['Operations', ['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory']],
   ['Commerce', ['Sales & orders', 'Feedback']],
   ['Insights', ['Reports', 'Assistant']],
-  ['Administration', ['User accounts', 'Events']],
+  ['Administration', ['User accounts', 'Role permissions', 'Your rights', 'Events']],
 ]
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
@@ -17,8 +19,25 @@ const message = (text, danger = false) => `<p class="message ${danger ? 'danger'
 
 function renderAuth(mode = 'login', notice = '') {
   const setup = mode === 'setup'
-  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<form id="login-form"><label>Username or email<input name="login" required></label><label>Password<span class="password-field"><input name="password" type="password" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form><button id="forgot-link" class="text-link" type="button">Forgot password?</button><button id="register-link" class="text-link" type="button">Create a farm account</button>`}</section></main>`
+  clearInterval(trendsRefreshTimer)
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" required></label><label>Username<input name="username" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<nav class="auth-tabs" aria-label="Account information"><button type="button" class="auth-tab active" data-auth-view="login" aria-selected="true">Sign in</button><button type="button" class="auth-tab" data-auth-view="trends" aria-selected="false">Farm trends</button><button type="button" class="auth-tab" data-auth-view="rights" aria-selected="false">Your rights</button></nav><section id="auth-login-panel"><form id="login-form"><label>Username or email<input name="login" required autocomplete="username"></label><label>Password<span class="password-field"><input name="password" type="password" required autocomplete="current-password"><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form><button id="forgot-link" class="text-link" type="button">Forgot password?</button><button id="register-link" class="text-link" type="button">Create a farm account</button></section><section id="auth-trends-panel" class="auth-info-panel" hidden><p class="kicker">AGRICULTURE NEWS SIGNALS</p><h2>Farm trends</h2><p class="muted">Public Kenya and worldwide agriculture coverage. These are news signals, not measured nearby-farm yields.</p><div id="public-trends-content" aria-live="polite">Loading current reports...</div></section><section id="auth-rights-panel" class="auth-info-panel" hidden><p class="kicker">ACCOUNT & DATA</p><h2>Your rights</h2><div class="rights-copy"><p>You can access the records allowed by your assigned role. Farm records are shared only with roles that need them to operate the service.</p><p>You may ask the farm administrator to correct your account details or a record, provide a copy of your personal account data, or delete/deactivate your account.</p><p>Some transaction and audit records may need to be retained for farm operations or legal obligations. The administrator can explain what applies to a specific request.</p><p>Sign-in alerts are sent to the email address registered to your account after each successful login.</p></div></section>`}</section></main>`
   const form = app.querySelector('form')
+  app.querySelectorAll('[data-auth-view]').forEach((tab) => tab.addEventListener('click', () => {
+    const view = tab.dataset.authView
+    app.querySelectorAll('[data-auth-view]').forEach((item) => {
+      const active = item === tab
+      item.classList.toggle('active', active)
+      item.setAttribute('aria-selected', String(active))
+    })
+    app.querySelector('#auth-login-panel').hidden = view !== 'login'
+    app.querySelector('#auth-trends-panel').hidden = view !== 'trends'
+    app.querySelector('#auth-rights-panel').hidden = view !== 'rights'
+    clearInterval(trendsRefreshTimer)
+    if (view === 'trends') {
+      loadPublicTrends()
+      trendsRefreshTimer = setInterval(loadPublicTrends, 6 * 60 * 60 * 1000)
+    }
+  }))
   app.querySelector('#register-link')?.addEventListener('click', () => renderRegister())
   app.querySelector('#forgot-link')?.addEventListener('click', () => renderForgotPassword())
   app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
@@ -38,10 +57,74 @@ function renderAuth(mode = 'login', notice = '') {
         renderAuth('login', devLink)
         return
       }
+      if (!setup && result.twoFactorRequired) {
+        renderTwoFactorChallenge(result.methods)
+        return
+      }
       currentUser = result.user
       renderApp()
     } catch (error) { renderAuth(mode, message(error.message, true)) }
   })
+}
+
+function renderTwoFactorChallenge(methods, notice = '') {
+  const availableMethods = methods.filter((method) => method === 'email' || method === 'sms')
+  const methodButtons = availableMethods.map((method) => `<button type="button" class="secondary-action" data-two-factor-method="${method}">Use ${method === 'email' ? 'email' : 'SMS'}</button>`).join('')
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-FACTOR AUTHENTICATION</p><h1>Verify it’s you</h1><p class="muted">Choose where to receive your sign-in code. Codes expire after 10 minutes.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><div class="button-row">${methodButtons}</div><form id="two-factor-code-form" hidden><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and sign in</button><button id="two-factor-resend" class="text-link" type="button">Send another code</button></form><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
+  const codeForm = app.querySelector('#two-factor-code-form')
+  let selectedMethod = ''
+  const showError = (error) => { app.querySelector('#two-factor-notice').innerHTML = message(error.message, true) }
+  const sendCode = async (method) => {
+    selectedMethod = method
+    try {
+      await api.sendLoginTwoFactorCode(method)
+      app.querySelector('#two-factor-notice').innerHTML = message(`A code was sent using ${method === 'email' ? 'email' : 'SMS'}.`)
+      codeForm.hidden = false
+      codeForm.elements.namedItem('code').focus()
+    } catch (error) { showError(error) }
+  }
+  app.querySelectorAll('[data-two-factor-method]').forEach((button) => button.addEventListener('click', () => sendCode(button.dataset.twoFactorMethod)))
+  codeForm.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    try {
+      const result = await api.verifyLoginTwoFactorCode({ method: selectedMethod, code: codeForm.elements.namedItem('code').value })
+      currentUser = result.user
+      renderApp()
+    } catch (error) { showError(error) }
+  })
+  app.querySelector('#two-factor-resend').addEventListener('click', () => sendCode(selectedMethod))
+  app.querySelector('#two-factor-back').addEventListener('click', async () => {
+    try {
+      await api.cancelLoginTwoFactor()
+      renderAuth('login')
+    } catch (error) {
+      showError(error)
+    }
+  })
+}
+
+async function loadPublicTrends() {
+  const content = app.querySelector('#public-trends-content')
+  if (!content) return
+  try {
+    const data = await api.trends()
+    const renderGroup = (title, group) => {
+      const articles = group.articles || []
+      const rows = articles.map((article) => {
+        let url = '#'
+        try {
+          const parsed = new URL(article.url)
+          if (parsed.protocol === 'https:') url = parsed.href
+        } catch { return '' }
+        return `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.title)}</a><small>${escapeHtml(article.domain)}${article.publishedAt ? ` · ${escapeHtml(article.publishedAt)}` : ''}</small></li>`
+      }).join('')
+      const updated = group.updatedAt ? new Date(`${group.updatedAt.replace(' ', 'T')}Z`).toLocaleString() : 'Not available'
+      return `<section class="trend-group"><div class="trend-heading"><h3>${escapeHtml(title)}</h3><small>${group.stale ? 'Cached · ' : ''}Updated ${escapeHtml(updated)}</small></div><ul>${rows || `<li class="empty">${group.unavailable ? 'Trend feed is temporarily unavailable.' : 'No current reports found.'}</li>`}</ul></section>`
+    }
+    content.innerHTML = `<p class="trend-source">Source: ${escapeHtml(data.source)} · refreshes every ${Number(data.refreshHours)} hours</p>${renderGroup(`Regional · ${data.region}`, data.regional)}${renderGroup('Worldwide', data.global)}`
+  } catch (error) {
+    content.innerHTML = `<p class="message danger">${escapeHtml(error.message)}</p>`
+  }
 }
 
 function renderForgotPassword(notice = '') {
@@ -104,6 +187,67 @@ function renderRegister(notice = '') {
   })
 }
 
+async function renderAccountSecurity() {
+  let status
+  try {
+    status = await api.twoFactorStatus()
+  } catch (error) {
+    app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><h1>Account security</h1>${message(error.message, true)}<button id="security-back">Back to workspace</button></section></main>`
+    app.querySelector('#security-back').addEventListener('click', renderApp)
+    return
+  }
+
+  const enabled = new Set(status.methods)
+  const methodRows = status.methods.map((method) => `<li><div><strong>${method === 'email' ? 'Email codes' : 'SMS codes'}</strong><p class="muted">${method === 'email' ? 'Sent to your verified account email.' : `Sent to ${escapeHtml(status.phone || 'your verified phone')}.`}</p></div><form class="remove-two-factor-form" data-method="${method}"><label>Current password<input name="password" type="password" autocomplete="current-password" required></label><button class="secondary-action">Remove</button></form></li>`).join('')
+  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Account security</h2><button id="security-back" class="quiet">Back to workspace</button><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="security-logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">ACCOUNT SECURITY</p><h1>Two-factor authentication</h1><p class="muted">Choose email or SMS codes each time you sign in.</p></div><span class="health-pill">${status.methods.length ? 'Two-factor on' : 'Two-factor off'}</span></header><div id="security-notice" aria-live="polite"></div><section class="module-grid"><section class="panel"><h2>Enabled methods</h2><p class="muted">You must verify a new method before it can be used at sign-in.</p><ul class="security-method-list">${methodRows || '<li class="empty">No extra sign-in verification is enabled.</li>'}</ul></section><section class="panel"><h2>Add a method</h2>${enabled.has('email') ? '<p class="muted">Email verification is enabled for your verified account email.</p>' : '<button id="enable-email-two-factor" class="secondary-action">Enable email codes</button>'}${enabled.has('sms') ? `<p class="muted">Your verified phone is ${escapeHtml(status.phone || '')}.</p>` : `<form id="enable-sms-two-factor" class="compact-form"><label>Kenyan mobile number<input name="phone" type="tel" value="${escapeHtml(status.phone || '')}" placeholder="+254712345678" autocomplete="tel" required></label><button>Verify phone and enable SMS</button></form>`}<form id="verify-two-factor-enrollment" hidden><label>6-digit verification code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Confirm method</button></form></section></section></main></div>`
+
+  app.querySelector('#security-back').addEventListener('click', renderApp)
+  app.querySelector('#security-logout').addEventListener('click', async () => {
+    await api.logout()
+    currentUser = null
+    renderAuth('login')
+  })
+  const notice = app.querySelector('#security-notice')
+  const codeForm = app.querySelector('#verify-two-factor-enrollment')
+  let pendingMethod = ''
+  const beginEnrollment = async (method, phone = '') => {
+    try {
+      await api.startTwoFactorEnrollment({ method, phone })
+      pendingMethod = method
+      codeForm.hidden = false
+      codeForm.querySelector('input').focus()
+      notice.innerHTML = message(`A verification code was sent by ${method === 'email' ? 'email' : 'SMS'}.`)
+    } catch (error) {
+      notice.innerHTML = message(error.message, true)
+    }
+  }
+  app.querySelector('#enable-email-two-factor')?.addEventListener('click', () => beginEnrollment('email'))
+  app.querySelector('#enable-sms-two-factor')?.addEventListener('submit', (event) => {
+    event.preventDefault()
+    beginEnrollment('sms', new FormData(event.currentTarget).get('phone'))
+  })
+  codeForm.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    try {
+      await api.verifyTwoFactorEnrollment({ method: pendingMethod, code: codeForm.elements.namedItem('code').value })
+      await renderAccountSecurity()
+    } catch (error) {
+      notice.innerHTML = message(error.message, true)
+    }
+  })
+  app.querySelectorAll('.remove-two-factor-form').forEach((form) => form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const data = Object.fromEntries(new FormData(form))
+    data.method = form.dataset.method
+    try {
+      await api.removeTwoFactorMethod(data)
+      await renderAccountSecurity()
+    } catch (error) {
+      notice.innerHTML = message(error.message, true)
+    }
+  }))
+}
+
 async function renderApp() {
   if (['customer', 'buyer', 'worker', 'veterinarian'].includes(currentUser.role)) {
     await renderRoleWorkspace()
@@ -122,6 +266,12 @@ async function renderApp() {
     return
   }
   app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Farm workspace</h2><nav class="workspace-nav" aria-label="Farm modules">${['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory', 'Sales & orders', 'Reports', 'Feedback', 'User accounts', 'Assistant'].map((item) => `<button class="workspace-nav-item ${item === 'Overview' ? 'active' : ''}" data-module="${item}">${item}</button>`).join('')}</nav><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">OVERVIEW</p><h1>Good day, ${escapeHtml(currentUser.fullName.split(' ')[0])}</h1><p class="muted">Keep the herd records complete and easy to trust.</p></div><span class="health-pill">API connected</span></header><section class="stats"><div><small>Animals</small><strong>${animals.length}</strong></div><div><small>Health records</small><strong>${healthRecords.length}</strong></div><div><small>Role</small><strong>${escapeHtml(currentUser.role)}</strong></div></section><div class="grid"><section class="panel"><div class="panel-head"><h2>Livestock register</h2><span>${animals.length} records</span></div><form id="animal-form" class="compact-form"><input name="tagNumber" placeholder="Tag number" required><select name="species"><option value="cattle">Cattle</option><option value="goat">Goat</option><option value="rabbit">Rabbit</option><option value="chicken">Chicken</option><option value="sheep">Sheep</option></select><input name="breed" placeholder="Breed"><select name="sex"><option value="female">Female</option><option value="male">Male</option></select><button>Add animal</button></form><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Species</th><th>Breed</th><th>Status</th></tr></thead><tbody>${animals.length ? animals.map((animal) => `<tr><td>${escapeHtml(animal.tag_number)}</td><td>${escapeHtml(animal.species)}</td><td>${escapeHtml(animal.breed || '—')}</td><td><span class="status">${escapeHtml(animal.status)}</span></td></tr>`).join('') : '<tr><td colspan="4" class="empty">No animals yet.</td></tr>'}</tbody></table></div></section><section class="panel"><div class="panel-head"><h2>Animal health</h2><span>${healthRecords.length} records</span></div><form id="health-form" class="compact-form"><select name="animalId" required><option value="">Animal</option>${animals.map((animal) => `<option value="${animal.id}">${escapeHtml(animal.tag_number)}</option>`).join('')}</select><select name="recordType"><option value="vaccination">Vaccination</option><option value="treatment">Treatment</option><option value="deworming">Deworming</option><option value="checkup">Checkup</option></select><input name="description" placeholder="Description" required><input name="recordDate" type="date" required><button>Save record</button></form><div class="table-wrap"><table><thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${healthRecords.length ? healthRecords.map((record) => `<tr><td>${escapeHtml(record.record_date)}</td><td>${escapeHtml(record.tag_number)}</td><td>${escapeHtml(record.record_type)}</td><td>${escapeHtml(record.description)}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No health records yet.</td></tr>'}</tbody></table></div></section></div></main></div>`
+  const accountSecurityButton = document.createElement('button')
+  accountSecurityButton.id = 'account-security'
+  accountSecurityButton.className = 'quiet'
+  accountSecurityButton.textContent = 'Account security'
+  app.querySelector('aside .user-chip').before(accountSecurityButton)
+  accountSecurityButton.addEventListener('click', renderAccountSecurity)
   const stats = app.querySelector('.stats')
   stats.classList.add('overview-stats')
   const milkTotal = Number(overviewData.milkToday?.morning || 0) + Number(overviewData.milkToday?.evening || 0)
@@ -192,6 +342,8 @@ function renderAdminModule(module) {
   if (module === 'Livestock') return renderLivestockModule()
   if (module === 'Animal health') return renderHealthModule()
   if (module === 'User accounts') return renderUsersModule()
+  if (module === 'Role permissions') return renderPermissionsModule()
+  if (module === 'Your rights') return renderRightsModule()
   if (module === 'Feedback') return renderFeedbackModule()
   const details = {
     Livestock: ['Livestock register', 'Register animals, update their status and review the herd.'],
@@ -203,6 +355,8 @@ function renderAdminModule(module) {
     Reports: ['Reports', 'Review production, health compliance, finance and forecast results.'],
     Feedback: ['Feedback', 'Review customer feedback, complaints and suggestions.'],
     'User accounts': ['User accounts', 'Create staff and buyer accounts, assign roles and deactivate access.'],
+    'Role permissions': ['Role permissions', 'Control which farm modules each role can access.'],
+    'Your rights': ['Your rights', 'Review the access granted to your account and learn how to manage your data.'],
     Assistant: ['Farm assistant', 'Ask questions about records and receive role-limited decision support.'],
   }[module]
   app.querySelectorAll('[data-module]').forEach((item) => item.classList.toggle('active', item.dataset.module === module))
@@ -285,7 +439,7 @@ async function renderProductionModule() {
   try {
     const [data, summary] = await Promise.all([api.production(), api.productionSummary()])
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Farm produce</h1><p class="muted">Record any produce with its quantity produced, quantity sold and unit.</p></div><span class="health-pill">${data.records.length} records</span></header><section class="module-grid"><section class="panel"><h2>Record produce</h2><form id="produce-form" class="compact-form"><input name="produceName" list="produce-types" placeholder="Produce name" maxlength="120" required><datalist id="produce-types"><option value="Milk"><option value="Eggs"><option value="Wool"></datalist><input name="productionDate" type="date" required><select name="session"><option value="">No session</option><option value="morning">Morning</option><option value="evening">Evening</option><option value="other">Other</option></select><input name="quantityProduced" type="number" min="0" step="0.01" placeholder="Quantity produced" required><input name="quantitySold" type="number" min="0" step="0.01" placeholder="Quantity sold" value="0" required><input name="quantityDamaged" type="number" min="0" step="0.01" placeholder="Damaged or unusable" value="0" required><input name="unit" list="produce-units" placeholder="Unit, e.g. litres, trays, kg" maxlength="30" required><datalist id="produce-units"><option value="litres"><option value="eggs"><option value="trays"><option value="kg"></datalist><input name="notes" placeholder="Notes (optional)"><button>Save produce record</button></form></section><section class="panel"><h2>Recent produce</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produce</th><th>Session</th><th>Produced</th><th>Sold</th><th>Damaged</th><th>Unit</th></tr></thead><tbody>${data.records.length ? data.records.map((item) => `<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '—')}</td><td>${item.quantity_produced}</td><td>${item.quantity_sold}</td><td>${item.quantity_damaged}</td><td>${escapeHtml(item.unit)}</td></tr>`).join('') : '<tr><td colspan="7" class="empty">No produce records yet.</td></tr>'}</tbody></table></div></section></section>`
-    content.querySelector('.module-grid').before(renderProductionSummary(summary))
+    content.querySelector('.module-grid').insertAdjacentHTML('beforebegin', renderProductionSummary(summary))
     content.querySelector('#produce-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.recordProduction(Object.fromEntries(new FormData(event.target))); await renderProductionModule() })
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
@@ -482,17 +636,38 @@ async function renderReportsModule() {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
-async function renderAssistantModule() {
-  const content = app.querySelector('.content')
-  content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Farm assistant</h1><p class="muted">Role-limited, rule-based decision support from your records.</p></div><span class="health-pill">Rule-based mode</span></header><section class="panel assistant-panel"><div id="assistant-messages" class="assistant-messages"><p class="message success">Ask about milk, animals, tasks, stock or health follow-ups.</p></div><form id="assistant-form" class="assistant-form"><input name="message" placeholder="Ask a farm question..." required><button>Ask assistant</button></form></section>`
+async function renderAssistantModule(target = app.querySelector('.content')) {
+  const content = target
+  const permissionData = await api.permissions()
+  const rolePermissions = permissionData.permissions || permissionData.matrix?.[currentUser.role] || {}
+  const canRunScenarios = Boolean(rolePermissions['scenarios.run']?.allowed)
+  content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Farm assistant</h1><p class="muted">Advice from farm records and public agriculture signals.</p></div><span class="health-pill" id="assistant-mode">Rule-based mode</span></header><div class="assistant-layout"><section class="panel assistant-panel"><div id="assistant-messages" class="assistant-messages"><p class="message success">Ask for advice, current agriculture trends, or a review of farm records.</p></div><form id="assistant-form" class="assistant-form"><input name="message" placeholder="Ask a farm question..." required><button>Ask assistant</button></form></section>${canRunScenarios ? `<section class="panel assistant-scenario"><h2>30-day yield scenario</h2><p class="muted">Estimate the effect of adding animals using recent recorded production.</p><form id="assistant-scenario-form"><label>Additional dairy cattle<input name="additionalCows" type="number" min="0" max="250" value="0" required></label><label>Additional laying hens<input name="additionalHens" type="number" min="0" max="250" value="0" required></label><button>Estimate yield</button></form><div id="assistant-scenario-result" aria-live="polite"></div><p class="muted scenario-limitation">Estimates assume added animals perform like the current group. They do not predict feed, health, weather or management effects.</p></section>` : ''}</div>`
   content.querySelector('#assistant-form').addEventListener('submit', async (event) => {
     event.preventDefault()
     const form = event.target
     const input = form.querySelector('input')
     const messages = content.querySelector('#assistant-messages')
     messages.insertAdjacentHTML('beforeend', `<p class="assistant-question">${escapeHtml(input.value)}</p>`)
-    try { const result = await api.assistantChat(input.value); content.querySelector('.health-pill').textContent = result.mode; messages.insertAdjacentHTML('beforeend', `<p class="message success">${escapeHtml(result.answer)}</p>`) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
+    try { const result = await api.assistantChat(input.value); content.querySelector('#assistant-mode').textContent = result.mode; messages.insertAdjacentHTML('beforeend', `<p class="message success">${escapeHtml(result.answer)}</p>`) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
     input.value = ''
+  })
+  content.querySelector('#assistant-scenario-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const result = content.querySelector('#assistant-scenario-result')
+    result.innerHTML = '<p class="muted">Calculating from recorded production...</p>'
+    try {
+      const forecast = await api.assistantScenario(Object.fromEntries(new FormData(event.target)))
+      const yieldRows = forecast.scenarios.map((scenario) => {
+        const label = scenario.product === 'milk' ? 'Milk' : 'Eggs'
+        if (scenario.status === 'insufficient_data') return `<p class="message forecast-warning">${label}: ${Number(scenario.recordingDays)} consecutive days available; at least 21 are needed.</p>`
+        if (scenario.status === 'no_active_animals') return `<p class="message forecast-warning">${label}: no active animals are recorded for this production type.</p>`
+        return `<div class="scenario-result"><strong>${label}: ${Number(scenario.estimatedTotal).toLocaleString()} ${escapeHtml(scenario.unit)} over 30 days</strong><span>Baseline ${Number(scenario.baselineTotal).toLocaleString()} ${escapeHtml(scenario.unit)} · change +${Number(scenario.change).toLocaleString()}</span></div>${scenario.includesSimulatedData ? '<p class="message forecast-warning">This estimate includes simulated demonstration records.</p>' : ''}`
+      }).join('')
+      const feedRows = forecast.feedUse.map((item) => item.status === 'ready'
+        ? `<div class="scenario-result"><strong>${escapeHtml(item.item)}</strong><span>Recorded 30-day stock-out: ${Number(item.recordedUse30Days).toLocaleString()} ${escapeHtml(item.unit)} · estimated with added animals: ${Number(item.estimatedUseWithAddedAnimals).toLocaleString()} ${escapeHtml(item.unit)}</span></div>`
+        : `<p class="message forecast-warning">${escapeHtml(item.item)}: no recent feed stock-out records for a 30-day estimate.</p>`).join('')
+      result.innerHTML = `${yieldRows}<h3>Feed-use estimate</h3>${feedRows || '<p class="muted">Add feed inventory items and record stock-outs to estimate feed use.</p>'}<p class="muted scenario-limitation">${escapeHtml(forecast.limitations)}</p>`
+    } catch (error) { result.innerHTML = message(error.message, true) }
   })
 }
 
@@ -530,7 +705,46 @@ async function renderHealthModule() {
 }
 
 async function renderUsersModule() {
-  const content=app.querySelector('.content'); try { const data=await api.users(); content.innerHTML=`<header><div><p class="kicker">FARM MODULE</p><h1>User accounts</h1><p class="muted">Create accounts and control access.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create account</h2><form id="user-module-form" class="compact-form"><input name="fullName" placeholder="Full name" required><input name="username" placeholder="Username" required><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="12" placeholder="Temporary password" required><select name="role"><option value="worker">Worker</option><option value="veterinarian">Veterinarian</option><option value="buyer">Buyer</option><option value="customer">Customer</option></select><button>Create account</button></form></section><section class="panel"><h2>Accounts</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Status</th></tr></thead><tbody>${data.users.map((u)=>`<tr><td>${escapeHtml(u.full_name)}</td><td>${u.role}</td><td>${u.is_active?'Active':'Inactive'}</td></tr>`).join('')}</tbody></table></div></section></section>`; content.querySelector('form').addEventListener('submit',async(e)=>{e.preventDefault();await api.createUser(Object.fromEntries(new FormData(e.target)));await renderUsersModule()}) } catch(error){content.innerHTML=message(error.message,true)}
+  const content = app.querySelector('.content')
+  try {
+    const data = await api.users()
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>User accounts</h1><p class="muted">Create accounts and control access.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create account</h2><form id="user-module-form" class="compact-form"><input name="fullName" placeholder="Full name" required><input name="username" placeholder="Username" required><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="12" placeholder="Temporary password" required><select name="role"><option value="worker">Worker</option><option value="veterinarian">Veterinarian</option><option value="buyer">Buyer</option><option value="customer">Customer</option></select><button>Create account</button></form></section><section class="panel"><h2>Accounts</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Status</th></tr></thead><tbody>${data.users.map((user) => `<tr><td>${escapeHtml(user.full_name)}</td><td>${escapeHtml(user.role)}</td><td>${user.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody></table></div></section></section>`
+    content.querySelector('#user-module-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      try {
+        await api.createUser(Object.fromEntries(new FormData(event.target)))
+        await renderUsersModule()
+      } catch (error) { content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(error.message, true) })) }
+    })
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderPermissionsModule() {
+  const content = app.querySelector('.content')
+  try {
+    const { matrix } = await api.permissions()
+    const roleForms = Object.entries(matrix).filter(([role]) => role !== 'admin').map(([role, permissions]) => `<section class="panel permission-role"><h2>${escapeHtml(role)}</h2><form data-permission-role="${escapeHtml(role)}"><div class="permission-list">${Object.entries(permissions).map(([code, permission]) => `<label class="permission-item"><input type="checkbox" name="permission" value="${escapeHtml(code)}" ${permission.allowed ? 'checked' : ''}><span>${escapeHtml(permission.label)}</span></label>`).join('')}</div><button type="submit">Save ${escapeHtml(role)} access</button></form></section>`).join('')
+    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Role permissions</h1><p class="muted">Changes take effect on the next API request. Administrator access is fixed to prevent lockout.</p></div><span class="health-pill">${Object.keys(matrix).length - 1} configurable roles</span></header><div class="permissions-grid">${roleForms}</div>`
+    content.querySelectorAll('[data-permission-role]').forEach((form) => form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const selected = new FormData(form).getAll('permission')
+      const permissions = Object.fromEntries(selected.map((code) => [code, true]))
+      try {
+        await api.updateRolePermissions(form.dataset.permissionRole, permissions)
+        await renderPermissionsModule()
+      } catch (error) { content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(error.message, true) })) }
+    }))
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderRightsModule(target = app.querySelector('.content')) {
+  const content = target
+  try {
+    const data = await api.permissions()
+    const permissions = data.permissions || data.matrix?.[data.role] || {}
+    const grants = Object.values(permissions).filter((permission) => permission.allowed)
+    content.innerHTML = `<header><div><p class="kicker">ACCOUNT & DATA</p><h1>Your rights</h1><p class="muted">Access is based on your assigned role: ${escapeHtml(data.role)}.</p></div><span class="health-pill">${grants.length} granted actions</span></header><section class="panel rights-panel"><h2>Your access</h2><ul class="rights-permissions">${grants.map((permission) => `<li>${escapeHtml(permission.label)}</li>`).join('') || '<li>No module permissions are currently assigned.</li>'}</ul><h2>Personal data</h2><div class="rights-copy"><p>You may access records made available to your role and ask the farm administrator to correct your account details or a farm record.</p><p>You may request a copy of your personal account data or ask for your account to be deleted or deactivated. Some transaction and audit records may need to be retained for farm operations or legal obligations; the administrator can explain what applies.</p><p>Your sign-in email address is used for security alerts. Contact the farm administrator to update it or discuss a data request.</p></div></section>`
+  } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
 async function renderFeedbackModule() {
@@ -539,14 +753,30 @@ async function renderFeedbackModule() {
 
 async function renderRoleWorkspace(initialModule) {
   const workspaces = {
-    worker: { title: 'Daily operations', description: 'Production, farm tasks and stock movements.', modules: ['Production', 'Activities', 'Inventory'] },
-    veterinarian: { title: 'Animal health', description: 'Livestock records, treatment history and follow-up care.', modules: ['Livestock', 'Health records', 'Due follow-ups'] },
-    customer: { title: 'Farm shop', description: 'Browse farm produce, place orders and follow up on payments.', modules: ['Farm shop', 'My orders', 'Feedback'] },
-    buyer: { title: 'Livestock buying', description: 'Browse available livestock and track your requests.', modules: ['Livestock catalogue', 'My orders', 'Feedback'] },
+    worker: { title: 'Daily operations', description: 'Production, farm tasks and stock movements.', modules: ['Production', 'Activities', 'Inventory', 'Assistant', 'Your rights'] },
+    veterinarian: { title: 'Animal health', description: 'Livestock records, treatment history and follow-up care.', modules: ['Livestock', 'Health records', 'Due follow-ups', 'Assistant', 'Your rights'] },
+    customer: { title: 'Farm shop', description: 'Browse farm produce, place orders and follow up on payments.', modules: ['Farm shop', 'My orders', 'Feedback', 'Assistant', 'Your rights'] },
+    buyer: { title: 'Livestock buying', description: 'Browse available livestock and track your requests.', modules: ['Livestock catalogue', 'My orders', 'Feedback', 'Assistant', 'Your rights'] },
   }
   const workspace = workspaces[currentUser.role]
-  const activeModule = initialModule || workspace.modules[0]
-  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>${escapeHtml(workspace.title)}</h2><nav class="workspace-nav" aria-label="Workspace modules">${workspace.modules.map((item) => `<button class="workspace-nav-item ${item === activeModule ? 'active' : ''}" data-role-module="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('')}</nav><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">YOUR WORKSPACE</p><h1>${escapeHtml(activeModule)}</h1><p class="muted">${escapeHtml(workspace.description)}</p></div><span class="health-pill">Role protected</span></header><div id="role-content"></div></main></div>`
+  const permissionData = await api.permissions()
+  const rolePermissions = permissionData.permissions || {}
+  currentPermissions = rolePermissions
+  const modulePermissions = {
+    Production: ['production.view'], Activities: ['activities.view'], Inventory: ['inventory.view'],
+    Livestock: ['animals.view'], 'Health records': ['health.view'], 'Due follow-ups': ['health.view'],
+    'Farm shop': ['products.view'], 'Livestock catalogue': ['products.view'], 'My orders': ['orders.view'],
+    Feedback: ['feedback.view', 'feedback.create'], Assistant: ['assistant.use'],
+  }
+  const visibleModules = workspace.modules.filter((item) => item === 'Your rights' || (modulePermissions[item] || []).some((permission) => rolePermissions[permission]?.allowed))
+  const activeModule = visibleModules.includes(initialModule) ? initialModule : (visibleModules[0] || 'Your rights')
+  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>${escapeHtml(workspace.title)}</h2><nav class="workspace-nav" aria-label="Workspace modules">${visibleModules.map((item) => `<button class="workspace-nav-item ${item === activeModule ? 'active' : ''}" data-role-module="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('')}</nav><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">YOUR WORKSPACE</p><h1>${escapeHtml(activeModule)}</h1><p class="muted">${escapeHtml(workspace.description)}</p></div><span class="health-pill">Role protected</span></header><div id="role-content"></div></main></div>`
+  const accountSecurityButton = document.createElement('button')
+  accountSecurityButton.id = 'account-security'
+  accountSecurityButton.className = 'quiet'
+  accountSecurityButton.textContent = 'Account security'
+  app.querySelector('aside .user-chip').before(accountSecurityButton)
+  accountSecurityButton.addEventListener('click', renderAccountSecurity)
   app.querySelector('#logout').addEventListener('click', async () => { await api.logout(); currentUser = null; renderLanding(app, () => renderAuth('login'), () => renderAuth('login')) })
   app.querySelectorAll('[data-role-module]').forEach((button) => button.addEventListener('click', () => renderRoleWorkspace(button.dataset.roleModule)))
   await renderRoleModule(activeModule)
@@ -555,24 +785,35 @@ async function renderRoleWorkspace(initialModule) {
 async function renderRoleModule(module) {
   const content = app.querySelector('#role-content')
   const showError = (error) => { content.innerHTML = message(error.message, true) }
+  if (module === 'Assistant') {
+    await renderAssistantModule(content)
+    return
+  }
+  if (module === 'Your rights') {
+    await renderRightsModule(content)
+    return
+  }
   try {
     if (module === 'Production') {
       const [data, summary] = await Promise.all([api.production(), api.productionSummary()])
-      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>Record daily produce</h2><form id="role-production-form" class="compact-form"><select name="produceName"><option value="Milk">Milk</option><option value="Eggs">Eggs</option></select><input name="productionDate" type="date" value="${new Date().toISOString().slice(0, 10)}" required><select name="session"><option value="morning">Morning</option><option value="evening">Evening</option><option value="">No session</option></select><input name="quantityProduced" type="number" min="0" step="0.01" placeholder="Quantity produced" required><select name="unit"><option value="litres">Litres</option><option value="trays">Trays</option><option value="eggs">Eggs</option></select><input name="quantitySold" type="number" min="0" step="0.01" value="0" required><input name="quantityDamaged" type="number" min="0" step="0.01" value="0" required><button>Save production</button></form></section><section class="panel"><h2>Recent records</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produce</th><th>Session</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>${data.records.map((item) => `<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '—')}</td><td>${Number(item.quantity_produced).toLocaleString()}</td><td>${escapeHtml(item.unit)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No production records yet.</td></tr>'}</tbody></table></div></section></section>`
+      const canRecord = Boolean(currentPermissions['production.record']?.allowed)
+      content.innerHTML = `<section class="module-grid">${canRecord ? `<section class="panel"><h2>Record daily produce</h2><form id="role-production-form" class="compact-form"><select name="produceName"><option value="Milk">Milk</option><option value="Eggs">Eggs</option></select><input name="productionDate" type="date" value="${new Date().toISOString().slice(0, 10)}" required><select name="session"><option value="morning">Morning</option><option value="evening">Evening</option><option value="">No session</option></select><input name="quantityProduced" type="number" min="0" step="0.01" placeholder="Quantity produced" required><select name="unit"><option value="litres">Litres</option><option value="trays">Trays</option><option value="eggs">Eggs</option></select><input name="quantitySold" type="number" min="0" step="0.01" value="0" required><input name="quantityDamaged" type="number" min="0" step="0.01" value="0" required><button>Save production</button></form></section>` : ''}<section class="panel"><h2>Recent records</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produce</th><th>Session</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>${data.records.map((item) => `<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '—')}</td><td>${Number(item.quantity_produced).toLocaleString()}</td><td>${escapeHtml(item.unit)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No production records yet.</td></tr>'}</tbody></table></div></section></section>`
       content.insertAdjacentHTML('afterbegin', renderProductionSummary(summary))
-      content.querySelector('#role-production-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.recordProduction(Object.fromEntries(new FormData(event.target))); await renderRoleModule(module) } catch (error) { showError(error) } })
+      content.querySelector('#role-production-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.recordProduction(Object.fromEntries(new FormData(event.target))); await renderRoleModule(module) } catch (error) { showError(error) } })
       return
     }
     if (module === 'Activities') {
       const data = await api.activities()
-      content.innerHTML = `<section class="panel"><h2>Assigned and shared activities</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Task</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${item.status === 'planned' ? `<button class="small-action" data-complete-activity="${Number(item.id)}">Complete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No assigned activities.</td></tr>'}</tbody></table></div></section>`
+      const canComplete = Boolean(currentPermissions['activities.complete']?.allowed)
+      content.innerHTML = `<section class="panel"><h2>Assigned and shared activities</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Task</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${canComplete && item.status === 'planned' ? `<button class="small-action" data-complete-activity="${Number(item.id)}">Complete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No assigned activities.</td></tr>'}</tbody></table></div></section>`
       content.querySelectorAll('[data-complete-activity]').forEach((button) => button.addEventListener('click', async () => { try { await api.completeActivity(button.dataset.completeActivity); await renderRoleModule(module) } catch (error) { showError(error) } }))
       return
     }
     if (module === 'Inventory') {
       const [data, history] = await Promise.all([api.inventory(), api.inventoryTransactions()])
-      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>Stock on hand</h2><div class="table-wrap"><table><thead><tr><th>Item</th><th>Balance</th><th>Reorder at</th></tr></thead><tbody>${data.items.map((item) => `<tr class="${Number(item.quantity_on_hand) <= Number(item.reorder_level) ? 'low-stock-row' : ''}"><td>${escapeHtml(item.name)}</td><td>${Number(item.quantity_on_hand).toLocaleString()} ${escapeHtml(item.unit)}</td><td>${Number(item.reorder_level).toLocaleString()}</td></tr>`).join('')}</tbody></table></div></section><section class="panel"><h2>Record stock use</h2><form id="role-stock-form" class="compact-form"><select name="itemId" required><option value="">Choose item</option>${data.items.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.quantity_on_hand)} ${escapeHtml(item.unit)}</option>`).join('')}</select><select name="transactionType"><option value="out">Stock out</option><option value="in">Stock in</option><option value="adjustment">Adjustment</option></select><input name="quantityChange" type="number" step="0.01" placeholder="Signed quantity" required><input name="reason" placeholder="Reason" required><button>Save movement</button></form></section></section><section class="panel"><h2>Recent stock movements</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Item</th><th>Change</th><th>Reason</th></tr></thead><tbody>${history.transactions.map((item) => `<tr><td>${escapeHtml(item.transaction_date)}</td><td>${escapeHtml(item.item_name)}</td><td>${Number(item.quantity_change).toLocaleString()}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No stock movements.</td></tr>'}</tbody></table></div></section>`
-      content.querySelector('#role-stock-form').addEventListener('submit', async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); const itemId = values.itemId; delete values.itemId; try { await api.inventoryTransaction(itemId, values); await renderRoleModule(module) } catch (error) { showError(error) } })
+      const canTransact = Boolean(currentPermissions['inventory.transact']?.allowed)
+      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>Stock on hand</h2><div class="table-wrap"><table><thead><tr><th>Item</th><th>Balance</th><th>Reorder at</th></tr></thead><tbody>${data.items.map((item) => `<tr class="${Number(item.quantity_on_hand) <= Number(item.reorder_level) ? 'low-stock-row' : ''}"><td>${escapeHtml(item.name)}</td><td>${Number(item.quantity_on_hand).toLocaleString()} ${escapeHtml(item.unit)}</td><td>${Number(item.reorder_level).toLocaleString()}</td></tr>`).join('')}</tbody></table></div></section>${canTransact ? `<section class="panel"><h2>Record stock use</h2><form id="role-stock-form" class="compact-form"><select name="itemId" required><option value="">Choose item</option>${data.items.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.quantity_on_hand)} ${escapeHtml(item.unit)}</option>`).join('')}</select><select name="transactionType"><option value="out">Stock out</option><option value="in">Stock in</option><option value="adjustment">Adjustment</option></select><input name="quantityChange" type="number" step="0.01" placeholder="Signed quantity" required><input name="reason" placeholder="Reason" required><button>Save movement</button></form></section>` : ''}</section><section class="panel"><h2>Recent stock movements</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Item</th><th>Change</th><th>Reason</th></tr></thead><tbody>${history.transactions.map((item) => `<tr><td>${escapeHtml(item.transaction_date)}</td><td>${escapeHtml(item.item_name)}</td><td>${Number(item.quantity_change).toLocaleString()}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No stock movements.</td></tr>'}</tbody></table></div></section>`
+      content.querySelector('#role-stock-form')?.addEventListener('submit', async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); const itemId = values.itemId; delete values.itemId; try { await api.inventoryTransaction(itemId, values); await renderRoleModule(module) } catch (error) { showError(error) } })
       return
     }
     if (module === 'Livestock' || module === 'Due follow-ups' || module === 'Health records') {
@@ -583,15 +824,17 @@ async function renderRoleModule(module) {
       }
       const dueRows = health.dueSoon.map((item) => `<tr><td>${escapeHtml(item.next_due_date)}</td><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td></tr>`).join('')
       const recordRows = health.records.map((item) => `<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td></tr>`).join('')
-      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>Record treatment or care</h2><form id="role-health-form" class="compact-form"><select name="animalId" required><option value="">Choose animal</option>${animals.animals.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.tag_number)} · ${escapeHtml(item.species)}</option>`).join('')}</select><select name="recordType"><option value="treatment">Treatment</option><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option><option value="checkup">Checkup</option><option value="illness">Illness</option></select><input name="description" placeholder="Clinical note or action" required><input name="medication" placeholder="Medication, if applicable"><input name="recordDate" type="date" value="${new Date().toISOString().slice(0, 10)}" required><input name="nextDueDate" type="date"><button>Save health record</button></form></section><section class="panel"><h2>Due follow-ups</h2><div class="table-wrap"><table><thead><tr><th>Due</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${dueRows || '<tr><td colspan="4" class="empty">No open follow-ups due.</td></tr>'}</tbody></table></div></section></section><section class="panel"><h2>Health history</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${recordRows || '<tr><td colspan="4" class="empty">No health records.</td></tr>'}</tbody></table></div></section>`
-      content.querySelector('#role-health-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createHealthRecord(Object.fromEntries(new FormData(event.target))); await renderRoleModule(module) } catch (error) { showError(error) } })
+      const canRecordHealth = Boolean(currentPermissions['health.record']?.allowed)
+      content.innerHTML = `<section class="module-grid">${canRecordHealth ? `<section class="panel"><h2>Record treatment or care</h2><form id="role-health-form" class="compact-form"><select name="animalId" required><option value="">Choose animal</option>${animals.animals.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.tag_number)} · ${escapeHtml(item.species)}</option>`).join('')}</select><select name="recordType"><option value="treatment">Treatment</option><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option><option value="checkup">Checkup</option><option value="illness">Illness</option></select><input name="description" placeholder="Clinical note or action" required><input name="medication" placeholder="Medication, if applicable"><input name="recordDate" type="date" value="${new Date().toISOString().slice(0, 10)}" required><input name="nextDueDate" type="date"><button>Save health record</button></form></section>` : ''}<section class="panel"><h2>Due follow-ups</h2><div class="table-wrap"><table><thead><tr><th>Due</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${dueRows || '<tr><td colspan="4" class="empty">No open follow-ups due.</td></tr>'}</tbody></table></div></section></section><section class="panel"><h2>Health history</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${recordRows || '<tr><td colspan="4" class="empty">No health records.</td></tr>'}</tbody></table></div></section>`
+      content.querySelector('#role-health-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createHealthRecord(Object.fromEntries(new FormData(event.target))); await renderRoleModule(module) } catch (error) { showError(error) } })
       return
     }
     if (module === 'Farm shop' || module === 'Livestock catalogue') {
       const data = await api.products()
       const products = data.products.filter((item) => Number(item.available_quantity) > 0)
-      content.innerHTML = `<section class="panel"><h2>Available listings</h2><form id="role-order-form" class="compact-form"><select name="productId" required><option value="">Choose listing</option>${products.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity).toLocaleString()} ${escapeHtml(item.unit)} · KES ${Math.round(Number(item.unit_price)).toLocaleString()}</option>`).join('')}</select><input name="quantity" type="number" min="0.01" step="0.01" placeholder="Quantity" required><button>Request order</button></form><div class="table-wrap"><table><thead><tr><th>Listing</th><th>Type</th><th>Available</th><th>Unit price</th></tr></thead><tbody>${products.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.product_type)}</td><td>${Number(item.available_quantity).toLocaleString()} ${escapeHtml(item.unit)}</td><td>KES ${Math.round(Number(item.unit_price)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No available listings.</td></tr>'}</tbody></table></div></section>`
-      content.querySelector('#role-order-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createOrder(Object.fromEntries(new FormData(event.target))); await renderRoleWorkspace('My orders') } catch (error) { showError(error) } })
+      const canOrder = Boolean(currentPermissions['orders.create']?.allowed)
+      content.innerHTML = `<section class="panel"><h2>Available listings</h2>${canOrder ? `<form id="role-order-form" class="compact-form"><select name="productId" required><option value="">Choose listing</option>${products.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity).toLocaleString()} ${escapeHtml(item.unit)} · KES ${Math.round(Number(item.unit_price)).toLocaleString()}</option>`).join('')}</select><input name="quantity" type="number" min="0.01" step="0.01" placeholder="Quantity" required><button>Request order</button></form>` : ''}<div class="table-wrap"><table><thead><tr><th>Listing</th><th>Type</th><th>Available</th><th>Unit price</th></tr></thead><tbody>${products.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.product_type)}</td><td>${Number(item.available_quantity).toLocaleString()} ${escapeHtml(item.unit)}</td><td>KES ${Math.round(Number(item.unit_price)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No available listings.</td></tr>'}</tbody></table></div></section>`
+      content.querySelector('#role-order-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createOrder(Object.fromEntries(new FormData(event.target))); await renderRoleWorkspace('My orders') } catch (error) { showError(error) } })
       return
     }
     if (module === 'My orders' || module === 'Payments') {
@@ -600,9 +843,11 @@ async function renderRoleModule(module) {
       return
     }
     if (module === 'Feedback') {
-      const data = await api.feedback()
-      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>Send feedback</h2><form id="role-feedback-form" class="compact-form"><select name="category"><option value="feedback">Feedback</option><option value="complaint">Complaint</option><option value="suggestion">Suggestion</option></select><textarea name="message" rows="5" placeholder="Write your message" required></textarea><button>Send message</button></form></section><section class="panel"><h2>My messages</h2><div class="feedback-list">${data.feedback.map((item) => `<article class="feedback-item"><p class="kicker">${escapeHtml(item.category)} · ${escapeHtml(item.status)}</p><p>${escapeHtml(item.message)}</p><small>${escapeHtml(item.created_at)}</small></article>`).join('') || '<p class="empty">No messages sent.</p>'}</div></section></section>`
-      content.querySelector('#role-feedback-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createFeedback(Object.fromEntries(new FormData(event.target))); await renderRoleWorkspace('Feedback') } catch (error) { showError(error) } })
+      const canView = Boolean(currentPermissions['feedback.view']?.allowed)
+      const canCreate = Boolean(currentPermissions['feedback.create']?.allowed)
+      const data = canView ? await api.feedback() : { feedback: [] }
+      content.innerHTML = `<section class="module-grid">${canCreate ? `<section class="panel"><h2>Send feedback</h2><form id="role-feedback-form" class="compact-form"><select name="category"><option value="feedback">Feedback</option><option value="complaint">Complaint</option><option value="suggestion">Suggestion</option></select><textarea name="message" rows="5" placeholder="Write your message" required></textarea><button>Send message</button></form></section>` : ''}${canView ? `<section class="panel"><h2>My messages</h2><div class="feedback-list">${data.feedback.map((item) => `<article class="feedback-item"><p class="kicker">${escapeHtml(item.category)} · ${escapeHtml(item.status)}</p><p>${escapeHtml(item.message)}</p><small>${escapeHtml(item.created_at)}</small></article>`).join('') || '<p class="empty">No messages sent.</p>'}</div></section>` : ''}</section>`
+      content.querySelector('#role-feedback-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createFeedback(Object.fromEntries(new FormData(event.target))); await renderRoleWorkspace('Feedback') } catch (error) { showError(error) } })
       return
     }
   } catch (error) { showError(error) }

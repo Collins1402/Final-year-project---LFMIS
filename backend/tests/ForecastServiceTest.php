@@ -70,14 +70,43 @@ final class ForecastServiceTest extends TestCase
         $this->assertSame(1, (int) $stored['uses_weather']);
     }
 
+    public function testScenarioProjectsMilkAndEggsFromAdditionalAnimals(): void
+    {
+        $db = $this->database();
+        $this->addProductionDays($db, 22, 1);
+        $insertEggs = $db->prepare('INSERT INTO farm_produce VALUES (?, ?, ?, ?, ?)');
+        for ($daysAgo = 22; $daysAgo >= 1; $daysAgo--) {
+            $insertEggs->execute([date('Y-m-d', strtotime('-' . $daysAgo . ' days')), 'Eggs', 4, 'trays', null]);
+        }
+        $db->exec("INSERT INTO animals VALUES (1, 'active', 'cattle'), (2, 'active', 'cattle'), (3, 'active', 'chicken'), (4, 'active', 'chicken'), (5, 'active', 'chicken'), (6, 'active', 'chicken'), (7, 'active', 'chicken')");
+        $db->exec("INSERT INTO inventory_items (id, name, unit, category, is_active) VALUES (1, 'Dairy feed', 'kg', 'feed', 1)");
+        $db->prepare('INSERT INTO inventory_transactions VALUES (1, ?, ?, ?)')->execute(['out', -70, date('Y-m-d', strtotime('-10 days'))]);
+        $service = new ForecastService($db, static function (string $url, array $payload): array {
+            $value = array_sum(array_column($payload['observations'], 'litres')) / count($payload['observations']);
+            return ['forecast' => array_fill(0, 30, ['litres' => $value])];
+        });
+
+        $result = $service->scenario(2, 5);
+
+        $this->assertSame(30, $result['horizonDays']);
+        $this->assertSame('ready', $result['scenarios'][0]['status']);
+        $this->assertSame(2, $result['scenarios'][0]['additionalAnimals']);
+        $this->assertEquals($result['scenarios'][0]['baselineTotal'] * 2, $result['scenarios'][0]['estimatedTotal']);
+        $this->assertSame('ready', $result['scenarios'][1]['status']);
+        $this->assertEquals($result['scenarios'][1]['baselineTotal'] * 2, $result['scenarios'][1]['estimatedTotal']);
+        $this->assertSame(70.0, $result['feedUse'][0]['recordedUse30Days']);
+        $this->assertSame(140.0, $result['feedUse'][0]['estimatedUseWithAddedAnimals']);
+    }
+
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');
         $db->exec('CREATE TABLE farm_produce (production_date TEXT, produce_name TEXT, quantity_produced REAL, unit TEXT, notes TEXT)');
         $db->exec('CREATE TABLE weather_observations (observation_date TEXT, rain_mm REAL, temp_c REAL)');
         $db->exec('CREATE TABLE farm_activities (status TEXT)');
-        $db->exec('CREATE TABLE inventory_items (is_active INTEGER, quantity_on_hand REAL, reorder_level REAL)');
-        $db->exec('CREATE TABLE animals (id INTEGER, status TEXT)');
+        $db->exec('CREATE TABLE inventory_items (id INTEGER, name TEXT, unit TEXT, category TEXT, is_active INTEGER, quantity_on_hand REAL, reorder_level REAL)');
+        $db->exec('CREATE TABLE animals (id INTEGER, status TEXT, species TEXT)');
+        $db->exec('CREATE TABLE inventory_transactions (item_id INTEGER, transaction_type TEXT, quantity_change REAL, transaction_date TEXT)');
         $db->exec('CREATE TABLE health_records (id INTEGER, animal_id INTEGER, record_type TEXT, record_date TEXT, next_due_date TEXT)');
         $db->exec('CREATE TABLE forecast_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, method TEXT, training_days INTEGER, backtest_days INTEGER, mae_litres REAL, rmse_litres REAL, baseline_mae_litres REAL, uses_weather INTEGER, notes TEXT, requested_by INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
         return $db;

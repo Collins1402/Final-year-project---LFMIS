@@ -17,6 +17,7 @@ const post = (path, data) => request(path, { method: 'POST', body: JSON.stringif
 
 export const api = {
   health: () => request('/api/health'),
+  trends: () => request('/api/trends'),
   setupStatus: () => request('/api/setup-status'),
   setup: (data) => post('/api/setup', data),
   register: (data) => post('/api/register', data),
@@ -24,6 +25,13 @@ export const api = {
   forgotPassword: (data) => post('/api/password/forgot', data),
   resetPassword: (data) => post('/api/password/reset', data),
   login: (data) => post('/api/login', data),
+  sendLoginTwoFactorCode: (method) => post('/api/login/2fa/send', { method }),
+  verifyLoginTwoFactorCode: (data) => post('/api/login/2fa/verify', data),
+  cancelLoginTwoFactor: () => post('/api/login/2fa/cancel', {}),
+  twoFactorStatus: () => request('/api/account/2fa'),
+  startTwoFactorEnrollment: (data) => post('/api/account/2fa/enroll', data),
+  verifyTwoFactorEnrollment: (data) => post('/api/account/2fa/enroll/verify', data),
+  removeTwoFactorMethod: (data) => post('/api/account/2fa/remove', data),
   logout: () => post('/api/logout', {}),
   session: () => request('/api/session'),
   overview: () => request('/api/overview'),
@@ -62,6 +70,7 @@ export const api = {
   forecastReport: () => request('/api/reports/forecast'),
   forecastHistory: () => request('/api/reports/forecast/history'),
   assistantChat: (message) => post('/api/assistant/chat', { message }),
+  assistantScenario: (data) => post('/api/assistant/scenario', data),
   notifications: () => request('/api/notifications'),
   markNotificationRead: (id) => request(`/api/notifications/${id}`, { method: 'PATCH', body: '{}' }),
   loadDemoData: () => post('/api/demo-data', {}),
@@ -70,4 +79,6 @@ export const api = {
   resolveFeedback: (id) => request(`/api/feedback/${id}/resolve`, { method: 'PATCH', body: '{}' }),
   users: () => request('/api/users'),
   createUser: (data) => post('/api/users', data),
+  permissions: () => request('/api/permissions'),
+  updateRolePermissions: (role, permissions) => post(`/api/permissions/${encodeURIComponent(role)}`, { permissions }),
 }

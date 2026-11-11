@@ -19,18 +19,102 @@ final class ForecastService
 
     public function trainingData(): array
     {
+        return $this->trainingDataFor('milk');
+    }
+
+    public function scenario(int $additionalCows, int $additionalHens): array
+    {
+        if ($additionalCows < 0 || $additionalCows > 250 || $additionalHens < 0 || $additionalHens > 250) {
+            throw new \InvalidArgumentException('Additional animal counts must be between 0 and 250.');
+        }
+        $animalCounts = [];
+        foreach ($this->db->query("SELECT LOWER(species) AS species, COUNT(*) AS count FROM animals WHERE status = 'active' GROUP BY LOWER(species)")->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $animalCounts[$row['species']] = (int) $row['count'];
+        }
+        $results = [];
+        foreach ([
+            'milk' => ['species' => 'cattle', 'additional' => $additionalCows],
+            'eggs' => ['species' => 'chicken', 'additional' => $additionalHens],
+        ] as $product => $plan) {
+            $history = $this->trainingDataFor($product);
+            $animalCount = $animalCounts[$plan['species']] ?? 0;
+            $result = [
+                'product' => $product,
+                'unit' => $history['unit'],
+                'recordingDays' => count($history['observations']),
+                'activeAnimals' => $animalCount,
+                'additionalAnimals' => $plan['additional'],
+                'includesSimulatedData' => $history['includesSimulatedData'],
+                'status' => 'insufficient_data',
+            ];
+            if (count($history['observations']) >= 21) {
+                $forecast = $this->post('/forecast', ['observations' => $history['observations'], 'horizon' => 30]);
+                $baseline = array_sum(array_map(static fn(array $item): float => (float) ($item['litres'] ?? 0), $forecast['forecast'] ?? []));
+                $result['baselineTotal'] = round($baseline, 2);
+                if ($animalCount > 0) {
+                    $result['estimatedTotal'] = round($baseline * (($animalCount + $plan['additional']) / $animalCount), 2);
+                    $result['change'] = round($result['estimatedTotal'] - $baseline, 2);
+                    $result['status'] = 'ready';
+                } else {
+                    $result['status'] = 'no_active_animals';
+                }
+            }
+            $results[] = $result;
+        }
+        $activeAnimalCount = array_sum($animalCounts);
+        $additionalAnimalCount = $additionalCows + $additionalHens;
+        $feedUsageQuery = $this->db->prepare(
+            "SELECT i.id, i.name, i.unit, COALESCE(SUM(CASE WHEN t.transaction_type = 'out' THEN ABS(t.quantity_change) ELSE 0 END), 0) AS recent_use
+             FROM inventory_items i LEFT JOIN inventory_transactions t ON t.item_id = i.id AND t.transaction_date >= ? AND t.transaction_date < ?
+             WHERE i.category = 'feed' AND i.is_active = 1 GROUP BY i.id, i.name, i.unit ORDER BY i.name"
+        );
+        $feedUsageQuery->execute([date('Y-m-d', strtotime('-30 days')), date('Y-m-d', strtotime('tomorrow'))]);
+        $feedUse = [];
+        foreach ($feedUsageQuery->fetchAll(PDO::FETCH_ASSOC) as $item) {
+            $recentUse = (float) $item['recent_use'];
+            $incrementalUse = $activeAnimalCount > 0 ? $recentUse * $additionalAnimalCount / $activeAnimalCount : 0.0;
+            $feedUse[] = [
+                'item' => $item['name'],
+                'unit' => $item['unit'],
+                'recordedUse30Days' => round($recentUse, 2),
+                'estimatedUseWithAddedAnimals' => round($recentUse + $incrementalUse, 2),
+                'status' => $recentUse > 0 ? 'ready' : 'no_recent_usage',
+            ];
+        }
+        return [
+            'horizonDays' => 30,
+            'scenarios' => $results,
+            'feedUse' => $feedUse,
+            'limitations' => 'Yield estimates scale recorded production in proportion to active animals and assume added animals perform like the current group. Feed-use estimates scale the latest 30 days of recorded feed stock-outs by total animal count; stock movements may not equal feed consumed. Neither estimate models health, weather or management effects, and feed changes are not assumed to cause a yield change.',
+        ];
+    }
+
+    private function trainingDataFor(string $produceName): array
+    {
+        $unitsByProduct = [
+            'milk' => ['litre', 'litres', 'l'],
+            'eggs' => ['tray', 'trays', 'egg', 'eggs'],
+        ];
+        if (!isset($unitsByProduct[$produceName])) {
+            throw new \InvalidArgumentException('Unsupported produce type.');
+        }
+        $unitQuery = $this->db->prepare('SELECT unit FROM farm_produce WHERE LOWER(produce_name) = ? ORDER BY production_date DESC LIMIT 1');
+        $unitQuery->execute([$produceName]);
+        $unit = strtolower((string) $unitQuery->fetchColumn());
+        if (!in_array($unit, $unitsByProduct[$produceName], true)) {
+            return ['observations' => [], 'includesSimulatedData' => false, 'unit' => null];
+        }
         $statement = $this->db->prepare(
             "SELECT production_date AS date, SUM(quantity_produced) AS litres,
                     MAX(CASE WHEN notes = 'SIMULATED DATA' THEN 1 ELSE 0 END) AS simulated
              FROM farm_produce
-             WHERE LOWER(produce_name) = 'milk'
-               AND LOWER(unit) IN ('litre', 'litres', 'l')
+             WHERE LOWER(produce_name) = ? AND LOWER(unit) = ?
                AND production_date < ?
              GROUP BY production_date
              ORDER BY production_date DESC
              LIMIT 365"
         );
-        $statement->execute([date('Y-m-d')]);
+        $statement->execute([$produceName, $unit, date('Y-m-d')]);
         $rows = array_reverse($statement->fetchAll());
         $observations = [];
         $includesSimulatedData = false;
@@ -68,7 +152,7 @@ final class ForecastService
             unset($observation);
         }
 
-        return ['observations' => $observations, 'includesSimulatedData' => $includesSimulatedData];
+        return ['observations' => $observations, 'includesSimulatedData' => $includesSimulatedData, 'unit' => $unit];
     }
 
     public function report(int $userId): array
