@@ -106,7 +106,7 @@ final class ForecastService
         }
         $statement = $this->db->prepare(
             "SELECT production_date AS date, SUM(quantity_produced) AS litres,
-                    MAX(CASE WHEN notes = 'SIMULATED DATA' THEN 1 ELSE 0 END) AS simulated
+                    MAX(CASE WHEN notes = 'SIMULATED DATA' OR notes LIKE '%TEST DATA%' THEN 1 ELSE 0 END) AS simulated
              FROM farm_produce
              WHERE LOWER(produce_name) = ? AND LOWER(unit) = ?
                AND production_date < ?

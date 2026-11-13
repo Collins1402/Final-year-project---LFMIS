@@ -24,6 +24,18 @@ final class ForecastServiceTest extends TestCase
         $this->assertTrue($data['includesSimulatedData']);
     }
 
+    public function testTrainingDataFlagsTestDataDemoRecordsAsSimulated(): void
+    {
+        $db = $this->database();
+        $this->addProductionDays($db, 22, 1);
+        $db->exec("UPDATE farm_produce SET notes = 'TEST DATA - demo record'");
+
+        $data = (new ForecastService($db))->trainingData();
+
+        $this->assertCount(22, $data['observations']);
+        $this->assertTrue($data['includesSimulatedData']);
+    }
+
     public function testReportRejectsHistoryShorterThanTwentyOneDays(): void
     {
         $db = $this->database();
