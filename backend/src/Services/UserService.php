@@ -91,6 +91,45 @@ final class UserService
         return $this->find($id);
     }
 
+    public function delete(int $id, int $actingUserId): void
+    {
+        if ($id <= 0) {
+            throw new \InvalidArgumentException('Invalid user id.');
+        }
+        if ($id === $actingUserId) {
+            throw new \InvalidArgumentException('You cannot remove your own account.');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $statement = $this->db->prepare(
+                'SELECT users.is_active, roles.name AS role
+                 FROM users JOIN roles ON roles.id = users.role_id
+                 WHERE users.id = ?'
+            );
+            $statement->execute([$id]);
+            $user = $statement->fetch();
+            if (!$user) {
+                throw new \InvalidArgumentException('User not found.');
+            }
+            if ($user['role'] === 'admin' && $this->activeAdminCount(true) <= (int) $user['is_active']) {
+                throw new \InvalidArgumentException('Keep at least one active administrator.');
+            }
+
+            $delete = $this->db->prepare('DELETE FROM users WHERE id = ?');
+            $delete->execute([$id]);
+            if ($delete->rowCount() !== 1) {
+                throw new \RuntimeException('User could not be removed.');
+            }
+            $this->db->commit();
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $error;
+        }
+    }
+
     public function find(int $id): array
     {
         $statement = $this->db->prepare(
@@ -108,10 +147,12 @@ final class UserService
         return $user;
     }
 
-    private function activeAdminCount(): int
+    private function activeAdminCount(bool $lock = false): int
     {
-        return (int) $this->db->query(
-            "SELECT COUNT(*) FROM users JOIN roles ON roles.id = users.role_id WHERE roles.name = 'admin' AND users.is_active = 1"
-        )->fetchColumn();
+        $sql = "SELECT users.id FROM users JOIN roles ON roles.id = users.role_id WHERE roles.name = 'admin' AND users.is_active = 1";
+        if ($lock && $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'sqlite') {
+            $sql .= ' FOR UPDATE';
+        }
+        return count($this->db->query($sql)->fetchAll(PDO::FETCH_COLUMN));
     }
 }
