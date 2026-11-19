@@ -423,7 +423,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     expense_rows = []
     for offset, row in enumerate(rows_as_dicts(workbook, "expenses"), start=1):
         category = str(row["category"]).lower()
-        if category not empty_categories:
+        if category not in {"feed", "veterinary", "labour", "equipment", "transport", "utilities", "maintenance", "other"}:
             category = "other"
         expense_rows.append((
             300000 + offset,
@@ -494,7 +494,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
         "DELETE FROM farm_activities WHERE id >= 800000;",
         "DELETE FROM health_records WHERE id >= 700000;",
         "DELETE FROM customers WHERE id >= 900000;",
-        "DELETE FROM animals WHERE id <= 350;",
+        "DELETE FROM animals WHERE tag_number LIKE 'SIM-%';",
         "SET FOREIGN_KEY_CHECKS = 1;",
     ]
     return "\n\n".join(statements) + "\n", "\n".join(reset) + "\n", counts
