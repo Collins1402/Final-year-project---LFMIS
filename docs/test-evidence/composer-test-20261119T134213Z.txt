@@ -1,0 +1,131 @@
+> phpunit --testdox
+PHPUnit 9.6.37 by Sebastian Bergmann and contributors.
+
+Activity Service (Lfmis\Tests\ActivityService)
+ ✔ Health concern creates issue and notifies admin and veterinarian
+ ✔ Health concern requires animal and symptoms
+ ✔ Ordinary activity does not create health record or expose concern notifications
+
+Assistant Service (Lfmis\Tests\AssistantService)
+ ✔ Customer cannot read farm wide operational metrics
+ ✔ Trend question uses public headlines and labels their limits
+
+Audit Service (Lfmis\Tests\AuditService)
+ ✔ Records and filters audit events
+ ✔ Rejects invalid audit filters
+ ✔ Record rejects invalid event names
+
+Auth Service (Lfmis\Tests\AuthService)
+ ✔ Password policy requires twelve characters
+ ✔ Customer and buyer registration creates linked customer records
+ ✔ Self registration cannot grant staff roles
+ ✔ Login with two factor does not create an authenticated session
+
+Backup Service (Lfmis\Tests\BackupService)
+ ✔ Creates dated backup without returning its absolute path
+ ✔ Removes partial backup after dump failure
+ ✔ Rejects unsafe database name before starting dump
+
+Commerce Workflow (Lfmis\Tests\CommerceWorkflow)
+ ✔ Acceptance reserves produce and fulfillment records sale once
+ ✔ Acceptance allocates specific livestock
+ ✔ Customer can request listed product
+ ✔ Admin quote is linked to catalog stock
+ ✔ Livestock availability uses active animal records
+ ✔ Customer cannot request livestock listing
+ ✔ Insufficient stock rolls back acceptance
+
+Customer Data Isolation (Lfmis\Tests\CustomerDataIsolation)
+ ✔ Orders can be scoped to the signed in customer
+ ✔ Feedback can be scoped to the signed in customer
+
+Event Service (Lfmis\Tests\EventService)
+ ✔ Creates daytime event that ends at four
+ ✔ Rejects events ending after four
+ ✔ Rejects overnight or reversed times
+
+Forecast Service (Lfmis\Tests\ForecastService)
+ ✔ Training data uses latest gap free run and excludes today
+ ✔ Training data flags test data demo records as simulated
+ ✔ Report rejects history shorter than twenty one days
+ ✔ Report surfaces unavailable ml service for the api to handle
+ ✔ Report stores an identical daily backtest only once
+ ✔ Scenario projects milk and eggs from additional animals
+
+Health Service (Lfmis\Tests\HealthService)
+ ✔ Due soon includes overdue open follow ups and excludes closed or inactive ones
+
+Inventory Service (Lfmis\Tests\InventoryService)
+ ✔ Transaction updates balance and stores history
+ ✔ Transaction cannot make stock negative
+
+Login Alert Service (Lfmis\Tests\LoginAlertService)
+ ✔ Successful login sends security details without credentials
+ ✔ Mail failure does not throw
+
+Mpesa Service (Lfmis\Tests\MpesaService)
+ ✔ Initiate normalizes phone and sends stk push
+ ✔ Callback confirms payment records sale and notifies staff only once
+ ✔ Failed callback allows buyer to retry
+ ✔ Callback rejects wrong secret
+ ✔ Buyer cannot pay another customers order
+ ✔ Initiate rejects invalid phone
+
+Overview Service (Lfmis\Tests\OverviewService)
+ ✔ Summary aggregates farm and business indicators
+
+Permission Service (Lfmis\Tests\PermissionService)
+ ✔ Admin can revoke and restore role permission
+ ✔ Administrator permissions cannot be changed
+ ✔ Database backup permission is granted only to administrator
+
+Production Service (Lfmis\Tests\ProductionService)
+ ✔ Records generic produce and units sold
+ ✔ Rejects sold and damaged quantities above production
+ ✔ Summary groups recent daily and month to date production
+
+Rate Limit Service (Lfmis\Tests\RateLimitService)
+ ✔ Allows requests within the configured limit
+ ✔ Rejects requests above the configured limit
+ ✔ Rate limit buckets are isolated by scope and identity
+
+Reminder Service (Lfmis\Tests\ReminderService)
+ ✔ Selects due records and sends each reminder once
+ ✔ Failed email is retried and attempt count increases
+
+Report Service (Lfmis\Tests\ReportService)
+ ✔ Returns twelve monthly production and finance periods
+
+Request Security (Lfmis\Tests\RequestSecurity)
+ ✔ Trusted origin must match configured application origin
+ ✔ Trusted referer may supply the application origin
+ ✔ Lan private origins are accepted for development
+
+Security (Lfmis\Tests\Security)
+ ✔ Worker cannot access admin backup permission
+ ✔ Customer cannot read another customers orders
+ ✔ Sql injection login input returns normal credential error
+ ✔ Sql injection search filter remains a parameterized search
+ ✔ Locked and expired accounts cannot sign in
+
+Trends Service (Lfmis\Tests\TrendsService)
+ ✔ Fetches and caches regional and global articles
+Unable to send sign-in alert email.
+
+Two Factor Service (Lfmis\Tests\TwoFactorService)
+ ✔ Email enrollment and login code are single use
+ ✔ Sms enrollment is rejected
+ ✔ Five incorrect codes lock the challenge
+ ✔ Fourth code request in an hour is rate limited
+ ✔ Expired code cannot enable a method
+ ✔ Legacy sms only login is rejected
+
+User Service (Lfmis\Tests\UserService)
+ ✔ Removing customer login preserves linked customer record
+ ✔ Cannot remove own account
+ ✔ Cannot remove last active administrator
+ ✔ Can remove administrator when another active administrator remains
+
+Time: 00:00.892, Memory: 8.00 MB
+
+OK (76 tests, 219 assertions)

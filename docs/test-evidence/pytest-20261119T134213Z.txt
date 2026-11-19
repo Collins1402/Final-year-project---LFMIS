@@ -1,0 +1,19 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\colli\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Final Year Project\Final-year-project---LFMIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 10 items
+
+ml/tests/test_ml.py::test_validation_rejects_short_history PASSED        [ 10%]
+ml/tests/test_ml.py::test_validation_rejects_gap_and_negative PASSED     [ 20%]
+ml/tests/test_ml.py::test_baselines_have_expected_values PASSED          [ 30%]
+ml/tests/test_ml.py::test_evaluation_returns_model_and_three_baselines PASSED [ 40%]
+ml/tests/test_ml.py::test_forecast_uses_best_baseline_and_returns_evaluation PASSED [ 50%]
+ml/tests/test_ml.py::test_metrics_are_deterministic_and_non_negative PASSED [ 60%]
+ml/tests/test_ml.py::test_real_csv_loader_counts_missing_values_and_evaluation_reports_short_data PASSED [ 70%]
+ml/tests/test_ml.py::test_real_csv_evaluation_includes_ridge_and_each_baseline PASSED [ 80%]
+ml/tests/test_synthetic_importer.py::test_workbook_converter_remaps_orders_and_labels_data PASSED [ 90%]
+ml/tests/test_synthetic_importer.py::test_customer_ids_are_remapped_without_colliding_with_real_ids PASSED [100%]
+
+============================= 10 passed in 2.73s ==============================
