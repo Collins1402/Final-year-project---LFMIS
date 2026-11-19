@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import sqrt
-from typing import Any, Callable
+from datetime import date
+from typing import Any
 import argparse
 import csv
 import json
@@ -15,6 +16,11 @@ try:
     from .features import build_features, weather_means
 except ImportError:
     from features import build_features, weather_means
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+REAL_DATA_PATH = REPOSITORY_ROOT / "ml" / "data" / "real_milk.csv"
+REPORT_PATH = REPOSITORY_ROOT / "docs" / "ml-evaluation.md"
+CSV_FIELDS = ("date", "litres", "rain_mm", "temp_c")
 
 
 @dataclass(frozen=True)
@@ -30,7 +36,7 @@ def validate_observations(observations: list[dict[str, Any]], minimum_days: int 
     dates = []
     for item in observations:
         try:
-            current = __import__("datetime").date.fromisoformat(str(item["date"]))
+            current = date.fromisoformat(str(item["date"]))
             litres = float(item["litres"])
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError("Each observation needs a valid date and litres value.") from error
@@ -104,16 +110,98 @@ def evaluate_observations(observations: list[dict[str, Any]]) -> list[dict[str, 
     return results
 
 
+def load_csv(path: Path) -> tuple[list[dict[str, Any]], dict[str, int], int]:
+    missing = {field: 0 for field in CSV_FIELDS}
+    observations: list[dict[str, Any]] = []
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None or any(field not in reader.fieldnames for field in CSV_FIELDS):
+            raise ValueError("CSV must contain date, litres, rain_mm, and temp_c columns.")
+        for row in reader:
+            observation: dict[str, Any] = {}
+            for field in CSV_FIELDS:
+                value = (row.get(field) or "").strip()
+                if not value:
+                    missing[field] += 1
+                    observation[field] = None
+                elif field in {"litres", "rain_mm", "temp_c"}:
+                    try:
+                        observation[field] = float(value)
+                    except ValueError as error:
+                        raise ValueError(f"CSV has a non-numeric {field} value on row {reader.line_num}.") from error
+                else:
+                    observation[field] = value
+            observations.append(observation)
+    return observations, missing, len(observations)
+
+
+def evaluation_report(source: Path, observations: list[dict[str, Any]], missing: dict[str, int], row_count: int) -> str:
+    lines = [
+        "# ML Evaluation",
+        "",
+        f"Data source: `{source.as_posix()}`",
+        f"Production rows/days supplied: {row_count}",
+        "",
+        "| Column | Missing values |",
+        "|---|---:|",
+    ]
+    lines.extend(f"| {field} | {missing[field]} |" for field in CSV_FIELDS)
+    results: list[dict[str, Any]] = []
+    status = ""
+    try:
+        validate_observations(observations)
+        results = evaluate_observations(observations)
+        status = f"Evaluation computed from {row_count} consecutive production days. Metrics describe this dataset only."
+    except ValueError as error:
+        if row_count < 21:
+            status = f"Cannot be reported as farm accuracy: only {row_count} production day(s) are available; at least 21 consecutive days are required."
+        else:
+            status = f"Cannot be reported as farm accuracy: the supplied history is invalid for evaluation ({error})."
+    lines.extend(["", f"Status: {status}", ""])
+    if results:
+        lines.extend([
+            "| Model | Features | Backtest days | MAE (L) | RMSE (L) |",
+            "|---|---|---:|---:|---:|",
+        ])
+        for result in results:
+            lines.append(
+                f"| {result['model']} | {result['features']} | {result['days']} | "
+                f"{result['maeLitres']:.3f} | {result['rmseLitres']:.3f} |"
+            )
+    else:
+        lines.extend([
+            "| Model | Features | Backtest days | MAE (L) | RMSE (L) |",
+            "|---|---|---:|---:|---:|",
+            "| Ridge regression | 7 lags + day-of-week + weather | — | Not computed | Not computed |",
+            "| Baseline: naive | Previous day | — | Not computed | Not computed |",
+            "| Baseline: seven-day mean | Previous seven-day mean | — | Not computed | Not computed |",
+            "| Baseline: seasonal naive | Same weekday last week | — | Not computed | Not computed |",
+        ])
+    lines.extend([
+        "",
+        "Limits: this model is decision support, not a causal explanation or guarantee of future yield. Results from one farm may not generalize to other farms or seasons. The weather-enabled ridge model uses observed weather where available and historical means for missing weather; association does not establish that weather caused a production change. Rows must represent complete, consecutive calendar days for the backtest to run.",
+        "",
+    ])
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", required=True, type=Path)
+    parser.add_argument("--csv", default=REAL_DATA_PATH, type=Path)
+    parser.add_argument("--output", default=REPORT_PATH, type=Path)
     args = parser.parse_args()
-    with args.csv.open(newline="", encoding="utf-8") as handle:
-        observations = [
-            {
-                key: None if value == "" else float(value) if key in {"litres", "rain_mm", "temp_c"} else value
-                for key, value in row.items()
-            }
-            for row in csv.DictReader(handle)
-        ]
-    print(json.dumps(evaluate_observations(observations), indent=2))
+    data_path = args.csv.resolve()
+    try:
+        observations, missing, row_count = load_csv(data_path)
+    except FileNotFoundError:
+        observations, missing, row_count = [], {field: 0 for field in CSV_FIELDS}, 0
+    report = evaluation_report(data_path.relative_to(REPOSITORY_ROOT) if data_path.is_relative_to(REPOSITORY_ROOT) else data_path, observations, missing, row_count)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(report, encoding="utf-8")
+    try:
+        results = evaluate_observations(observations)
+        status = "evaluated"
+    except ValueError:
+        results = []
+        status = "insufficient_or_invalid_data"
+    print(json.dumps({"status": status, "days": row_count, "missingValues": missing, "results": results, "report": str(args.output)}, indent=2))

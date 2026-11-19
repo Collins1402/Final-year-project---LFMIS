@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from ml.evaluate import baseline_predictions, evaluate_observations, metrics, validate_observations
+from ml.evaluate import baseline_predictions, evaluate_observations, evaluation_report, load_csv, metrics, validate_observations
 from ml.forecast_service import forecast
 
 
@@ -61,3 +61,36 @@ def test_metrics_are_deterministic_and_non_negative():
     assert result.mae == pytest.approx(2 / 3)
     assert result.rmse == pytest.approx((2 / 3) ** 0.5)
     assert result.mae >= 0
+
+
+def test_real_csv_loader_counts_missing_values_and_evaluation_reports_short_data(tmp_path):
+    source = tmp_path / "real_milk.csv"
+    source.write_text("date,litres,rain_mm,temp_c\n2026-01-01,18,,\n", encoding="utf-8")
+
+    values, missing, row_count = load_csv(source)
+    report = evaluation_report(source, values, missing, row_count)
+
+    assert row_count == 1
+    assert missing == {"date": 0, "litres": 0, "rain_mm": 1, "temp_c": 1}
+    assert "Cannot be reported as farm accuracy" in report
+    assert "only 1 production day(s)" in report
+    assert "Baseline: seasonal naive" in report
+    assert "Not computed" in report
+
+
+def test_real_csv_evaluation_includes_ridge_and_each_baseline(tmp_path):
+    source = tmp_path / "real_milk.csv"
+    source.write_text(
+        "date,litres,rain_mm,temp_c\n"
+        + "".join(f"{item['date']},{item['litres']},,\n" for item in observations(28)),
+        encoding="utf-8",
+    )
+
+    values, missing, row_count = load_csv(source)
+    report = evaluation_report(source, values, missing, row_count)
+
+    assert "Evaluation computed from 28 consecutive production days" in report
+    assert "| Ridge regression |" in report
+    assert "| Baseline: naive |" in report
+    assert "| Baseline: seven_day_mean |" in report
+    assert "| Baseline: seasonal_naive |" in report

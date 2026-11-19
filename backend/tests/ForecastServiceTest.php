@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Lfmis\Tests;
 
 use Lfmis\Services\ForecastService;
+use Lfmis\Services\ForecastUnavailableException;
 use PDO;
 use PHPUnit\Framework\TestCase;
 
@@ -21,6 +22,7 @@ final class ForecastServiceTest extends TestCase
         $this->assertCount(24, $data['observations']);
         $this->assertSame(date('Y-m-d', strtotime('-24 days')), $data['observations'][0]['date']);
         $this->assertSame(date('Y-m-d', strtotime('-1 day')), $data['observations'][23]['date']);
+        $this->assertEquals(20.4, $data['observations'][0]['litres']);
         $this->assertTrue($data['includesSimulatedData']);
     }
 
@@ -53,6 +55,18 @@ final class ForecastServiceTest extends TestCase
             $this->assertStringContainsString('At least 21 consecutive', $error->getMessage());
         }
         $this->assertSame(0, $requestCount);
+    }
+
+    public function testReportSurfacesUnavailableMlServiceForTheApiToHandle(): void
+    {
+        $db = $this->database();
+        $this->addProductionDays($db, 22, 1);
+        $service = new ForecastService($db, static function (): array {
+            throw new ForecastUnavailableException('Forecast service is unavailable.');
+        });
+
+        $this->expectException(ForecastUnavailableException::class);
+        $service->report(1);
     }
 
     public function testReportStoresAnIdenticalDailyBacktestOnlyOnce(): void

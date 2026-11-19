@@ -253,6 +253,16 @@ SOURCE C:/path/to/lfmis/backups/lfmis-YYYYMMDD-HHMMSS-uuuuuu.sql;
 
 The `-p` option prompts for the database password; do not put it in the command. Verify the restored tables and latest records before restarting the application. Keep backups private and store an additional copy in a protected location outside the repository.
 
+### Milk forecast evaluation
+
+The evaluation command reads `ml/data/real_milk.csv` with columns `date,litres,rain_mm,temp_c` and writes the result to `docs/ml-evaluation.md`:
+
+```powershell
+python ml/evaluate.py
+```
+
+The checked-in CSV is an empty template because no verified farm production dataset was supplied. The generated report therefore records zero available days and does not present synthetic fixture metrics as farm accuracy. Populate the CSV with real, consecutive daily records before reporting accuracy; the test-only synthetic data remains under `ml/tests/`.
+
 ### Not yet integrated
 
 - Supplier workflows, offline synchronization, and mobile support remain follow-up work. Email features require a configured SMTP relay.

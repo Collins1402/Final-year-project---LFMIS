@@ -9,3 +9,4 @@ One line per phase gate.
 - 2026-11-19 · Activity health concerns: worker activity entries can create issue records and notify administrators and veterinarians.
 - 2026-11-19 · Audit trail: added centralized event logging, admin-filtered audit history and an audited farm-data export.
 - 2026-11-19 · Database backups: added an admin-triggered, server-side mysqldump job, ignored backup storage and restore instructions.
+- 2026-11-19 · Forecast evaluation: added the real-milk CSV input and generated-report workflow, with short or invalid history explicitly excluded from farm-accuracy claims.
