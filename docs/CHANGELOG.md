@@ -13,3 +13,4 @@ One line per phase gate.
 - 2026-11-19 · Security: added endpoint rate limits, authenticated-write Origin validation, security headers, and focused role/data-isolation/injection/lockout tests.
 - 2026-11-19 · Worker usability: added large task shortcuts and English/Kiswahili labels for worker and veterinarian workflows.
 - 2026-11-19 · Demo evidence: added the timed defence walkthrough and a script that saves timestamped PHPUnit and pytest output.
+- 2026-11-19 · Synthetic workbook: added safe remapped Excel-to-SQL staging import and corrected local/LAN Origin validation.

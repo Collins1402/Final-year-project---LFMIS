@@ -109,7 +109,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     customer_id_map = unique_customer_map(customers)
     customer_rows = [
         (customer_id_map[int(row["id"])], None, row["name"], str(row["phone"]) if row.get("phone") not in (None, "") else None,
-         f"{row['email']}.invalid" if str(row["email"]).endswith(".invalid") else row["email"])
+         str(row["email"]).replace("'", "''"))
         for row in customers
     ]
     add_insert(statements, "customers", ["id", "user_id", "name", "phone", "email"], customer_rows)
