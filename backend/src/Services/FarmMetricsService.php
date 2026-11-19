@@ -15,6 +15,9 @@ final class FarmMetricsService
     public function summary(): array
     {
         $hasData = false;
+        $today = date('Y-m-d');
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+        $monthStart = date('Y-m-01');
 
         $milkTodayTotal = 0.0;
         $milkTodayMorning = 0.0;
@@ -25,7 +28,8 @@ final class FarmMetricsService
 
         try {
             // Milk today
-            $milkStmt = $this->db->query("SELECT production_session, COALESCE(SUM(quantity_produced), 0) as total FROM farm_produce WHERE LOWER(produce_name) = 'milk' AND production_date = CURRENT_DATE() GROUP BY production_session");
+            $milkStmt = $this->db->prepare("SELECT production_session, COALESCE(SUM(quantity_produced), 0) as total FROM farm_produce WHERE LOWER(produce_name) = 'milk' AND production_date = ? GROUP BY production_session");
+            $milkStmt->execute([$today]);
             while ($row = $milkStmt->fetch(PDO::FETCH_ASSOC)) {
                 $hasData = true;
                 $val = (float) $row['total'];
@@ -36,21 +40,27 @@ final class FarmMetricsService
             }
 
             // Milk month
-            $milkMonth = $this->db->query("SELECT COALESCE(SUM(quantity_produced), 0) FROM farm_produce WHERE LOWER(produce_name) = 'milk' AND production_date >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')")->fetchColumn();
+            $milkMonthStmt = $this->db->prepare("SELECT COALESCE(SUM(quantity_produced), 0) FROM farm_produce WHERE LOWER(produce_name) = 'milk' AND production_date >= ? AND production_date < ?");
+            $milkMonthStmt->execute([$monthStart, $tomorrow]);
+            $milkMonth = $milkMonthStmt->fetchColumn();
             if ($milkMonth !== false && (float) $milkMonth > 0) {
                 $hasData = true;
                 $milkMonthTotal = (float) $milkMonth;
             }
 
             // Eggs today
-            $eggsTodayVal = $this->db->query("SELECT COALESCE(SUM(quantity_produced), 0) FROM farm_produce WHERE LOWER(produce_name) IN ('eggs', 'egg') AND production_date = CURRENT_DATE()")->fetchColumn();
+            $eggsTodayStmt = $this->db->prepare("SELECT COALESCE(SUM(quantity_produced), 0) FROM farm_produce WHERE LOWER(produce_name) IN ('eggs', 'egg') AND production_date = ?");
+            $eggsTodayStmt->execute([$today]);
+            $eggsTodayVal = $eggsTodayStmt->fetchColumn();
             if ($eggsTodayVal !== false && (float) $eggsTodayVal > 0) {
                 $hasData = true;
                 $eggsToday = (float) $eggsTodayVal;
             }
 
             // Eggs month
-            $eggsMonthVal = $this->db->query("SELECT COALESCE(SUM(quantity_produced), 0) FROM farm_produce WHERE LOWER(produce_name) IN ('eggs', 'egg') AND production_date >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')")->fetchColumn();
+            $eggsMonthStmt = $this->db->prepare("SELECT COALESCE(SUM(quantity_produced), 0) FROM farm_produce WHERE LOWER(produce_name) IN ('eggs', 'egg') AND production_date >= ? AND production_date < ?");
+            $eggsMonthStmt->execute([$monthStart, $tomorrow]);
+            $eggsMonthVal = $eggsMonthStmt->fetchColumn();
             if ($eggsMonthVal !== false && (float) $eggsMonthVal > 0) {
                 $hasData = true;
                 $eggsMonthTotal = (float) $eggsMonthVal;
@@ -95,7 +105,9 @@ final class FarmMetricsService
         // Feed consumption this month
         $feedConsumedMonth = 0.0;
         try {
-            $feedVal = $this->db->query("SELECT COALESCE(SUM(ABS(it.quantity_change)), 0) FROM inventory_transactions it JOIN inventory_items ii ON ii.id = it.item_id WHERE ii.category = 'feed' AND it.quantity_change < 0 AND it.transaction_date >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')")->fetchColumn();
+            $feedStmt = $this->db->prepare("SELECT COALESCE(SUM(ABS(it.quantity_change)), 0) FROM inventory_transactions it JOIN inventory_items ii ON ii.id = it.item_id WHERE ii.category = 'feed' AND it.quantity_change < 0 AND it.transaction_date >= ? AND it.transaction_date < ?");
+            $feedStmt->execute([$monthStart, $tomorrow]);
+            $feedVal = $feedStmt->fetchColumn();
             if ($feedVal !== false && (float) $feedVal > 0) {
                 $hasData = true;
                 $feedConsumedMonth = (float) $feedVal;
@@ -106,12 +118,16 @@ final class FarmMetricsService
         $salesMonth = 0.0;
         $expensesMonth = 0.0;
         try {
-            $salesVal = $this->db->query("SELECT COALESCE(SUM(quantity * unit_price), 0) FROM sales WHERE sold_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')")->fetchColumn();
+            $salesStmt = $this->db->prepare("SELECT COALESCE(SUM(quantity * unit_price), 0) FROM sales WHERE sold_at >= ? AND sold_at < ?");
+            $salesStmt->execute([$monthStart, $tomorrow]);
+            $salesVal = $salesStmt->fetchColumn();
             if ($salesVal !== false && (float) $salesVal > 0) {
                 $hasData = true;
                 $salesMonth = (float) $salesVal;
             }
-            $expVal = $this->db->query("SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')")->fetchColumn();
+            $expStmt = $this->db->prepare("SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date >= ? AND expense_date < ?");
+            $expStmt->execute([$monthStart, $tomorrow]);
+            $expVal = $expStmt->fetchColumn();
             if ($expVal !== false && (float) $expVal > 0) {
                 $hasData = true;
                 $expensesMonth = (float) $expVal;
