@@ -247,7 +247,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS orders (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   customer_id BIGINT UNSIGNED NOT NULL,
-  status ENUM('pending', 'quoted', 'accepted', 'fulfilled', 'cancelled') NOT NULL DEFAULT 'pending',
+  status ENUM('pending', 'quoted', 'accepted', 'paid', 'fulfilled', 'cancelled') NOT NULL DEFAULT 'pending',
   total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
   notes VARCHAR(500) NULL,
   handled_by BIGINT UNSIGNED NULL,

@@ -24,6 +24,7 @@ require_once __DIR__ . '/../src/Services/ActivityService.php';
 require_once __DIR__ . '/../src/Services/ProductionService.php';
 require_once __DIR__ . '/../src/Services/InventoryService.php';
 require_once __DIR__ . '/../src/Services/CommerceService.php';
+require_once __DIR__ . '/../src/Services/MpesaService.php';
 require_once __DIR__ . '/../src/Services/AssistantService.php';
 require_once __DIR__ . '/../src/Services/NotificationService.php';
 require_once __DIR__ . '/../src/Services/FeedbackService.php';
@@ -53,6 +54,7 @@ use Lfmis\Services\ActivityService;
 use Lfmis\Services\ProductionService;
 use Lfmis\Services\InventoryService;
 use Lfmis\Services\CommerceService;
+use Lfmis\Services\MpesaService;
 use Lfmis\Services\AssistantService;
 use Lfmis\Services\NotificationService;
 use Lfmis\Services\FeedbackService;
@@ -97,6 +99,7 @@ try {
     $production = new ProductionService($db);
     $inventory = new InventoryService($db);
     $commerce = new CommerceService($db);
+    $mpesa = new MpesaService($db);
     $assistant = new AssistantService($db);
     $notifications = new NotificationService($db);
     $feedback = new FeedbackService($db);
@@ -419,6 +422,25 @@ try {
         if ($method === 'GET' && $permissions->allows($current['role'], 'products.view')) Response::json(['products' => $commerce->products($current['role'])]);
         if ($method === 'POST' && $permissions->allows($current['role'], 'products.manage')) Response::json(['product' => $commerce->createProduct($request->body())], 201);
         Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($method === 'POST' && $path === '/api/payments/mpesa/callback') {
+        $result = $mpesa->handleCallback((string) ($_GET['token'] ?? ''), $request->body());
+        Response::json([
+            'ResultCode' => 0,
+            'ResultDesc' => !empty($result['duplicate']) ? 'Duplicate callback acknowledged.' : 'Callback processed.',
+        ]);
+    }
+    if ($method === 'POST' && $path === '/api/payments/mpesa/initiate') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        $allowed = $permissions->allows($current['role'], 'orders.create')
+            || $permissions->allows($current['role'], 'orders.manage')
+            || $permissions->allows($current['role'], 'finance.manage');
+        if (!$allowed) Response::error('You do not have permission to perform this action.', 403);
+        $body = $request->body();
+        $orderId = filter_var($body['orderId'] ?? null, FILTER_VALIDATE_INT);
+        if ($orderId === false || $orderId === null) Response::error('Choose a valid order.', 422);
+        Response::json(['payment' => $mpesa->initiate((int) $orderId, $current, isset($body['phone']) ? (string) $body['phone'] : null)], 201);
     }
     if ($path === '/api/orders') {
         $current = $auth->currentUser();

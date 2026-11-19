@@ -847,7 +847,51 @@ async function renderRoleModule(module) {
     }
     if (module === 'My orders' || module === 'Payments') {
       const [orderData, paymentData] = await Promise.all([api.orders(), api.payments()])
-      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>My orders</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th></tr></thead><tbody>${orderData.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.total_amount)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${paymentData.payments.map((item) => `<tr><td>#${Number(item.order_id)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.amount)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No payments recorded.</td></tr>'}</tbody></table></div></section></section>`
+      const latestPayment = new Map()
+      paymentData.payments.forEach((payment) => {
+        if (!latestPayment.has(Number(payment.order_id))) latestPayment.set(Number(payment.order_id), payment)
+      })
+      const orders = orderData.orders.map((item) => {
+        const orderId = Number(item.id)
+        const payment = latestPayment.get(orderId)
+        const payable = !['paid', 'fulfilled', 'cancelled'].includes(item.status)
+        const paymentStatus = payment?.status === 'failed' ? 'Payment failed. You can retry.' : payment?.status === 'confirmed' ? 'Paid.' : ''
+        return `<tr><td>#${orderId}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.total_amount)).toLocaleString()}</td><td>${payable ? `<label class="sr-only" for="mpesa-phone-${orderId}">M-PESA phone number</label><input id="mpesa-phone-${orderId}" type="tel" inputmode="tel" placeholder="07XXXXXXXX" value="${escapeHtml(item.phone || '')}" aria-label="M-PESA phone number for order ${orderId}"><button type="button" class="small-action" data-mpesa-pay="${orderId}">Pay with M-PESA</button>` : ''}<span data-mpesa-status="${orderId}" aria-live="polite">${escapeHtml(paymentStatus)}</span></td></tr>`
+      }).join('')
+      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>My orders</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th><th>Payment</th></tr></thead><tbody>${orders || '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Payments</h2><p class="muted">After starting a payment, check your phone and enter your M-PESA PIN.</p><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${paymentData.payments.map((item) => `<tr><td>#${Number(item.order_id)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.amount)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No payments recorded.</td></tr>'}</tbody></table></div></section></section>`
+      content.querySelectorAll('[data-mpesa-pay]').forEach((button) => button.addEventListener('click', async () => {
+        const orderId = Number(button.dataset.mpesaPay)
+        const phone = content.querySelector(`#mpesa-phone-${orderId}`).value
+        const status = content.querySelector(`[data-mpesa-status="${orderId}"]`)
+        button.disabled = true
+        status.textContent = 'Starting M-PESA payment…'
+        try {
+          await api.initiateMpesaPayment({ orderId, phone })
+          status.textContent = 'Check your phone and enter your M-PESA PIN.'
+          const deadline = Date.now() + 60_000
+          while (Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 3000))
+            const [ordersNow, paymentsNow] = await Promise.all([api.orders(), api.payments()])
+            const orderNow = ordersNow.orders.find((item) => Number(item.id) === orderId)
+            const paymentNow = paymentsNow.payments.find((item) => Number(item.order_id) === orderId)
+            if (orderNow?.status === 'paid' || paymentNow?.status === 'confirmed') {
+              status.textContent = 'Paid. Thank you.'
+              await renderRoleModule(module)
+              return
+            }
+            if (paymentNow?.status === 'failed') {
+              status.textContent = 'Payment failed. You can retry.'
+              button.disabled = false
+              return
+            }
+          }
+          status.textContent = 'Still waiting for confirmation. Try again after the payment status updates.'
+          button.disabled = false
+        } catch (error) {
+          status.textContent = `${error.message} You can retry.`
+          button.disabled = false
+        }
+      }))
       return
     }
     if (module === 'Feedback') {

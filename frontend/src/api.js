@@ -65,6 +65,7 @@ export const api = {
   createExpense: (data) => post('/api/expenses', data),
   payments: () => request('/api/payments'),
   createPayment: (data) => post('/api/payments', data),
+  initiateMpesaPayment: (data) => post('/api/payments/mpesa/initiate', data),
   financeReport: () => request('/api/reports/finance'),
   operationalReports: () => request('/api/reports/operations'),
   forecastReport: () => request('/api/reports/forecast'),
