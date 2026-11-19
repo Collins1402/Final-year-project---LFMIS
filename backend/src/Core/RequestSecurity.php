@@ -40,7 +40,8 @@ final class RequestSecurity
         $candidateIsLocalHost = in_array($candidateHost, ['localhost', '127.0.0.1', '::1'], true);
         $appIsLocalHost = in_array($appHost, ['localhost', '127.0.0.1', '::1'], true);
         if ($candidateIsLocalHost || $appIsLocalHost) {
-            return $candidateIsLocalHost && $appIsLocalHost;
+            return ($candidateIsLocalHost || self::isPrivateHost($candidateHost))
+                && ($appIsLocalHost || self::isPrivateHost($appHost));
         }
         return self::isPrivateHost($candidateHost) && self::isPrivateHost($appHost);
     }
