@@ -24,6 +24,7 @@ require_once __DIR__ . '/../src/Services/ActivityService.php';
 require_once __DIR__ . '/../src/Services/ProductionService.php';
 require_once __DIR__ . '/../src/Services/InventoryService.php';
 require_once __DIR__ . '/../src/Services/CommerceService.php';
+require_once __DIR__ . '/../src/Services/AuditService.php';
 require_once __DIR__ . '/../src/Services/MpesaService.php';
 require_once __DIR__ . '/../src/Services/AssistantService.php';
 require_once __DIR__ . '/../src/Services/NotificationService.php';
@@ -54,6 +55,7 @@ use Lfmis\Services\ActivityService;
 use Lfmis\Services\ProductionService;
 use Lfmis\Services\InventoryService;
 use Lfmis\Services\CommerceService;
+use Lfmis\Services\AuditService;
 use Lfmis\Services\MpesaService;
 use Lfmis\Services\AssistantService;
 use Lfmis\Services\NotificationService;
@@ -99,6 +101,7 @@ try {
     $production = new ProductionService($db);
     $inventory = new InventoryService($db);
     $commerce = new CommerceService($db);
+    $audit = new AuditService($db);
     $mpesa = new MpesaService($db);
     $assistant = new AssistantService($db);
     $notifications = new NotificationService($db);
@@ -159,11 +162,17 @@ try {
     }
     if ($method === 'POST' && $path === '/api/login') {
         $body = $request->body();
-        $user = $auth->login((string) ($body['login'] ?? ''), (string) ($body['password'] ?? ''));
+        try {
+            $user = $auth->login((string) ($body['login'] ?? ''), (string) ($body['password'] ?? ''));
+        } catch (InvalidArgumentException | RuntimeException $error) {
+            $audit->record(null, 'sign_in_failed', 'auth', null, ['reason' => 'credentials_rejected']);
+            throw $error;
+        }
         if (($user['twoFactorRequired'] ?? false) === true) {
             $twoFactor->beginLogin((int) $user['pendingUserId'], $user['methods']);
             Response::json(['twoFactorRequired' => true, 'methods' => $user['methods']]);
         }
+        $audit->record((int) $user['id'], 'sign_in_succeeded', 'auth', (int) $user['id']);
         $loginAlerts->notify($user);
         Response::json(['user' => $user]);
     }
@@ -173,8 +182,14 @@ try {
     }
     if ($method === 'POST' && $path === '/api/login/2fa/verify') {
         $body = $request->body();
-        $userId = $twoFactor->verifyLoginCode((string) ($body['method'] ?? ''), (string) ($body['code'] ?? ''));
-        $user = $auth->completeLogin($userId);
+        try {
+            $userId = $twoFactor->verifyLoginCode((string) ($body['method'] ?? ''), (string) ($body['code'] ?? ''));
+            $user = $auth->completeLogin($userId);
+        } catch (InvalidArgumentException | RuntimeException $error) {
+            $audit->record(null, 'sign_in_failed', 'auth', null, ['reason' => 'two_factor_rejected']);
+            throw $error;
+        }
+        $audit->record((int) $user['id'], 'sign_in_succeeded', 'auth', (int) $user['id'], ['two_factor' => true]);
         $loginAlerts->notify($user);
         Response::json(['user' => $user]);
     }
@@ -292,7 +307,7 @@ try {
         }
         if ($method === 'POST') {
             $created = $users->create($request->body());
-            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'user', $created['id']]);
+            $audit->record((int) $current['id'], 'user_created', 'user', (int) $created['id'], ['role' => $created['role']]);
             Response::json(['user' => $created], 201);
         }
     }
@@ -304,8 +319,12 @@ try {
         if (!$permissions->allows($current['role'], 'users.manage')) {
             Response::error('You do not have permission to perform this action.', 403);
         }
-        $updated = $users->update((int) $matches[1], $request->body());
-        $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update', 'user', $updated['id']]);
+        $body = $request->body();
+        $updated = $users->update((int) $matches[1], $body);
+        $action = array_key_exists('isActive', $body) && filter_var($body['isActive'], FILTER_VALIDATE_BOOLEAN) === false
+            ? 'user_deactivated'
+            : 'user_updated';
+        $audit->record((int) $current['id'], $action, 'user', (int) $updated['id'], ['role' => $updated['role']]);
         Response::json(['user' => $updated]);
     }
     if ($method === 'DELETE' && preg_match('#^/api/users/(\d+)$#', $path, $matches)) {
@@ -335,8 +354,38 @@ try {
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if (!$permissions->allows($current['role'], 'roles.manage')) Response::error('You do not have permission to perform this action.', 403);
         $matrix = $permissions->updateRole($matches[1], (array) ($request->body()['permissions'] ?? []));
-        $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update_permissions', 'role', null]);
+        $audit->record((int) $current['id'], 'role_permissions_changed', 'role', null, ['role' => $matches[1]]);
         Response::json(['permissions' => $matrix]);
+    }
+    if ($method === 'GET' && $path === '/api/audit-logs') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'audit.view')) Response::error('You do not have permission to perform this action.', 403);
+        Response::json(['logs' => $audit->list([
+            'userId' => $_GET['userId'] ?? '',
+            'action' => $_GET['action'] ?? '',
+            'from' => $_GET['from'] ?? '',
+            'to' => $_GET['to'] ?? '',
+        ])]);
+    }
+    if ($method === 'GET' && $path === '/api/admin/export') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'data.export')) Response::error('You do not have permission to perform this action.', 403);
+        $export = [
+            'animals' => $db->query('SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, notes, created_at FROM animals')->fetchAll(),
+            'health_records' => $db->query('SELECT id, animal_id, record_type, description, medication, dosage, cost, record_date, next_due_date, created_at FROM health_records')->fetchAll(),
+            'farm_activities' => $db->query('SELECT id, activity_type, description, animal_id, assigned_to, activity_at, status, completed_at, created_at FROM farm_activities')->fetchAll(),
+            'farm_produce' => $db->query('SELECT id, produce_name, production_date, production_session, animal_id, quantity_produced, quantity_sold, quantity_damaged, unit, notes, created_at FROM farm_produce')->fetchAll(),
+            'inventory_items' => $db->query('SELECT id, name, category, unit, quantity_on_hand, reorder_level, unit_cost, is_active FROM inventory_items')->fetchAll(),
+            'orders' => $db->query('SELECT id, customer_id, status, total_amount, notes, ordered_at, accepted_at, fulfilled_at FROM orders')->fetchAll(),
+            'order_items' => $db->query('SELECT id, order_id, product_id, item_name, quantity, unit, unit_price FROM order_items')->fetchAll(),
+            'payments' => $db->query('SELECT id, order_id, customer_id, amount, method, status, transaction_reference, checkout_request_id, phone, paid_at, created_at FROM payments')->fetchAll(),
+            'sales' => $db->query('SELECT id, order_id, customer_id, description, quantity, unit, unit_price, sold_at FROM sales')->fetchAll(),
+            'expenses' => $db->query('SELECT id, category, description, amount, expense_date FROM expenses')->fetchAll(),
+        ];
+        $audit->record((int) $current['id'], 'data_exported', 'export', null, ['tables' => array_keys($export)]);
+        Response::json(['generatedAt' => date(DATE_ATOM), 'data' => $export]);
     }
     if ($method === 'GET' && $path === '/api/events') {
         Response::json(['events' => $events->publicList()]);
@@ -458,7 +507,18 @@ try {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if (!$permissions->allows($current['role'], 'orders.manage')) Response::error('You do not have permission to perform this action.', 403);
-        Response::json(['order' => $commerce->updateOrder((int) $matches[1], $request->body(), $current['id'])]);
+        $orderId = (int) $matches[1];
+        $before = $db->prepare('SELECT status FROM orders WHERE id = ?');
+        $before->execute([$orderId]);
+        $previousStatus = $before->fetchColumn();
+        $order = $commerce->updateOrder($orderId, $request->body(), $current['id']);
+        if ($previousStatus !== $order['status']) {
+            $audit->record((int) $current['id'], 'order_status_changed', 'order', $orderId, [
+                'from' => $previousStatus,
+                'to' => $order['status'],
+            ]);
+        }
+        Response::json(['order' => $order]);
     }
     if ($path === '/api/sales' || $path === '/api/expenses' || $path === '/api/payments') {
         $current = $auth->currentUser();

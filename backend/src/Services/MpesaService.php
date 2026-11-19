@@ -210,6 +210,13 @@ final class MpesaService
             }
         }
 
+        (new AuditService($this->db))->record(
+            null,
+            'payment_confirmed',
+            'payment',
+            (int) $payment['id'],
+            ['order_id' => (int) $payment['order_id']]
+        );
         $this->notifyStaff((int) $payment['id'], (int) $payment['order_id']);
     }
 

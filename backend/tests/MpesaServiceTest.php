@@ -124,6 +124,7 @@ final class MpesaServiceTest extends TestCase
         $db->exec('CREATE TABLE roles (id INTEGER PRIMARY KEY, name TEXT)');
         $db->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, role_id INTEGER, is_active INTEGER)');
         $db->exec('CREATE TABLE notifications (user_id INTEGER, type TEXT, entity_type TEXT, entity_id INTEGER, title TEXT, message TEXT, dedupe_key TEXT, UNIQUE(user_id, dedupe_key))');
+        $db->exec('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, entity_type TEXT, entity_id INTEGER, details TEXT, ip_address TEXT)');
         $db->exec("INSERT INTO customers VALUES (1, 11, '0712345678')");
         $db->exec("INSERT INTO customers VALUES (2, 12, '0722222222')");
         $db->exec("INSERT INTO orders VALUES (1, 1, 'pending', 300)");
