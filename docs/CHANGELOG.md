@@ -10,3 +10,6 @@ One line per phase gate.
 - 2026-11-19 · Audit trail: added centralized event logging, admin-filtered audit history and an audited farm-data export.
 - 2026-11-19 · Database backups: added an admin-triggered, server-side mysqldump job, ignored backup storage and restore instructions.
 - 2026-11-19 · Forecast evaluation: added the real-milk CSV input and generated-report workflow, with short or invalid history explicitly excluded from farm-accuracy claims.
+- 2026-11-19 · Security: added endpoint rate limits, authenticated-write Origin validation, security headers, and focused role/data-isolation/injection/lockout tests.
+- 2026-11-19 · Worker usability: added large task shortcuts and English/Kiswahili labels for worker and veterinarian workflows.
+- 2026-11-19 · Demo evidence: added the timed defence walkthrough and a script that saves timestamped PHPUnit and pytest output.

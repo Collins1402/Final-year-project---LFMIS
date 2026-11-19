@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Lfmis\Tests;
 
 use Lfmis\Services\AuthService;
+use Lfmis\Services\AuditService;
 use Lfmis\Services\CommerceService;
 use Lfmis\Services\PermissionService;
 use PDO;
@@ -54,12 +55,12 @@ final class SecurityTest extends TestCase
     {
         $db = new PDO('sqlite::memory:');
         $db->exec('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, user_id INTEGER, action TEXT, entity_type TEXT, entity_id INTEGER, details TEXT, ip_address TEXT, created_at TEXT)');
+        $db->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, full_name TEXT)');
         $db->exec("INSERT INTO audit_logs VALUES (1, 1, 'login', 'auth', 1, '{}', NULL, '2026-01-01')");
 
-        $result = $db->prepare('SELECT action FROM audit_logs WHERE action LIKE ?');
-        $result->execute(["%' OR 1=1 --%"]);
+        $result = (new AuditService($db))->list(['action' => "' OR 1=1 --"]);
 
-        $this->assertSame([], $result->fetchAll(PDO::FETCH_COLUMN));
+        $this->assertSame([], $result);
         $this->assertSame(1, (int) $db->query('SELECT COUNT(*) FROM audit_logs')->fetchColumn());
     }
 
