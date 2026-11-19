@@ -18,4 +18,5 @@ seed_data/
 scripts/dev-all.sh
 backup_*.sql
 recovery-before-original-schema.sql
+/backups/
 
