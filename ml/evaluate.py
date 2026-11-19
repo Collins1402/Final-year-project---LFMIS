@@ -172,10 +172,10 @@ def evaluation_report(source: Path, observations: list[dict[str, Any]], missing:
         lines.extend([
             "| Model | Features | Backtest days | MAE (L) | RMSE (L) |",
             "|---|---|---:|---:|---:|",
-            "| Ridge regression | 7 lags + day-of-week + weather | — | Not computed | Not computed |",
-            "| Baseline: naive | Previous day | — | Not computed | Not computed |",
-            "| Baseline: seven-day mean | Previous seven-day mean | — | Not computed | Not computed |",
-            "| Baseline: seasonal naive | Same weekday last week | — | Not computed | Not computed |",
+            "| Ridge regression | 7 lags + day-of-week + weather | - | Not computed | Not computed |",
+            "| Baseline: naive | Previous day | - | Not computed | Not computed |",
+            "| Baseline: seven-day mean | Previous seven-day mean | - | Not computed | Not computed |",
+            "| Baseline: seasonal naive | Same weekday last week | - | Not computed | Not computed |",
         ])
     lines.extend([
         "",
