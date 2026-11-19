@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS animals (
 CREATE TABLE IF NOT EXISTS health_records (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   animal_id BIGINT UNSIGNED NOT NULL,
-  record_type ENUM('vaccination', 'treatment', 'deworming', 'checkup', 'illness', 'other') NOT NULL,
+  record_type ENUM('vaccination', 'treatment', 'deworming', 'checkup', 'illness', 'issue', 'other') NOT NULL,
   description VARCHAR(255) NOT NULL,
   medication VARCHAR(120) NULL,
   dosage VARCHAR(60) NULL,

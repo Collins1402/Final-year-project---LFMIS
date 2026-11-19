@@ -55,7 +55,7 @@ final class HealthService
         $description = trim((string) ($input['description'] ?? ''));
         $recordDate = $this->date((string) ($input['recordDate'] ?? ''));
         $dueDate = isset($input['nextDueDate']) && trim((string) $input['nextDueDate']) !== '' ? $this->date((string) $input['nextDueDate']) : null;
-        if (!$animalId || !in_array($type, ['vaccination', 'treatment', 'deworming', 'checkup', 'illness', 'other'], true) || $description === '') {
+        if (!$animalId || !in_array($type, ['vaccination', 'treatment', 'deworming', 'checkup', 'illness', 'issue', 'other'], true) || $description === '') {
             throw new \InvalidArgumentException('Enter an animal, record type and description.');
         }
         if ($dueDate !== null && $dueDate < $recordDate) {
