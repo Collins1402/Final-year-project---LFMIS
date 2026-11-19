@@ -79,14 +79,18 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
 
     animals = rows_as_dicts(workbook, "animals")
     animal_rows = []
-    for row in animals:
+    animal_id_map: dict[int, int] = {}
+    for offset, row in enumerate(animals, start=1):
         if str(row.get("tag_number") or "").strip() == "":
             continue
+        original_id = int(row["id"])
+        synthetic_id = 800000 + offset
+        animal_id_map[original_id] = synthetic_id
         status = str(row.get("status") or "active").lower()
         if status not in {"active", "sold", "deceased", "transferred"}:
             status = "active"
         animal_rows.append((
-            int(row["id"]),
+            synthetic_id,
             row["tag_number"],
             str(row["species"]).lower(),
             row.get("breed"),
@@ -122,7 +126,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
             record_type = "checkup"
         health_rows.append((
             int(row["id"]) + 700000,
-            int(row["animal_id"]),
+            animal_id_map.get(int(row["animal_id"]), 800000 + int(row["animal_id"])),
             record_type,
             f"{row['description']} [{synthetic_mark}]",
             row.get("medication"),
@@ -154,7 +158,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
             int(row["id"]) + 800000,
             activity_type,
             f"{row['description']} [{synthetic_mark}]",
-            int(row["animal_id"]) if row.get("animal_id") not in (None, "") else None,
+            animal_id_map.get(int(row["animal_id"]), 800000 + int(row["animal_id"])) if row.get("animal_id") not in (None, "") else None,
             None,
             datetime_value(row["activity_at"]),
             status,
@@ -203,7 +207,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
             str(row["produce_name"]),
             date_value(row["production_date"]),
             row.get("production_session"),
-            int(row["animal_id"]) if row.get("animal_id") not in (None, "") else None,
+            animal_id_map.get(int(row["animal_id"]), 800000 + int(row["animal_id"])) if row.get("animal_id") not in (None, "") else None,
             quantity,
             sold,
             damaged,
@@ -352,7 +356,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
             unique_order_animals.append(animal_id)
     for index, animal_id in enumerate(unique_order_animals, start=1):
         if index <= len(workbook_orders):
-            order_animal_rows.append((100000 + index, animal_id))
+            order_animal_rows.append((100000 + index, animal_id_map.get(animal_id, 800000 + animal_id)))
 
     workbook_sales = rows_as_dicts(workbook, "sales")
     workbook_payments = rows_as_dicts(workbook, "payments")
@@ -494,7 +498,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
         "DELETE FROM farm_activities WHERE id >= 800000;",
         "DELETE FROM health_records WHERE id >= 700000;",
         "DELETE FROM customers WHERE id >= 900000;",
-        "DELETE FROM animals WHERE tag_number LIKE 'SIM-%';",
+        "DELETE FROM animals WHERE id >= 800000;",
         "SET FOREIGN_KEY_CHECKS = 1;",
     ]
     return "\n\n".join(statements) + "\n", "\n".join(reset) + "\n", counts

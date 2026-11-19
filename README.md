@@ -281,8 +281,10 @@ python scripts/import_synthetic_workbook.py "C:\Users\colli\Downloads\LFMIS_Exte
 By default this generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`. Apply it only to a staging or demo database after migrations:
 
 ```powershell
-mysql --host=127.0.0.1 --port=4321 --user=flouri_admin -p lfmis < seed_data/synthetic-workbook.sql
+php backend/bin/import_synthetic.php
 ```
+
+Use `php backend/bin/import_synthetic.php --reset-only` to remove only the synthetic-ID/tag range without changing real accounts or records. The importer does not copy workbook password placeholders or synthetic user-account credentials.
 
 The converter remaps workbook IDs, creates separate synthetic order records instead of repeating order ID `1`, uses the workbook's synthetic animal and customer records only with `SIMULATED DEMONSTRATION` labels, excludes the placeholder account passwords, and omits synthetic forecast/audit records that must not be presented as real system evidence.
 
