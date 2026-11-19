@@ -102,10 +102,13 @@ final class MpesaService
             throw new \InvalidArgumentException('Invalid M-PESA callback payload.');
         }
         $checkoutRequestId = trim((string) ($callback['CheckoutRequestID'] ?? ''));
-        if ($checkoutRequestId === '' || !isset($callback['ResultCode']) || !is_numeric($callback['ResultCode'])) {
+        $parsedResultCode = isset($callback['ResultCode'])
+            ? filter_var((string) $callback['ResultCode'], FILTER_VALIDATE_INT)
+            : false;
+        if ($checkoutRequestId === '' || $parsedResultCode === false) {
             throw new \InvalidArgumentException('M-PESA callback is missing its request result.');
         }
-        $resultCode = (int) $callback['ResultCode'];
+        $resultCode = (int) $parsedResultCode;
         $metadata = [];
         foreach (($callback['CallbackMetadata']['Item'] ?? []) as $item) {
             if (is_array($item) && isset($item['Name'])) {
