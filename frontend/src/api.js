@@ -79,6 +79,7 @@ export const api = {
   resolveFeedback: (id) => request(`/api/feedback/${id}/resolve`, { method: 'PATCH', body: '{}' }),
   users: () => request('/api/users'),
   createUser: (data) => post('/api/users', data),
+  deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
   permissions: () => request('/api/permissions'),
   updateRolePermissions: (role, permissions) => post(`/api/permissions/${encodeURIComponent(role)}`, { permissions }),
 }

@@ -72,7 +72,7 @@ if (in_array($origin, [Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'), 'http
     header('Access-Control-Allow-Credentials: true');
     header('Vary: Origin');
 }
-header('Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
@@ -304,6 +304,19 @@ try {
         $updated = $users->update((int) $matches[1], $request->body());
         $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update', 'user', $updated['id']]);
         Response::json(['user' => $updated]);
+    }
+    if ($method === 'DELETE' && preg_match('#^/api/users/(\d+)$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) {
+            Response::error('Please sign in to continue.', 401);
+        }
+        if (!$permissions->allows($current['role'], 'users.manage')) {
+            Response::error('You do not have permission to perform this action.', 403);
+        }
+        $userId = (int) $matches[1];
+        $users->delete($userId, (int) $current['id']);
+        $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'delete', 'user', $userId]);
+        Response::json(['ok' => true]);
     }
     if ($path === '/api/permissions' && $method === 'GET') {
         $current = $auth->currentUser();

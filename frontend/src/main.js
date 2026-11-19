@@ -703,7 +703,7 @@ async function renderUsersModule() {
   const content = app.querySelector('.content')
   try {
     const data = await api.users()
-    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>User accounts</h1><p class="muted">Create accounts and control access.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create account</h2><form id="user-module-form" class="compact-form"><input name="fullName" placeholder="Full name" required><input name="username" placeholder="Username" required><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="12" placeholder="Temporary password" required><select name="role"><option value="worker">Worker</option><option value="veterinarian">Veterinarian</option><option value="buyer">Buyer</option><option value="customer">Customer</option></select><button>Create account</button></form></section><section class="panel"><h2>Accounts</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Status</th></tr></thead><tbody>${data.users.map((user) => `<tr><td>${escapeHtml(user.full_name)}</td><td>${escapeHtml(user.role)}</td><td>${user.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody></table></div></section></section>`
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>User accounts</h1><p class="muted">Create accounts and control access.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create account</h2><form id="user-module-form" class="compact-form"><input name="fullName" placeholder="Full name" required><input name="username" placeholder="Username" required><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="12" placeholder="Temporary password" required><select name="role"><option value="worker">Worker</option><option value="veterinarian">Veterinarian</option><option value="buyer">Buyer</option><option value="customer">Customer</option></select><button>Create account</button></form></section><section class="panel"><h2>Accounts</h2><p class="muted">Removing an account revokes sign-in access; farm records are retained.</p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody>${data.users.length ? data.users.map((user) => `<tr><td>${escapeHtml(user.full_name)}</td><td>${escapeHtml(user.role)}</td><td>${user.is_active ? 'Active' : 'Inactive'}</td><td><button class="danger-action" type="button" data-remove-user="${user.id}" ${Number(user.id) === Number(currentUser.id) ? 'disabled title="You cannot remove your own account"' : ''}>Remove</button></td></tr>`).join('') : '<tr><td colspan="4" class="empty">No user accounts.</td></tr>'}</tbody></table></div></section></section>`
     content.querySelector('#user-module-form').addEventListener('submit', async (event) => {
       event.preventDefault()
       try {
@@ -711,6 +711,19 @@ async function renderUsersModule() {
         await renderUsersModule()
       } catch (error) { content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(error.message, true) })) }
     })
+    content.querySelectorAll('[data-remove-user]').forEach((button) => button.addEventListener('click', async () => {
+      const user = data.users.find((item) => Number(item.id) === Number(button.dataset.removeUser))
+      if (!user || !window.confirm(`Remove ${user.full_name}'s account? They will lose sign-in access. Farm records will be retained.`)) return
+      button.disabled = true
+      try {
+        await api.deleteUser(Number(user.id))
+        await renderUsersModule()
+        content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(`${user.full_name}'s account was removed. Farm records were retained.`) }))
+      } catch (error) {
+        button.disabled = false
+        content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(error.message, true) }))
+      }
+    }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
