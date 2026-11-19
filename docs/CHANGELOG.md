@@ -6,3 +6,4 @@ One line per phase gate.
 - 2026-10-13 · Demo-ready workflows: integrated milk forecasting and 12-month reports; added role workspaces, customer data scoping, order stock allocation, inventory history, live overview, production summaries, simulated SQL data generation, and corrected local run instructions.
 - 2026-11-19 · M-PESA: added Daraja STK initiation, secret-protected idempotent callbacks, payment/order settlement, and buyer-side payment polling.
 - 2026-11-19 · Health reminders: added daily due-record notifications and retryable administrator email delivery with attempt tracking.
+- 2026-11-19 · Activity health concerns: worker activity entries can create issue records and notify administrators and veterinarians.

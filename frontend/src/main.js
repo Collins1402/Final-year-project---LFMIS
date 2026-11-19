@@ -360,12 +360,30 @@ function renderAdminModule(module) {
   app.querySelector('[data-module="Overview"]').addEventListener('click', renderApp)
 }
 
+function activityHealthFields(animals) {
+  const options = animals.filter((animal) => animal.status === 'active')
+    .map((animal) => `<option value="${Number(animal.id)}">${escapeHtml(animal.tag_number)} · ${escapeHtml(animal.species)}</option>`)
+    .join('')
+  return `<label class="checkbox-field"><input type="checkbox" name="healthConcern" value="1"> I noticed a health problem</label><fieldset data-health-concern-fields disabled hidden><label>Animal<select name="animalId" required><option value="">Choose animal</option>${options}</select></label><label>Symptoms<textarea name="symptoms" rows="3" maxlength="220" required placeholder="What did you notice?"></textarea></label></fieldset>`
+}
+
+function wireActivityHealthFields(form) {
+  const checkbox = form.querySelector('[name="healthConcern"]')
+  const fields = form.querySelector('[data-health-concern-fields]')
+  checkbox.addEventListener('change', () => {
+    fields.hidden = !checkbox.checked
+    fields.disabled = !checkbox.checked
+  })
+}
+
 async function renderActivitiesModule() {
   const content = app.querySelector('.content')
   try {
-    const data = await api.activities()
-    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Activities</h1><p class="muted">Plan and complete daily farm work.</p></div><span class="health-pill">Live records</span></header><section class="module-grid"><section class="panel"><h2>Plan activity</h2><form id="activity-form" class="compact-form"><select name="activityType"><option value="feeding">Feeding</option><option value="milking">Milking</option><option value="cleaning">Cleaning</option><option value="health">Health follow-up</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select><input name="description" placeholder="What needs to happen?" required><input name="activityAt" type="datetime-local" required><button>Save activity</button></form></section><section class="panel"><h2>Activity list</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.length ? data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${item.status === 'planned' ? `<button class="small-action" data-complete="${item.id}">Complete</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No activities yet.</td></tr>'}</tbody></table></div></section></section>`
-    content.querySelector('#activity-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createActivity(Object.fromEntries(new FormData(event.target))); await renderActivitiesModule() })
+    const [data, animalData] = await Promise.all([api.activities(), api.animals()])
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Activities</h1><p class="muted">Plan and complete daily farm work.</p></div><span class="health-pill">Live records</span></header><section class="module-grid"><section class="panel"><h2>Plan activity</h2><form id="activity-form" class="compact-form"><select name="activityType"><option value="feeding">Feeding</option><option value="milking">Milking</option><option value="cleaning">Cleaning</option><option value="health">Health follow-up</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select><input name="description" placeholder="What needs to happen?" required><input name="activityAt" type="datetime-local" required>${activityHealthFields(animalData.animals)}<button>Save activity</button></form></section><section class="panel"><h2>Activity list</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.length ? data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${item.status === 'planned' ? `<button class="small-action" data-complete="${item.id}">Complete</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No activities yet.</td></tr>'}</tbody></table></div></section></section>`
+    const form = content.querySelector('#activity-form')
+    wireActivityHealthFields(form)
+    form.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createActivity(Object.fromEntries(new FormData(form))); await renderActivitiesModule() } catch (error) { content.insertAdjacentHTML('afterbegin', message(error.message, true)) } })
     content.querySelectorAll('[data-complete]').forEach((button) => button.addEventListener('click', async () => { await api.completeActivity(button.dataset.complete); await renderActivitiesModule() }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
@@ -811,9 +829,18 @@ async function renderRoleModule(module) {
       return
     }
     if (module === 'Activities') {
-      const data = await api.activities()
+      const canCreate = Boolean(currentPermissions['activities.create']?.allowed)
+      const [data, animalData] = await Promise.all([
+        api.activities(),
+        canCreate ? api.animals() : Promise.resolve({ animals: [] }),
+      ])
       const canComplete = Boolean(currentPermissions['activities.complete']?.allowed)
-      content.innerHTML = `<section class="panel"><h2>Assigned and shared activities</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Task</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${canComplete && item.status === 'planned' ? `<button class="small-action" data-complete-activity="${Number(item.id)}">Complete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No assigned activities.</td></tr>'}</tbody></table></div></section>`
+      content.innerHTML = `${canCreate ? `<section class="panel"><h2>Record an activity</h2><form id="role-activity-form" class="compact-form"><select name="activityType"><option value="feeding">Feeding</option><option value="milking">Milking</option><option value="cleaning">Cleaning</option><option value="health">Health follow-up</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select><input name="description" placeholder="What did you do?" required><input name="activityAt" type="datetime-local" required>${activityHealthFields(animalData.animals)}<button>Save activity</button></form></section>` : ''}<section class="panel"><h2>Assigned and shared activities</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Task</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${canComplete && item.status === 'planned' ? `<button class="small-action" data-complete-activity="${Number(item.id)}">Complete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No assigned activities.</td></tr>'}</tbody></table></div></section>`
+      const activityForm = content.querySelector('#role-activity-form')
+      if (activityForm) {
+        wireActivityHealthFields(activityForm)
+        activityForm.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createActivity(Object.fromEntries(new FormData(activityForm))); await renderRoleModule(module) } catch (error) { showError(error) } })
+      }
       content.querySelectorAll('[data-complete-activity]').forEach((button) => button.addEventListener('click', async () => { try { await api.completeActivity(button.dataset.completeActivity); await renderRoleModule(module) } catch (error) { showError(error) } }))
       return
     }
@@ -833,7 +860,7 @@ async function renderRoleModule(module) {
       const dueRows = health.dueSoon.map((item) => `<tr><td>${escapeHtml(item.next_due_date)}</td><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td></tr>`).join('')
       const recordRows = health.records.map((item) => `<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td></tr>`).join('')
       const canRecordHealth = Boolean(currentPermissions['health.record']?.allowed)
-      content.innerHTML = `<section class="module-grid">${canRecordHealth ? `<section class="panel"><h2>Record treatment or care</h2><form id="role-health-form" class="compact-form"><select name="animalId" required><option value="">Choose animal</option>${animals.animals.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.tag_number)} · ${escapeHtml(item.species)}</option>`).join('')}</select><select name="recordType"><option value="treatment">Treatment</option><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option><option value="checkup">Checkup</option><option value="illness">Illness</option></select><input name="description" placeholder="Clinical note or action" required><input name="medication" placeholder="Medication, if applicable"><input name="recordDate" type="date" value="${new Date().toISOString().slice(0, 10)}" required><input name="nextDueDate" type="date"><button>Save health record</button></form></section>` : ''}<section class="panel"><h2>Due follow-ups</h2><div class="table-wrap"><table><thead><tr><th>Due</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${dueRows || '<tr><td colspan="4" class="empty">No open follow-ups due.</td></tr>'}</tbody></table></div></section></section><section class="panel"><h2>Health history</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${recordRows || '<tr><td colspan="4" class="empty">No health records.</td></tr>'}</tbody></table></div></section>`
+      content.innerHTML = `<section class="module-grid">${canRecordHealth ? `<section class="panel"><h2>Record treatment or care</h2><form id="role-health-form" class="compact-form"><select name="animalId" required><option value="">Choose animal</option>${animals.animals.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.tag_number)} · ${escapeHtml(item.species)}</option>`).join('')}</select><select name="recordType"><option value="treatment">Treatment</option><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option><option value="checkup">Checkup</option><option value="illness">Illness</option><option value="issue">Issue</option></select><input name="description" placeholder="Clinical note or action" required><input name="medication" placeholder="Medication, if applicable"><input name="recordDate" type="date" value="${new Date().toISOString().slice(0, 10)}" required><input name="nextDueDate" type="date"><button>Save health record</button></form></section>` : ''}<section class="panel"><h2>Due follow-ups</h2><div class="table-wrap"><table><thead><tr><th>Due</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${dueRows || '<tr><td colspan="4" class="empty">No open follow-ups due.</td></tr>'}</tbody></table></div></section></section><section class="panel"><h2>Health history</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Description</th></tr></thead><tbody>${recordRows || '<tr><td colspan="4" class="empty">No health records.</td></tr>'}</tbody></table></div></section>`
       content.querySelector('#role-health-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createHealthRecord(Object.fromEntries(new FormData(event.target))); await renderRoleModule(module) } catch (error) { showError(error) } })
       return
     }
