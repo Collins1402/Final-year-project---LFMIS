@@ -429,3 +429,26 @@ INSERT IGNORE INTO roles (name, description) VALUES
   ('veterinarian', 'Animal health records and follow-ups'),
   ('customer', 'Buys farm produce and tracks orders and payments'),
   ('buyer', 'Purchases livestock and tracks livestock orders');
+
+CREATE TABLE IF NOT EXISTS permissions (
+  code VARCHAR(60) PRIMARY KEY,
+  label VARCHAR(120) NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+  role_id TINYINT UNSIGNED NOT NULL,
+  permission_code VARCHAR(60) NOT NULL,
+  is_allowed TINYINT(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (role_id, permission_code),
+  CONSTRAINT fk_role_permissions_role FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE,
+  CONSTRAINT fk_role_permissions_permission FOREIGN KEY (permission_code) REFERENCES permissions (code) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO permissions (code, label) VALUES
+  ('audit.view', 'View audit log'),
+  ('data.export', 'Export farm data');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_code, is_allowed)
+SELECT roles.id, permissions.code, 1
+FROM roles CROSS JOIN permissions
+WHERE roles.name = 'admin' AND permissions.code IN ('audit.view', 'data.export');

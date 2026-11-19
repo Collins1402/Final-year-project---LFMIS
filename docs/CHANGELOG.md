@@ -7,3 +7,4 @@ One line per phase gate.
 - 2026-11-19 · M-PESA: added Daraja STK initiation, secret-protected idempotent callbacks, payment/order settlement, and buyer-side payment polling.
 - 2026-11-19 · Health reminders: added daily due-record notifications and retryable administrator email delivery with attempt tracking.
 - 2026-11-19 · Activity health concerns: worker activity entries can create issue records and notify administrators and veterinarians.
+- 2026-11-19 · Audit trail: added centralized event logging, admin-filtered audit history and an audited farm-data export.

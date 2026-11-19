@@ -24,7 +24,7 @@ final class AuditService
         if ($action === '' || strlen($action) > 40 || $entityType === '' || strlen($entityType) > 60) {
             throw new \InvalidArgumentException('Audit action and entity type must be valid.');
         }
-        if ($userId !== null && $userId < 1 || $entityId !== null && $entityId < 1) {
+        if (($userId !== null && $userId < 1) || ($entityId !== null && $entityId < 1)) {
             throw new \InvalidArgumentException('Audit identifiers must be positive.');
         }
         $ipAddress ??= isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : null;

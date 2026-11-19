@@ -73,6 +73,7 @@ final class MpesaServiceTest extends TestCase
         $this->assertSame('paid', $db->query('SELECT status FROM orders')->fetchColumn());
         $this->assertSame(1, (int) $db->query('SELECT COUNT(*) FROM sales')->fetchColumn());
         $this->assertSame(1, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
+        $this->assertSame('payment_confirmed', $db->query('SELECT action FROM audit_logs')->fetchColumn());
     }
 
     public function testFailedCallbackAllowsBuyerToRetry(): void
