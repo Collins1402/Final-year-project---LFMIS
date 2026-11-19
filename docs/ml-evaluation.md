@@ -1,15 +1,22 @@
 # ML Evaluation
 
-This is a synthetic fixture result for pipeline verification only. It must not be reported as Flouri Farm accuracy. Replace it with `ml/data/real_milk.csv` after at least 21 consecutive real production days.
+Data source: `ml/data/real_milk.csv`
+Production rows/days supplied: 0
 
-Sample size: 21 consecutive synthetic days; rolling backtest: 7 days.
+| Column | Missing values |
+|---|---:|
+| date | 0 |
+| litres | 0 |
+| rain_mm | 0 |
+| temp_c | 0 |
 
-| Model | Features | MAE (L) | RMSE (L) | Best baseline MAE (L) | Improvement |
-|---|---|---:|---:|---:|---:|
-| Ridge regression | 7 lags + day-of-week + without weather | 0.032 | 0.037 | 0.400 | 91.95% |
-| Ridge regression | 7 lags + day-of-week + with weather | 0.032 | 0.039 | 0.400 | 91.88% |
-| Baseline: naive | Previous day | 0.400 | 0.400 | - | - |
-| Baseline: seven-day mean | Previous seven-day mean | 1.600 | 1.600 | - | - |
-| Baseline: seasonal naive | Same weekday last week | 2.800 | 2.800 | - | - |
+Status: Cannot be reported as farm accuracy: only 0 production day(s) are available; at least 21 consecutive days are required.
 
-The weather comparison is associated with this synthetic fixture only; it does not establish causation. The real evaluation must state the number of farm days, missing values, and the limits of using data from one farm.
+| Model | Features | Backtest days | MAE (L) | RMSE (L) |
+|---|---|---:|---:|---:|
+| Ridge regression | 7 lags + day-of-week + weather | — | Not computed | Not computed |
+| Baseline: naive | Previous day | — | Not computed | Not computed |
+| Baseline: seven-day mean | Previous seven-day mean | — | Not computed | Not computed |
+| Baseline: seasonal naive | Same weekday last week | — | Not computed | Not computed |
+
+Limits: this model is decision support, not a causal explanation or guarantee of future yield. Results from one farm may not generalize to other farms or seasons. The weather-enabled ridge model uses observed weather where available and historical means for missing weather; association does not establish that weather caused a production change. Rows must represent complete, consecutive calendar days for the backtest to run.
