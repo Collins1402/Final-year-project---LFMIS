@@ -11,7 +11,7 @@ const adminNavigation = [
   ['Operations', ['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory']],
   ['Commerce', ['Sales & orders', 'Feedback']],
   ['Insights', ['Reports', 'Assistant']],
-  ['Administration', ['User accounts', 'Role permissions', 'Your rights', 'Events']],
+  ['Administration', ['User accounts', 'Role permissions', 'Audit log', 'Your rights', 'Events']],
 ]
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
@@ -338,6 +338,7 @@ function renderAdminModule(module) {
   if (module === 'Animal health') return renderHealthModule()
   if (module === 'User accounts') return renderUsersModule()
   if (module === 'Role permissions') return renderPermissionsModule()
+  if (module === 'Audit log') return renderAuditModule()
   if (module === 'Your rights') return renderRightsModule()
   if (module === 'Feedback') return renderFeedbackModule()
   const details = {
@@ -760,6 +761,43 @@ async function renderPermissionsModule() {
         await renderPermissionsModule()
       } catch (error) { content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(error.message, true) })) }
     }))
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderAuditModule(filters = {}) {
+  const content = app.querySelector('.content')
+  try {
+    const [auditData, userData] = await Promise.all([api.auditLogs(filters), api.users()])
+    const users = userData.users.map((user) => `<option value="${Number(user.id)}" ${String(filters.userId || '') === String(user.id) ? 'selected' : ''}>${escapeHtml(user.full_name)} · ${escapeHtml(user.role)}</option>`).join('')
+    const rows = auditData.logs.map((log) => {
+      let details = log.details || ''
+      try { details = JSON.stringify(JSON.parse(details), null, 2) } catch {}
+      return `<tr><td>${escapeHtml(log.created_at)}</td><td>${escapeHtml(log.user_name || 'System/unknown')}</td><td>${escapeHtml(log.action)}</td><td>${escapeHtml(log.entity_type)}${log.entity_id ? ` #${Number(log.entity_id)}` : ''}</td><td><pre>${escapeHtml(details)}</pre></td><td>${escapeHtml(log.ip_address || '—')}</td></tr>`
+    }).join('')
+    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><button id="audit-export" class="secondary-action">Export farm data</button></header><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action<input name="action" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
+    content.querySelector('#audit-filter-form').addEventListener('submit', (event) => {
+      event.preventDefault()
+      renderAuditModule(Object.fromEntries(new FormData(event.target)))
+    })
+    content.querySelector('#audit-export').addEventListener('click', async (event) => {
+      const button = event.currentTarget
+      button.disabled = true
+      try {
+        const result = await api.exportData()
+        const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `lfmis-farm-export-${new Date().toISOString().slice(0, 10)}.json`
+        link.click()
+        URL.revokeObjectURL(url)
+        content.querySelector('#audit-notice').innerHTML = message('Farm data export downloaded.')
+      } catch (error) {
+        content.querySelector('#audit-notice').innerHTML = message(error.message, true)
+      } finally {
+        button.disabled = false
+      }
+    })
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 

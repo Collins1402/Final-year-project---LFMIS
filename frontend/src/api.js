@@ -83,4 +83,9 @@ export const api = {
   deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
   permissions: () => request('/api/permissions'),
   updateRolePermissions: (role, permissions) => post(`/api/permissions/${encodeURIComponent(role)}`, { permissions }),
+  auditLogs: (filters = {}) => {
+    const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== ''))
+    return request(`/api/audit-logs${query.size ? `?${query}` : ''}`)
+  },
+  exportData: () => request('/api/admin/export'),
 }
