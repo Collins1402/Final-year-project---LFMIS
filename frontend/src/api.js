@@ -18,6 +18,10 @@ const post = (path, data) => request(path, { method: 'POST', body: JSON.stringif
 export const api = {
   health: () => request('/api/health'),
   trends: () => request('/api/trends'),
+  trendsHistory: (params = {}) => request('/api/trends/history?' + new URLSearchParams(params)),
+  trendsMetrics: (params = {}) => request('/api/trends/metrics?' + new URLSearchParams(params)),
+  trendsStatus: () => request('/api/trends/status'),
+  refreshTrends: () => post('/api/trends/refresh', {}),
   setupStatus: () => request('/api/setup-status'),
   setup: (data) => post('/api/setup', data),
   register: (data) => post('/api/register', data),
