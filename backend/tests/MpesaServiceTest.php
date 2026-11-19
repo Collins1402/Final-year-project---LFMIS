@@ -64,8 +64,8 @@ final class MpesaServiceTest extends TestCase
         $this->addPendingPayment($db);
         $service = new MpesaService($db);
 
-        $first = $service->handleCallback('0123456789abcdef0123456789abcdef', $this->callback(0));
-        $second = $service->handleCallback('0123456789abcdef0123456789abcdef', $this->callback(0));
+        $first = $service->handleCallback('0123456789abcdef0123456789abcdef', $this->callbackPayload(0));
+        $second = $service->handleCallback('0123456789abcdef0123456789abcdef', $this->callbackPayload(0));
 
         $this->assertFalse($first['duplicate']);
         $this->assertTrue($second['duplicate']);
@@ -80,7 +80,7 @@ final class MpesaServiceTest extends TestCase
         $db = $this->database();
         $this->addPendingPayment($db);
 
-        (new MpesaService($db))->handleCallback('0123456789abcdef0123456789abcdef', $this->callback(1032, null, 'Cancelled by user.'));
+        (new MpesaService($db))->handleCallback('0123456789abcdef0123456789abcdef', $this->callbackPayload(1032, null, 'Cancelled by user.'));
 
         $this->assertSame('failed', $db->query('SELECT status FROM payments')->fetchColumn());
         $this->assertSame('pending', $db->query('SELECT status FROM orders')->fetchColumn());
@@ -91,7 +91,7 @@ final class MpesaServiceTest extends TestCase
     {
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Invalid M-PESA callback authorization.');
-        (new MpesaService($this->database()))->handleCallback('wrong-secret', $this->callback(0));
+        (new MpesaService($this->database()))->handleCallback('wrong-secret', $this->callbackPayload(0));
     }
 
     public function testBuyerCannotPayAnotherCustomersOrder(): void
@@ -138,7 +138,7 @@ final class MpesaServiceTest extends TestCase
         $db->exec("INSERT INTO payments (order_id, customer_id, amount, method, status, checkout_request_id) VALUES (1, 1, 300, 'mpesa', 'pending', 'ws_CO_123')");
     }
 
-    private function callback(int $resultCode, ?string $receipt = 'ABC123', string $description = 'The service request is processed successfully.'): array
+    private function callbackPayload(int $resultCode, ?string $receipt = 'ABC123', string $description = 'The service request is processed successfully.'): array
     {
         $items = [];
         if ($receipt !== null) {

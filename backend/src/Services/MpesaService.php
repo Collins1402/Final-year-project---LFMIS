@@ -64,7 +64,7 @@ final class MpesaService
         try {
             $response = $this->sendStkPush($orderId, $amount, $normalizedPhone, $callbackUrl);
             $checkoutRequestId = trim((string) ($response['CheckoutRequestID'] ?? ''));
-            if (($response['ResponseCode'] ?? null) !== '0' && ($response['ResponseCode'] ?? null) !== 0 || $checkoutRequestId === '') {
+            if (!in_array($response['ResponseCode'] ?? null, ['0', 0], true) || $checkoutRequestId === '') {
                 throw new DeliveryException('M-PESA did not accept the payment request. Please try again.');
             }
             $update = $this->db->prepare(
@@ -229,8 +229,9 @@ final class MpesaService
 
     private function notifyStaff(int $paymentId, int $orderId): void
     {
+        $ignore = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
         $statement = $this->db->prepare(
-            "INSERT IGNORE INTO notifications (user_id, type, entity_type, entity_id, title, message, dedupe_key)
+            "$ignore INTO notifications (user_id, type, entity_type, entity_id, title, message, dedupe_key)
              SELECT users.id, 'system', 'payment', ?, 'M-PESA payment confirmed',
                     CONCAT('Order #', ?, ' has been paid.'), ?
              FROM users JOIN roles ON roles.id = users.role_id
