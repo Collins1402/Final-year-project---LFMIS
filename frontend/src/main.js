@@ -11,7 +11,7 @@ let roleLanguage = 'en'
 const adminNavigation = [
   ['Operations', ['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory']],
   ['Commerce', ['Sales & orders', 'Feedback']],
-  ['Insights', ['Reports', 'Assistant']],
+  ['Insights', ['Reports', 'Farm trends', 'Assistant']],
   ['Administration', ['User accounts', 'Role permissions', 'Audit log', 'Your rights', 'Events']],
 ]
 
@@ -138,7 +138,7 @@ async function loadPublicTrends() {
       const updated = group.updatedAt ? new Date(`${group.updatedAt.replace(' ', 'T')}Z`).toLocaleString() : 'Not available'
       return `<section class="trend-group"><div class="trend-heading"><h3>${escapeHtml(title)}</h3><small>${group.stale ? 'Cached · ' : ''}Updated ${escapeHtml(updated)}</small></div><ul>${rows || `<li class="empty">${group.unavailable ? 'Trend feed is temporarily unavailable.' : 'No current reports found.'}</li>`}</ul></section>`
     }
-    content.innerHTML = `<p class="trend-source">Source: ${escapeHtml(data.source)} · refreshes every ${Number(data.refreshHours)} hours</p>${renderGroup(`Regional · ${data.region}`, data.regional)}${renderGroup('Worldwide', data.global)}`
+    content.innerHTML = `<p class="trend-source">Source: ${escapeHtml(data.source)} · refreshes every ${Number(data.refreshHours)} hours</p>${renderGroup(`Kenya · ${data.region}`, data.kenya || data.regional)}${renderGroup('East Africa', data.east_africa)}${renderGroup('Global', data.global)}`
   } catch (error) {
     content.innerHTML = `<p class="message danger">${escapeHtml(error.message)}</p>`
   }
@@ -352,6 +352,7 @@ function renderAdminModule(module) {
   if (module === 'Inventory') return renderInventoryModule()
   if (module === 'Sales & orders') return renderCommerceModule()
   if (module === 'Reports') return renderReportsModule()
+  if (module === 'Farm trends') return renderFarmTrendsModule()
   if (module === 'Assistant') return renderAssistantModule()
   if (module === 'Livestock') return renderLivestockModule()
   if (module === 'Animal health') return renderHealthModule()
@@ -642,6 +643,113 @@ function renderForecastPanel(data, error) {
     <h3>Model and baseline comparison</h3><div class="table-wrap"><table><thead><tr><th>Model</th><th>Features</th><th>MAE</th><th>RMSE</th><th>Improvement</th></tr></thead><tbody>${evaluationRows}</tbody></table></div>
     <p class="muted forecast-limitation">${escapeHtml(result.limitations)} Backtest results are one-day-ahead; the forecast horizon is seven days.</p>
   </section>`
+}
+
+async function renderFarmTrendsModule() {
+  const content = app.querySelector('.content')
+  content.innerHTML = `<header><div><p class="kicker">AGRICULTURAL INTELLIGENCE</p><h1>Farm trends</h1><p class="muted">Separate live, synthetic and actual farm information.</p></div><button id="trends-refresh" class="secondary-action" type="button">Refresh now</button></header><div id="trends-content" aria-live="polite"><p class="muted">Loading agricultural intelligence...</p></div>`
+
+  let scope = 'kenya'
+  let historyRange = '7d'
+  let data = null
+
+  const money = (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  const formatDate = (value) => value ? new Date(String(value).replace(' ', 'T') + (String(value).includes('Z') ? '' : 'Z')).toLocaleString() : 'Not available'
+
+  const renderLive = () => {
+    const group = data?.[scope] || data?.regional || {}
+    const articles = group.articles || []
+    const rows = articles.map((article) => {
+      let url = '#'
+      try {
+        const parsed = new URL(article.url)
+        if (parsed.protocol === 'https:') url = parsed.href
+      } catch {}
+      return `<article class="trend-article"><div><strong>${escapeHtml(article.headline || article.title)}</strong><small>${escapeHtml(article.sourceDomain || article.domain || 'Source not available')} · ${article.category ? escapeHtml(article.category) : 'general'} · ${escapeHtml(article.countryCode || '')}</small></div><div><small>Published: ${escapeHtml(article.publishedAt ? formatDate(article.publishedAt) : 'Date unavailable')}</small><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Open original</a></div></article>`
+    }).join('')
+    return `<section class="panel trend-section"><h2>Live trends</h2><p class="muted">EXTERNAL LIVE DATA: GDELT agriculture and food-security reporting. Publication and retrieval times are shown separately.</p>${rows || `<p class="empty">${group.unavailable ? 'Live feed is temporarily unavailable.' : 'No current agricultural reports found.'}</p>`}</section>`
+  }
+
+  const renderSynthetic = () => {
+    const scopeData = data?.synthetic?.scopes?.[scope] || { categories: {} }
+    const cards = Object.entries(scopeData.categories || {}).flatMap(([category, metrics]) =>
+      Object.values(metrics).map((metric) => `<div class="synthetic-metric"><div><small>${escapeHtml(category.replace('_', ' '))}</small><strong>${escapeHtml(metric.label)}</strong></div><div><strong>${money(metric.metricValue)} ${escapeHtml(metric.unit)}</strong><small class="${Number(metric.changePercent) >= 0 ? 'trend-up' : 'trend-down'}">${Number(metric.changePercent) >= 0 ? '+' : ''}${Number(metric.changePercent).toFixed(2)}%</small><span class="simulated-badge">SIMULATED</span></div></div>`)).join('')
+    const events = (data?.synthetic?.events || []).filter((event) => event.geographicScope === scope || event.geographicScope === 'east_africa' && scope === 'kenya').map((event) => `<li><strong>${escapeHtml(event.name)}</strong><p>${escapeHtml(event.description)}</p><small>SIMULATED EVENT — NOT REAL · ${escapeHtml(event.geographicScope)} · ${escapeHtml(event.startPeriod)} · ${escapeHtml(event.durationHours)} hours</small></li>`).join('')
+    return `<section class="panel trend-section"><h2>Simulated trends</h2><p class="forecast-warning"><strong>SIMULATED DATA — NOT REAL MARKET INFORMATION</strong></p><div class="synthetic-grid">${cards || '<p class="empty">No synthetic indicators are available yet.</p>'}</div><h3>Active simulated events</h3><ul class="simulated-events">${events || '<li class="empty">No active simulated events.</li>'}</ul></section>`
+  }
+
+  const renderFarm = () => {
+    const farm = data?.actualFarm?.metrics
+    if (!farm) return `<section class="panel trend-section"><h2>Actual farm performance</h2><p class="empty">No actual farm records are available.</p></section>`
+    const weather = farm.weather
+    return `<section class="panel trend-section"><h2>Actual farm performance</h2><p class="muted">ACTUAL FARM DATA: measured operational records. These values are not market forecasts.</p><div class="stats trends-farm-stats"><div><small>Milk today</small><strong>${money(farm.milk.todayTotal)} L</strong><small>Morning ${money(farm.milk.morning)} · Evening ${money(farm.milk.evening)}</small></div><div><small>Eggs today</small><strong>${money(farm.eggs.todayTotal)} trays</strong></div><div><small>Active livestock</small><strong>${Number(farm.livestock.activeCount)}</strong></div><div><small>Inventory shortages</small><strong>${Number(farm.inventory.shortagesCount)}</strong></div><div><small>Sales this month</small><strong>KES ${money(farm.finance.salesThisMonth)}</strong></div><div><small>Expenses this month</small><strong>KES ${money(farm.finance.expensesThisMonth)}</strong></div></div><div class="weather-grid"><section><h3>Weather & climate</h3>${weather ? `<p>Latest observation: ${escapeHtml(weather.observation_date)}</p><p>Rainfall: ${money(weather.rain_mm)} mm · Temperature: ${money(weather.temp_c)} °C</p><small>Source: ${escapeHtml(weather.source)} · Recorded/fetched separately from forecasts.</small>` : '<p class="empty">No weather observations recorded.</p>'}</section><section><h3>Forecast caveat</h3><p class="muted">Historical observations, forecasts and synthetic weather scenarios must be kept separate. No synthetic weather scenario is presented here.</p></section></div></section>`
+  }
+
+  const renderStatus = () => {
+    const status = data?.status || {}
+    const log = status.lastLog
+    return `<section class="panel trend-status"><h2>Trend status</h2><div class="trend-status-grid"><div><small>Current reporting window</small><strong>${escapeHtml(status.currentPeriod || 'Calculating')}</strong></div><div><small>Next scheduled refresh</small><strong>${escapeHtml(status.nextScheduledRefresh ? formatDate(status.nextScheduledRefresh) : 'Not available')}</strong></div><div><small>Last job</small><strong>${escapeHtml(log ? formatDate(log.completed_at) : 'No refresh recorded')}</strong></div><div><small>Live / synthetic / farm</small><strong>${escapeHtml(log?.live_status || 'unknown')} / ${escapeHtml(log?.synthetic_status || 'unknown')} / ${escapeHtml(log?.actual_farm_status || 'unknown')}</strong></div></div><small>Missed periods: ${Number(status.missedPeriodsCount || 0)} · timezone: Africa/Nairobi</small></section>`
+  }
+
+  const renderHistory = async () => {
+    try {
+      const [history, metrics] = await Promise.all([
+        api.trendsHistory({ scope, type: 'all', limit: historyRange === '1d' ? 4 : historyRange === '7d' ? 28 : 100 }),
+        api.trendsMetrics({ scope, limit: 200 }),
+      ])
+      const rows = (history.history || []).slice(0, 12).map((item) => `<tr><td>${escapeHtml(item.trend_type)}</td><td>${escapeHtml(item.geographic_scope)}</td><td>${escapeHtml(item.period_start)}</td><td>${escapeHtml(item.period_end)}</td><td>${escapeHtml(item.status)}</td></tr>`).join('')
+      const series = (metrics.metrics || []).slice(0, 4)
+      const charts = series.map((metric) => {
+        const points = metric.points || []
+        if (!points.length) return ''
+        const values = points.map((point) => Number(point.value))
+        const min = Math.min(...values)
+        const max = Math.max(...values)
+        const width = 480
+        const height = 120
+        const coords = values.map((value, index) => {
+          const x = values.length === 1 ? width / 2 : 20 + (index * (width - 40) / (values.length - 1))
+          const y = max === min ? height / 2 : 15 + ((max - value) * (height - 30) / (max - min))
+          return `${x.toFixed(1)},${y.toFixed(1)}`
+        }).join(' ')
+        return `<figure class="trend-chart"><figcaption>${escapeHtml(metric.metricName)} · SIMULATED</figcaption><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(metric.metricName)} synthetic history"><polyline points="${coords}" fill="none" stroke="#d66f3d" stroke-width="3"></polyline></svg></figure>`
+      }).join('')
+      return `<section class="panel trend-section"><h2>Trend history</h2><label>Reporting period<select id="trend-history-range"><option value="1d">Previous 24 hours</option><option value="7d" selected>Previous 7 days</option><option value="30d">Previous 30 days</option><option value="12m">Previous 12 months</option></select></label><div class="trend-history-charts">${charts || '<p class="empty">No historical synthetic metrics yet.</p>'}</div><div class="table-wrap"><table><thead><tr><th>Type</th><th>Scope</th><th>Period start</th><th>Period end</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">No snapshots found for this period.</td></tr>'}</tbody></table></div></section>`
+    } catch (error) {
+      return `<section class="panel trend-section"><h2>Trend history</h2>${message(error.message, true)}</section>`
+    }
+  }
+
+  const load = async () => {
+    content.querySelector('#trends-content').innerHTML = '<p class="muted">Loading agricultural intelligence...</p>'
+    try {
+      data = await api.trends()
+      content.querySelector('#trends-content').innerHTML = `<nav class="trend-tabs" aria-label="Geographic scope"><button type="button" data-trend-scope="kenya" class="${scope === 'kenya' ? 'active' : ''}">Kenya</button><button type="button" data-trend-scope="east_africa" class="${scope === 'east_africa' ? 'active' : ''}">East Africa</button><button type="button" data-trend-scope="global" class="${scope === 'global' ? 'active' : ''}">Global</button></nav>${renderStatus()}${renderLive()}${renderSynthetic()}${await renderHistory()}${renderFarm()}`
+      content.querySelectorAll('[data-trend-scope]').forEach((button) => button.addEventListener('click', () => {
+        scope = button.dataset.trendScope
+        load()
+      }))
+      content.querySelector('#trend-history-range')?.addEventListener('change', (event) => {
+        historyRange = event.target.value
+        load()
+      })
+    } catch (error) {
+      content.querySelector('#trends-content').innerHTML = message(error.message, true)
+    }
+  }
+
+  content.querySelector('#trends-refresh').addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true
+    try {
+      await api.refreshTrends()
+      await load()
+    } catch (error) {
+      content.querySelector('#trends-content').insertAdjacentHTML('afterbegin', message(error.message, true))
+    } finally {
+      event.currentTarget.disabled = false
+    }
+  })
+  await load()
 }
 
 async function renderReportsModule() {
