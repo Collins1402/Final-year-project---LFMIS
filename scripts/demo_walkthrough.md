@@ -9,6 +9,7 @@ $Api = 'http://127.0.0.1:8000'
 $AppOrigin = 'http://127.0.0.1:5173'
 $WorkerUser = 'demo_worker'
 $WorkerPassword = 'replace-with-staging-worker-password'
+$WorkerCookie = Join-Path $env:TEMP 'lfmis-worker.cookies'
 $LockoutUser = 'demo_lockout'
 $LockoutCookie = Join-Path $env:TEMP 'lfmis-lockout.cookies'
 ```
@@ -49,10 +50,12 @@ Expected after a confirmed sandbox callback: payment status `confirmed` with a r
 
 | Time | Demo steps and expected results |
 |---|---|
-| 8:00–8:45 | Return to the worker browser session and demonstrate role denial with the following authenticated request. Expected HTTP status: `403`; the worker cannot create an administrator backup. |
+| 8:00–8:45 | Create a worker API session and demonstrate role denial. Expected: login returns the worker user; the backup request returns HTTP `403`. |
 
 ```powershell
-curl.exe -i -b worker.cookies -H "Origin: $AppOrigin" -H "Content-Type: application/json" -X POST "$Api/api/admin/backup" -d "{}"
+$WorkerLoginBody = @{ login = $WorkerUser; password = $WorkerPassword } | ConvertTo-Json -Compress
+curl.exe -sS -c $WorkerCookie -b $WorkerCookie -H "Content-Type: application/json" -X POST "$Api/api/login" -d $WorkerLoginBody
+curl.exe -i -b $WorkerCookie -H "Origin: $AppOrigin" -H "Content-Type: application/json" -X POST "$Api/api/admin/backup" -d "{}"
 ```
 
 | 8:45–9:15 | Show SQL-injection resistance by submitting an injection-shaped login. Expected HTTP `401` and the ordinary credential error; no account is authenticated. |
