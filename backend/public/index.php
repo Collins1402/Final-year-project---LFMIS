@@ -18,6 +18,9 @@ require_once __DIR__ . '/../src/Services/UserService.php';
 require_once __DIR__ . '/../src/Services/PermissionService.php';
 require_once __DIR__ . '/../src/Services/LoginAlertService.php';
 require_once __DIR__ . '/../src/Services/TrendsService.php';
+require_once __DIR__ . '/../src/Services/SyntheticTrendsService.php';
+require_once __DIR__ . '/../src/Services/FarmMetricsService.php';
+require_once __DIR__ . '/../src/Jobs/RefreshTrends.php';
 require_once __DIR__ . '/../src/Services/AnimalService.php';
 require_once __DIR__ . '/../src/Services/HealthService.php';
 require_once __DIR__ . '/../src/Services/VerificationService.php';
@@ -51,6 +54,9 @@ use Lfmis\Services\UserService;
 use Lfmis\Services\PermissionService;
 use Lfmis\Services\LoginAlertService;
 use Lfmis\Services\TrendsService;
+use Lfmis\Services\SyntheticTrendsService;
+use Lfmis\Services\FarmMetricsService;
+use Lfmis\Jobs\RefreshTrends;
 use Lfmis\Services\AnimalService;
 use Lfmis\Services\HealthService;
 use Lfmis\Services\VerificationService;
@@ -107,6 +113,9 @@ try {
     $permissions = new PermissionService($db);
     $loginAlerts = new LoginAlertService();
     $trends = new TrendsService($db);
+    $synthetic = new SyntheticTrendsService($db);
+    $farmMetrics = new FarmMetricsService($db);
+    $refreshTrends = new RefreshTrends($db, $trends, $synthetic, $farmMetrics);
     $animals = new AnimalService($db);
     $health = new HealthService($db);
     $verification = new VerificationService($db);
@@ -143,7 +152,79 @@ try {
         Response::json(['status' => 'ok', 'database' => 'ok', 'ml' => $mlStatus]);
     }
     if ($method === 'GET' && $path === '/api/trends') {
-        Response::json($trends->current());
+        $live = $trends->current();
+        $syntheticData = $synthetic->latest();
+        $farmData = $farmMetrics->summary();
+        $status = $refreshTrends->status();
+
+        Response::json([
+            'kenya' => $live['kenya'] ?? $live['regional'] ?? [],
+            'east_africa' => $live['east_africa'] ?? [],
+            'global' => $live['global'] ?? [],
+            'regional' => $live['regional'] ?? $live['kenya'] ?? [],
+            'region' => $live['region'] ?? 'Kenya',
+            'refreshHours' => 6,
+            'source' => 'GDELT Project news data',
+            'synthetic' => $syntheticData,
+            'actualFarm' => $farmData,
+            'status' => $status,
+            'updatedAt' => $live['updatedAt'] ?? gmdate('Y-m-d H:i:s'),
+        ]);
+    }
+    if ($method === 'GET' && $path === '/api/trends/history') {
+        $scope = (string) ($_GET['scope'] ?? 'all');
+        $type = (string) ($_GET['type'] ?? 'all');
+        $limit = min(100, max(1, (int) ($_GET['limit'] ?? 20)));
+
+        $conditions = [];
+        $params = [];
+        if ($scope !== 'all') {
+            $conditions[] = 'geographic_scope = ?';
+            $params[] = $scope;
+        }
+        if ($type !== 'all') {
+            $conditions[] = 'trend_type = ?';
+            $params[] = $type;
+        }
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+        try {
+            $stmt = $db->prepare("SELECT id, trend_type, geographic_scope, period_start, period_end, payload, status, created_at FROM trend_snapshot_history {$where} ORDER BY period_start DESC, id DESC LIMIT {$limit}");
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as &$r) {
+                $r['payload'] = json_decode((string) $r['payload'], true) ?: [];
+            }
+            Response::json(['history' => $rows]);
+        } catch (\Throwable) {
+            Response::json(['history' => []]);
+        }
+    }
+    if ($method === 'GET' && $path === '/api/trends/metrics') {
+        $scope = (string) ($_GET['scope'] ?? 'kenya');
+        $category = isset($_GET['category']) ? (string) $_GET['category'] : null;
+        $metricName = isset($_GET['metricName']) ? (string) $_GET['metricName'] : null;
+        $limit = min(200, max(1, (int) ($_GET['limit'] ?? 40)));
+        Response::json(['metrics' => $synthetic->historyMetrics($scope, $category, $metricName, $limit)]);
+    }
+    if ($method === 'GET' && $path === '/api/trends/status') {
+        Response::json($refreshTrends->status());
+    }
+    if ($method === 'POST' && $path === '/api/trends/refresh') {
+        $current = $auth->currentUser();
+        if ($current === null) {
+            Response::error('Please sign in to continue.', 401);
+        }
+        if (!$permissions->allows($current['role'], 'trends.manage') && $current['role'] !== 'admin') {
+            Response::error('Only administrators can refresh agricultural trends.', 403);
+        }
+        $rateLimits->consume('trends.refresh', 5, 60, (string) $current['id']);
+        $result = $refreshTrends->run(true);
+        $audit->record((int) $current['id'], 'trends_refreshed', 'trends', 0, [
+            'status' => $result['status'],
+            'liveStatus' => $result['liveStatus'] ?? null,
+            'syntheticStatus' => $result['syntheticStatus'] ?? null,
+        ]);
+        Response::json($result);
     }
     if ($method === 'GET' && $path === '/api/setup-status') {
         Response::json(['setupRequired' => (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0]);
