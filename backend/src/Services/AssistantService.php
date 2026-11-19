@@ -15,7 +15,7 @@ final class AssistantService
         $originalQuestion = trim($question);
         $question = strtolower($originalQuestion);
         $greeting = $question === '' || preg_match('/^(hi|hello|hey|how are you|how are u|good morning|good afternoon|good evening)\b/', $question);
-        $metaQuestion = preg_match('/\b(what do you do|who are you|what can you do|your capabilities|can you do|capabilities|help me with|about yourself|what are you)\b/i', $question) === 1;
+        $metaQuestion = preg_match('/\b(what do you do|who are you|what can you do|your capabilities|tell me about yourself|what are you)\b/i', $question) === 1;
         $chartQuestion = preg_match('/\b(chart|graph|plot|visualiz|diagram)\b/i', $question) === 1;
         $agricultureTerms = '/\b(agricultur|agronom|farm|crop|plant|soil|seed|fertili|irrigat|harvest|pest|disease|livestock|animal|cattle|cow|goat|sheep|chicken|poultry|rabbit|milk|egg|wool|feed|pasture|vet|vaccin|deworm|breeding|inventory|stock|weather|rain|maize|corn|bean|vegetable|fruit|greenhouse|beekeep|fish|aquaculture|tractor|compost|weed|yield|trend|worldwide|global|silage|fodder|hay|mastitis|nutrition|layer|broiler|ration|heat|inseminat)\w*\b/i';
         $hasFarmAccess = in_array($user['role'] ?? '', ['admin', 'worker', 'veterinarian'], true);
@@ -105,7 +105,7 @@ final class AssistantService
         }
 
         // Yield drop / low yield causes
-        if (preg_match('/\b(low yield|drop in yield|drop in milk|drop in production|decrease in milk|decrease in eggs|why are yields low|why is milk down|cause of low yield|falling yield)\b/i', $question)) {
+        if (preg_match('/\b(low yields?|drop in yields?|drop in milk|drop in production|decrease in milk|decrease in eggs|why are yields? low|why is milk down|causes? of (low|poor) yields?|falling yields?)\b/i', $question)) {
             return "Primary causes of low or declining farm yields:\n\n" .
                 "1. Water Intake: High-producing dairy cows require 80–120L of clean, cool water daily. Even a 20% water restriction causes an immediate milk drop within 24 hours.\n" .
                 "2. Feed Quality & Quantity: Insufficient dry matter, low energy or crude protein (<16% in dairy meal), poor-quality silage, or sudden change in feed rations.\n" .
