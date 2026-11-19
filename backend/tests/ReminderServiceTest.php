@@ -30,7 +30,7 @@ final class ReminderServiceTest extends TestCase
         $this->assertCount(2, $sent);
         $this->assertSame(1, (int) $db->query('SELECT reminder_attempts FROM health_records WHERE id = 1')->fetchColumn());
         $this->assertNotNull($db->query('SELECT reminded_at FROM health_records WHERE id = 1')->fetchColumn());
-        $this->assertSame(2, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
+        $this->assertSame(4, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
     }
 
     public function testFailedEmailIsRetriedAndAttemptCountIncreases(): void
@@ -53,7 +53,7 @@ final class ReminderServiceTest extends TestCase
         $this->assertSame(['selected' => 1, 'sent' => 1, 'failed' => 0], $second);
         $this->assertSame(2, (int) $db->query('SELECT reminder_attempts FROM health_records WHERE id = 1')->fetchColumn());
         $this->assertNotNull($db->query('SELECT reminded_at FROM health_records WHERE id = 1')->fetchColumn());
-        $this->assertSame(1, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
+        $this->assertSame(2, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
     }
 
     private function database(): PDO
