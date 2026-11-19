@@ -1,6 +1,6 @@
 import './style.css'
 import { api } from './api.js'
-import { renderLanding } from './landing.js'
+import { renderLanding, formatEventDate } from './landing.js'
 
 const app = document.querySelector('#app')
 let currentUser = null
