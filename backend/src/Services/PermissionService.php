@@ -45,6 +45,8 @@ final class PermissionService
         'audit.view' => 'View audit log',
         'data.export' => 'Export farm data',
         'backup.create' => 'Create database backup',
+        'trends.view' => 'View farm trends and market intelligence',
+        'trends.manage' => 'Refresh farm trends data',
     ];
 
     public function __construct(private PDO $db)
