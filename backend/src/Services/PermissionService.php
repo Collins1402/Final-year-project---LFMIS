@@ -42,6 +42,8 @@ final class PermissionService
         'feedback.create' => 'Submit feedback',
         'feedback.resolve' => 'Resolve feedback',
         'scenarios.run' => 'Run 30-day yield scenarios',
+        'audit.view' => 'View audit log',
+        'data.export' => 'Export farm data',
     ];
 
     public function __construct(private PDO $db)
