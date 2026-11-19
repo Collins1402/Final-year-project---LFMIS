@@ -4,3 +4,5 @@ One line per phase gate.
 
 - 2026-09-30 · Rebuild started: old code removed (kept in Git history at `6a79c7b`), skeleton created.
 - 2026-10-13 · Demo-ready workflows: integrated milk forecasting and 12-month reports; added role workspaces, customer data scoping, order stock allocation, inventory history, live overview, production summaries, simulated SQL data generation, and corrected local run instructions.
+- 2026-11-19 · M-PESA: added Daraja STK initiation, secret-protected idempotent callbacks, payment/order settlement, and buyer-side payment polling.
+- 2026-11-19 · Health reminders: added daily due-record notifications and retryable administrator email delivery with attempt tracking.

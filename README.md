@@ -220,12 +220,23 @@ The ML service requires at least 21 consecutive daily production totals. It uses
 ```powershell
 npm --prefix frontend run build
 php -l backend/public/index.php
-Push-Location backend; php vendor/bin/phpunit -c phpunit.xml; Pop-Location
+Push-Location backend; composer test; Pop-Location
 python -m pytest ml/tests
+```
+
+### Scheduled health reminders
+
+The daily reminder job creates a staff notification for health records due today or earlier, then emails the active administrator. A successful email is sent once. If delivery fails, the attempt count and error are recorded and the next run retries it.
+
+On Windows, create a daily task in Task Scheduler. Set **Program/script** to your PHP executable (for example `C:\xampp\php\php.exe`), **Add arguments** to the full path of `backend\bin\send_reminders.php`, and **Start in** to the repository root. The job must run with access to the same `.env.local` database and SMTP configuration as the web API.
+
+On a Linux host, add a daily cron entry, replacing the paths with the deployment paths:
+
+```cron
+0 7 * * * /usr/bin/php /path/to/lfmis/backend/bin/send_reminders.php
 ```
 
 ### Not yet integrated
 
-- Live M-Pesa STK prompts, signed callbacks, and automated confirmation require Daraja credentials and a reachable callback URL. M-Pesa payments remain pending; manually recorded non-M-Pesa payments are confirmed.
 - Supplier workflows, offline synchronization, and mobile support remain follow-up work. Email features require a configured SMTP relay.
 - Forecast performance must be evaluated with real farm records before operational use. Simulated data is labelled and must not be presented as farm results.
