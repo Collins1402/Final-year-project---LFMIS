@@ -24,7 +24,33 @@ final class RequestSecurity
         }
         $candidateOrigin = self::originOf($candidate);
         $appOrigin = self::originOf($appUrl);
-        return $candidateOrigin !== null && $appOrigin !== null && hash_equals($appOrigin, $candidateOrigin);
+        if ($candidateOrigin === null || $appOrigin === null) {
+            return false;
+        }
+        if (hash_equals($appOrigin, $candidateOrigin)) {
+            return true;
+        }
+        $candidateParts = parse_url($candidateOrigin);
+        $appParts = parse_url($appOrigin);
+        if (!is_array($candidateParts) || !is_array($appParts) || !isset($candidateParts['host'], $appParts['host'])) {
+            return false;
+        }
+        $candidateHost = strtolower((string) $candidateParts['host']);
+        $appHost = strtolower((string) $appParts['host']);
+        $candidateIsLocalHost = in_array($candidateHost, ['localhost', '127.0.0.1', '::1'], true);
+        $appIsLocalHost = in_array($appHost, ['localhost', '127.0.0.1', '::1'], true);
+        if ($candidateIsLocalHost || $appIsLocalHost) {
+            return $candidateIsLocalHost && $appIsLocalHost;
+        }
+        return self::isPrivateHost($candidateHost) && self::isPrivateHost($appHost);
+    }
+
+    private static function isPrivateHost(string $host): bool
+    {
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+        }
+        return false;
     }
 
     private static function originOf(string $url): ?string

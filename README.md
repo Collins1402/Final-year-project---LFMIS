@@ -269,6 +269,23 @@ python ml/evaluate.py
 
 The checked-in CSV is an empty template because no verified farm production dataset was supplied. The generated report therefore records zero available days and does not present synthetic fixture metrics as farm accuracy. Populate the CSV with real, consecutive daily records before reporting accuracy; the test-only synthetic data remains under `ml/tests/`.
 
+### Synthetic Excel dataset
+
+The supplied `LFMIS_Extensive_Synthetic_Dataset_12_Months.xlsx` workbook is intended for staging or UI demonstration only. It contains placeholder passwords and payment references and must not be imported as real data. Install the workbook reader and generate a safe, remapped SQL import:
+
+```powershell
+python -m pip install -r scripts/requirements.txt
+python scripts/import_synthetic_workbook.py "C:\Users\colli\Downloads\LFMIS_Extensive_Synthetic_Dataset_12_Months.xlsx"
+```
+
+By default this generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`. Apply it only to a staging or demo database after migrations:
+
+```powershell
+mysql --host=127.0.0.1 --port=4321 --user=flouri_admin -p lfmis < seed_data/synthetic-workbook.sql
+```
+
+The converter remaps workbook IDs, creates separate synthetic order records instead of repeating order ID `1`, uses the workbook's synthetic animal and customer records only with `SIMULATED DEMONSTRATION` labels, excludes the placeholder account passwords, and omits synthetic forecast/audit records that must not be presented as real system evidence.
+
 ### Not yet integrated
 
 - Supplier workflows, offline synchronization, and mobile support remain follow-up work. Email features require a configured SMTP relay.

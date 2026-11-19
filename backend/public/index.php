@@ -78,7 +78,7 @@ use Lfmis\Services\TwoFactorService;
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 RequestSecurity::sendHeaders();
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if (in_array($origin, [Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'), 'http://localhost:5173'], true)) {
+if (RequestSecurity::isTrustedOrigin($origin ?: null, $_SERVER['HTTP_REFERER'] ?? null, Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'))) {
     header("Access-Control-Allow-Origin: {$origin}");
     header('Access-Control-Allow-Credentials: true');
     header('Vary: Origin');

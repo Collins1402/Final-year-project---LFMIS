@@ -20,4 +20,11 @@ final class RequestSecurityTest extends TestCase
         $this->assertTrue(RequestSecurity::isTrustedOrigin(null, 'http://localhost:5173/orders/1', 'http://localhost:5173'));
         $this->assertFalse(RequestSecurity::isTrustedOrigin(null, 'http://localhost:5173.attacker.example/', 'http://localhost:5173'));
     }
+
+    public function testLanPrivateOriginsAreAcceptedForDevelopment(): void
+    {
+        $this->assertTrue(RequestSecurity::isTrustedOrigin('http://192.168.1.50:5173', null, 'http://192.168.1.50:5173'));
+        $this->assertTrue(RequestSecurity::isTrustedOrigin('http://192.168.1.50:5173', null, 'http://127.0.0.1:5173'));
+        $this->assertFalse(RequestSecurity::isTrustedOrigin('http://203.0.113.20:5173', null, 'http://127.0.0.1:5173'));
+    }
 }
