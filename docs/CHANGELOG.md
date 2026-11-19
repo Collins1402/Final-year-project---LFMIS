@@ -8,3 +8,4 @@ One line per phase gate.
 - 2026-11-19 · Health reminders: added daily due-record notifications and retryable administrator email delivery with attempt tracking.
 - 2026-11-19 · Activity health concerns: worker activity entries can create issue records and notify administrators and veterinarians.
 - 2026-11-19 · Audit trail: added centralized event logging, admin-filtered audit history and an audited farm-data export.
+- 2026-11-19 · Database backups: added an admin-triggered, server-side mysqldump job, ignored backup storage and restore instructions.

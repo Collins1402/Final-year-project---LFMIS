@@ -88,4 +88,5 @@ export const api = {
     return request(`/api/audit-logs${query.size ? `?${query}` : ''}`)
   },
   exportData: () => request('/api/admin/export'),
+  createBackup: () => post('/api/admin/backup', {}),
 }

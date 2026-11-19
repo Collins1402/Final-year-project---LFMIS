@@ -25,6 +25,7 @@ require_once __DIR__ . '/../src/Services/ProductionService.php';
 require_once __DIR__ . '/../src/Services/InventoryService.php';
 require_once __DIR__ . '/../src/Services/CommerceService.php';
 require_once __DIR__ . '/../src/Services/AuditService.php';
+require_once __DIR__ . '/../src/Services/BackupService.php';
 require_once __DIR__ . '/../src/Services/MpesaService.php';
 require_once __DIR__ . '/../src/Services/AssistantService.php';
 require_once __DIR__ . '/../src/Services/NotificationService.php';
@@ -56,6 +57,7 @@ use Lfmis\Services\ProductionService;
 use Lfmis\Services\InventoryService;
 use Lfmis\Services\CommerceService;
 use Lfmis\Services\AuditService;
+use Lfmis\Services\BackupService;
 use Lfmis\Services\MpesaService;
 use Lfmis\Services\AssistantService;
 use Lfmis\Services\NotificationService;
@@ -102,6 +104,7 @@ try {
     $inventory = new InventoryService($db);
     $commerce = new CommerceService($db);
     $audit = new AuditService($db);
+    $backup = new BackupService(dirname(__DIR__, 2));
     $mpesa = new MpesaService($db);
     $assistant = new AssistantService($db);
     $notifications = new NotificationService($db);
@@ -386,6 +389,14 @@ try {
         ];
         $audit->record((int) $current['id'], 'data_exported', 'export', null, ['tables' => array_keys($export)]);
         Response::json(['generatedAt' => date(DATE_ATOM), 'data' => $export]);
+    }
+    if ($method === 'POST' && $path === '/api/admin/backup') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'backup.create')) Response::error('You do not have permission to perform this action.', 403);
+        $created = $backup->create();
+        $audit->record((int) $current['id'], 'backup_created', 'backup', null, ['filename' => $created['filename']]);
+        Response::json(['backup' => $created], 201);
     }
     if ($method === 'GET' && $path === '/api/events') {
         Response::json(['events' => $events->publicList()]);

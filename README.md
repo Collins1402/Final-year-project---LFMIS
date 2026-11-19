@@ -236,6 +236,23 @@ On a Linux host, add a daily cron entry, replacing the paths with the deployment
 0 7 * * * /usr/bin/php /path/to/lfmis/backend/bin/send_reminders.php
 ```
 
+### Database backups and restore
+
+The admin **Audit log** screen has a **Back up now** action. It runs `mysqldump` on the server and writes a timestamped SQL file under the repository's ignored `backups/` directory. The API returns only the filename and timestamp; backup files are not served over HTTP. The server must have the MySQL client utility `mysqldump` on its `PATH`. You can also create a backup from the repository root with:
+
+```powershell
+php backend/bin/backup.php
+```
+
+To restore, stop the PHP API and frontend first. Make a separate copy of the SQL file and ensure the target database exists and is empty or that you intend to replace its contents. Open a MySQL client using the same host, port and database settings as the application, then run `SOURCE` with the full backup-file path:
+
+```text
+mysql --host=127.0.0.1 --port=4321 --user=flouri_admin -p lfmis
+SOURCE C:/path/to/lfmis/backups/lfmis-YYYYMMDD-HHMMSS-uuuuuu.sql;
+```
+
+The `-p` option prompts for the database password; do not put it in the command. Verify the restored tables and latest records before restarting the application. Keep backups private and store an additional copy in a protected location outside the repository.
+
 ### Not yet integrated
 
 - Supplier workflows, offline synchronization, and mobile support remain follow-up work. Email features require a configured SMTP relay.

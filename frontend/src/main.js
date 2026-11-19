@@ -774,7 +774,7 @@ async function renderAuditModule(filters = {}) {
       try { details = JSON.stringify(JSON.parse(details), null, 2) } catch {}
       return `<tr><td>${escapeHtml(log.created_at)}</td><td>${escapeHtml(log.user_name || 'System/unknown')}</td><td>${escapeHtml(log.action)}</td><td>${escapeHtml(log.entity_type)}${log.entity_id ? ` #${Number(log.entity_id)}` : ''}</td><td><pre>${escapeHtml(details)}</pre></td><td>${escapeHtml(log.ip_address || '—')}</td></tr>`
     }).join('')
-    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><button id="audit-export" class="secondary-action">Export farm data</button></header><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action<input name="action" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
+    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><div class="button-row"><button id="audit-export" class="secondary-action">Export farm data</button><button id="backup-now">Back up now</button></div></header><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action<input name="action" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
     content.querySelector('#audit-filter-form').addEventListener('submit', (event) => {
       event.preventDefault()
       renderAuditModule(Object.fromEntries(new FormData(event.target)))
@@ -792,6 +792,18 @@ async function renderAuditModule(filters = {}) {
         link.click()
         URL.revokeObjectURL(url)
         content.querySelector('#audit-notice').innerHTML = message('Farm data export downloaded.')
+      } catch (error) {
+        content.querySelector('#audit-notice').innerHTML = message(error.message, true)
+      } finally {
+        button.disabled = false
+      }
+    })
+    content.querySelector('#backup-now').addEventListener('click', async (event) => {
+      const button = event.currentTarget
+      button.disabled = true
+      try {
+        const result = await api.createBackup()
+        content.querySelector('#audit-notice').innerHTML = message(`Backup created on the server: ${result.backup.filename}`)
       } catch (error) {
         content.querySelector('#audit-notice').innerHTML = message(error.message, true)
       } finally {
