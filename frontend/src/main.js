@@ -6,6 +6,7 @@ const app = document.querySelector('#app')
 let currentUser = null
 let currentPermissions = {}
 let trendsRefreshTimer = null
+let roleLanguage = 'en'
 
 const adminNavigation = [
   ['Operations', ['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory']],
@@ -16,6 +17,23 @@ const adminNavigation = [
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
+const roleCopy = (english, swahili) => roleLanguage === 'sw' ? swahili : english
+const roleModuleLabel = (module) => {
+  if (!['worker', 'veterinarian'].includes(currentUser?.role)) return module
+  const labels = {
+    Home: ['Home', 'Nyumbani'],
+    Production: ['🥛 Milk & eggs', '🥛 Maziwa na mayai'],
+    Activities: ['📝 Tasks', '📝 Kazi'],
+    Inventory: ['📦 Stock', '📦 Stoo'],
+    Livestock: ['🐄 Animals', '🐄 Wanyama'],
+    'Health records': ['🩺 Animal care', '🩺 Matibabu'],
+    'Due follow-ups': ['⏰ Follow-ups', '⏰ Miadi'],
+    Assistant: ['Help', 'Msaada'],
+    'Your rights': ['Your rights', 'Haki zako'],
+  }
+  const labelsForModule = labels[module]
+  return labelsForModule ? labelsForModule[roleLanguage === 'sw' ? 1 : 0] : module
+}
 
 function renderAuth(mode = 'login', notice = '') {
   const setup = mode === 'setup'
@@ -829,8 +847,8 @@ async function renderFeedbackModule() {
 
 async function renderRoleWorkspace(initialModule) {
   const workspaces = {
-    worker: { title: 'Daily operations', description: 'Production, farm tasks and stock movements.', modules: ['Production', 'Activities', 'Inventory', 'Assistant', 'Your rights'] },
-    veterinarian: { title: 'Animal health', description: 'Livestock records, treatment history and follow-up care.', modules: ['Livestock', 'Health records', 'Due follow-ups', 'Assistant', 'Your rights'] },
+    worker: { title: 'Daily operations', description: 'Production, farm tasks and stock movements.', modules: ['Home', 'Production', 'Activities', 'Inventory', 'Assistant', 'Your rights'] },
+    veterinarian: { title: 'Animal health', description: 'Livestock records, treatment history and follow-up care.', modules: ['Home', 'Livestock', 'Health records', 'Due follow-ups', 'Assistant', 'Your rights'] },
     customer: { title: 'Farm shop', description: 'Browse farm produce, place orders and follow up on payments.', modules: ['Farm shop', 'My orders', 'Feedback', 'Assistant', 'Your rights'] },
     buyer: { title: 'Livestock buying', description: 'Browse available livestock and track your requests.', modules: ['Livestock catalogue', 'My orders', 'Feedback', 'Assistant', 'Your rights'] },
   }
@@ -839,14 +857,21 @@ async function renderRoleWorkspace(initialModule) {
   const rolePermissions = permissionData.permissions || {}
   currentPermissions = rolePermissions
   const modulePermissions = {
+    Home: [],
     Production: ['production.view'], Activities: ['activities.view'], Inventory: ['inventory.view'],
     Livestock: ['animals.view'], 'Health records': ['health.view'], 'Due follow-ups': ['health.view'],
     'Farm shop': ['products.view'], 'Livestock catalogue': ['products.view'], 'My orders': ['orders.view'],
     Feedback: ['feedback.view', 'feedback.create'], Assistant: ['assistant.use'],
   }
-  const visibleModules = workspace.modules.filter((item) => item === 'Your rights' || (modulePermissions[item] || []).some((permission) => rolePermissions[permission]?.allowed))
+  const visibleModules = workspace.modules.filter((item) => item === 'Home' || item === 'Your rights' || (modulePermissions[item] || []).some((permission) => rolePermissions[permission]?.allowed))
   const activeModule = visibleModules.includes(initialModule) ? initialModule : (visibleModules[0] || 'Your rights')
-  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>${escapeHtml(workspace.title)}</h2><nav class="workspace-nav" aria-label="Workspace modules">${visibleModules.map((item) => `<button class="workspace-nav-item ${item === activeModule ? 'active' : ''}" data-role-module="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('')}</nav><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">YOUR WORKSPACE</p><h1>${escapeHtml(activeModule)}</h1><p class="muted">${escapeHtml(workspace.description)}</p></div><span class="health-pill">Role protected</span></header><div id="role-content"></div></main></div>`
+  const isLowLiteracyRole = ['worker', 'veterinarian'].includes(currentUser.role)
+  const translatedModule = roleModuleLabel(activeModule)
+  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>${escapeHtml(roleCopy(workspace.title, currentUser.role === 'worker' ? 'Kazi za kila siku' : 'Afya ya wanyama'))}</h2><nav class="workspace-nav" aria-label="${escapeHtml(roleCopy('Workspace modules', 'Sehemu za kazi'))}">${visibleModules.map((item) => `<button class="workspace-nav-item ${item === activeModule ? 'active' : ''}" data-role-module="${escapeHtml(item)}">${escapeHtml(roleModuleLabel(item))}</button>`).join('')}</nav><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="logout" class="quiet">${escapeHtml(roleCopy('Sign out', 'Toka'))}</button></aside><main class="content"><header><div><p class="kicker">${escapeHtml(roleCopy('YOUR WORKSPACE', 'SEHEMU YAKO'))}</p><h1>${escapeHtml(translatedModule)}</h1><p class="muted">${escapeHtml(roleCopy(workspace.description, currentUser.role === 'worker' ? 'Rekodi maziwa, mayai, kazi na stoo.' : 'Rekodi matibabu ya wanyama na miadi.'))}</p></div><div class="workspace-header-actions">${isLowLiteracyRole ? `<button id="role-language-toggle" class="secondary-action" type="button">${roleLanguage === 'en' ? 'Kiswahili' : 'English'}</button>` : ''}<span class="health-pill">${escapeHtml(roleCopy('Role protected', 'Akaunti salama'))}</span></div></header><div id="role-content"></div></main></div>`
+  app.querySelector('#role-language-toggle')?.addEventListener('click', () => {
+    roleLanguage = roleLanguage === 'en' ? 'sw' : 'en'
+    renderRoleWorkspace(activeModule)
+  })
   const accountSecurityButton = document.createElement('button')
   accountSecurityButton.id = 'account-security'
   accountSecurityButton.className = 'quiet'
@@ -867,6 +892,14 @@ async function renderRoleModule(module) {
   }
   if (module === 'Your rights') {
     await renderRightsModule(content)
+    return
+  }
+  if (module === 'Home') {
+    const actions = currentUser.role === 'worker'
+      ? [['Production', '🥛', roleCopy('Record milk or eggs', 'Rekodi maziwa au mayai')], ['Activities', '📝', roleCopy('Record a task', 'Rekodi kazi')], ['Inventory', '📦', roleCopy('Check stock', 'Angalia stoo')]]
+      : [['Health records', '🩺', roleCopy('Add animal care', 'Ongeza matibabu')], ['Due follow-ups', '⏰', roleCopy('Check follow-ups', 'Angalia miadi')], ['Livestock', '🐄', roleCopy('View animals', 'Tazama wanyama')]]
+    content.innerHTML = `<section class="panel quick-actions-panel"><h2>${escapeHtml(roleCopy('Choose an action', 'Chagua kazi'))}</h2><div class="quick-action-grid">${actions.map(([moduleName, icon, label]) => `<button class="quick-action" type="button" data-quick-module="${moduleName}"><span aria-hidden="true">${icon}</span><strong>${escapeHtml(label)}</strong></button>`).join('')}</div></section>`
+    content.querySelectorAll('[data-quick-module]').forEach((button) => button.addEventListener('click', () => renderRoleWorkspace(button.dataset.quickModule)))
     return
   }
   try {

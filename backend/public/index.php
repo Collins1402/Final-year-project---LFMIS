@@ -7,10 +7,12 @@ require_once __DIR__ . '/../src/Core/Database.php';
 require_once __DIR__ . '/../src/Core/Request.php';
 require_once __DIR__ . '/../src/Core/Response.php';
 require_once __DIR__ . '/../src/Core/Session.php';
+require_once __DIR__ . '/../src/Core/RequestSecurity.php';
 require_once __DIR__ . '/../src/Core/DeliveryException.php';
 require_once __DIR__ . '/../src/Core/Mailer.php';
 require_once __DIR__ . '/../src/Services/AuthService.php';
 require_once __DIR__ . '/../src/Services/RateLimitException.php';
+require_once __DIR__ . '/../src/Services/RateLimitService.php';
 require_once __DIR__ . '/../src/Services/TwoFactorService.php';
 require_once __DIR__ . '/../src/Services/UserService.php';
 require_once __DIR__ . '/../src/Services/PermissionService.php';
@@ -41,6 +43,7 @@ use Lfmis\Core\Database;
 use Lfmis\Core\DeliveryException;
 use Lfmis\Core\Env;
 use Lfmis\Core\Request;
+use Lfmis\Core\RequestSecurity;
 use Lfmis\Core\Response;
 use Lfmis\Core\Session;
 use Lfmis\Services\AuthService;
@@ -69,9 +72,11 @@ use Lfmis\Services\ForecastUnavailableException;
 use Lfmis\Services\OverviewService;
 use Lfmis\Services\ReportService;
 use Lfmis\Services\RateLimitException;
+use Lfmis\Services\RateLimitService;
 use Lfmis\Services\TwoFactorService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
+RequestSecurity::sendHeaders();
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, [Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'), 'http://localhost:5173'], true)) {
     header("Access-Control-Allow-Origin: {$origin}");
@@ -86,10 +91,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 }
 Session::start();
 $request = new Request();
+$writeMethod = in_array($request->method(), ['POST', 'PATCH', 'DELETE'], true);
+if ($writeMethod && $request->path() !== '/api/payments/mpesa/callback' && Session::userId() !== null
+    && !RequestSecurity::isTrustedOrigin($_SERVER['HTTP_ORIGIN'] ?? null, $_SERVER['HTTP_REFERER'] ?? null, Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'))
+    && !RequestSecurity::isTrustedOrigin($_SERVER['HTTP_ORIGIN'] ?? null, $_SERVER['HTTP_REFERER'] ?? null, 'http://localhost:5173')) {
+    Response::error('This request origin could not be verified. Reload the page and try again.', 403);
+}
 
 try {
     $db = Database::connection();
     $auth = new AuthService($db);
+    $rateLimits = new RateLimitService($db);
     $twoFactor = new TwoFactorService($db);
     $users = new UserService($db);
     $permissions = new PermissionService($db);
@@ -164,6 +176,7 @@ try {
         ], 201);
     }
     if ($method === 'POST' && $path === '/api/login') {
+        $rateLimits->consume('login', 10, 60);
         $body = $request->body();
         try {
             $user = $auth->login((string) ($body['login'] ?? ''), (string) ($body['password'] ?? ''));
@@ -201,6 +214,7 @@ try {
         Response::json(['ok' => true]);
     }
     if ($method === 'POST' && $path === '/api/password/forgot') {
+        $rateLimits->consume('password.forgot', 5, 3600);
         $body = $request->body();
         $email = filter_var(trim((string) ($body['email'] ?? '')), FILTER_VALIDATE_EMAIL);
         if ($email === false) {
@@ -497,6 +511,7 @@ try {
             || $permissions->allows($current['role'], 'orders.manage')
             || $permissions->allows($current['role'], 'finance.manage');
         if (!$allowed) Response::error('You do not have permission to perform this action.', 403);
+        $rateLimits->consume('payments.mpesa.initiate', 5, 60, (string) $current['id'] . ':' . (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
         $body = $request->body();
         $orderId = filter_var($body['orderId'] ?? null, FILTER_VALIDATE_INT);
         if ($orderId === false || $orderId === null) Response::error('Choose a valid order.', 422);
