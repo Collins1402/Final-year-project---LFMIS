@@ -229,15 +229,18 @@ final class MpesaService
 
     private function notifyStaff(int $paymentId, int $orderId): void
     {
+        $staff = $this->db->query(
+            "SELECT users.id FROM users JOIN roles ON roles.id = users.role_id
+             WHERE users.is_active = 1 AND roles.name IN ('admin', 'worker', 'veterinarian')"
+        )->fetchAll(PDO::FETCH_COLUMN);
         $ignore = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
         $statement = $this->db->prepare(
             "$ignore INTO notifications (user_id, type, entity_type, entity_id, title, message, dedupe_key)
-             SELECT users.id, 'system', 'payment', ?, 'M-PESA payment confirmed',
-                    CONCAT('Order #', ?, ' has been paid.'), ?
-             FROM users JOIN roles ON roles.id = users.role_id
-             WHERE users.is_active = 1 AND roles.name IN ('admin', 'worker', 'veterinarian')"
+             VALUES (?, 'system', 'payment', ?, 'M-PESA payment confirmed', ?, ?)"
         );
-        $statement->execute([$orderId, $orderId, 'mpesa-payment:' . $paymentId]);
+        foreach ($staff as $userId) {
+            $statement->execute([$userId, $orderId, 'Order #' . $orderId . ' has been paid.', 'mpesa-payment:' . $paymentId]);
+        }
     }
 
     private function sendStkPush(int $orderId, int $amount, string $phone, string $callbackUrl): array
