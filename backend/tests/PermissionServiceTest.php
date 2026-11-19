@@ -30,6 +30,17 @@ final class PermissionServiceTest extends TestCase
         (new PermissionService($this->database()))->updateRole('admin', []);
     }
 
+    public function testDatabaseBackupPermissionIsGrantedOnlyToAdministrator(): void
+    {
+        $db = $this->database();
+        $db->exec("INSERT INTO permissions VALUES ('backup.create', 'Create database backup')");
+        $db->exec("INSERT INTO role_permissions VALUES (1, 'backup.create', 1)");
+        $service = new PermissionService($db);
+
+        $this->assertTrue($service->allows('admin', 'backup.create'));
+        $this->assertFalse($service->allows('worker', 'backup.create'));
+    }
+
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

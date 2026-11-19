@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Lfmis\Tests;
 
 use Lfmis\Services\BackupService;
-use PDO;
 use PHPUnit\Framework\TestCase;
 
 final class BackupServiceTest extends TestCase

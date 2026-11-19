@@ -45,7 +45,9 @@ final class BackupService
             }
             throw new \RuntimeException('MySQL backup failed. Confirm mysqldump is installed and database settings are valid.');
         }
-        chmod($path, 0600);
+        if (PHP_OS_FAMILY !== 'Windows') {
+            chmod($path, 0600);
+        }
 
         return ['filename' => $filename, 'createdAt' => $createdAt->format(DATE_ATOM)];
     }
