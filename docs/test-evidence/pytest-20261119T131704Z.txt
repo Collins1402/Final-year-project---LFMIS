@@ -1,0 +1,17 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\colli\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Final Year Project\Final-year-project---LFMIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 8 items
+
+ml/tests/test_ml.py::test_validation_rejects_short_history PASSED        [ 12%]
+ml/tests/test_ml.py::test_validation_rejects_gap_and_negative PASSED     [ 25%]
+ml/tests/test_ml.py::test_baselines_have_expected_values PASSED          [ 37%]
+ml/tests/test_ml.py::test_evaluation_returns_model_and_three_baselines PASSED [ 50%]
+ml/tests/test_ml.py::test_forecast_uses_best_baseline_and_returns_evaluation PASSED [ 62%]
+ml/tests/test_ml.py::test_metrics_are_deterministic_and_non_negative PASSED [ 75%]
+ml/tests/test_ml.py::test_real_csv_loader_counts_missing_values_and_evaluation_reports_short_data PASSED [ 87%]
+ml/tests/test_ml.py::test_real_csv_evaluation_includes_ridge_and_each_baseline PASSED [100%]
+
+============================== 8 passed in 2.79s ==============================
