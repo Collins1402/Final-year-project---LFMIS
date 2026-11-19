@@ -30,11 +30,11 @@ final class VerificationService
         try {
             Mailer::send($email, $subject, $body);
         } catch (DeliveryException $error) {
-            if (Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') !== '1') {
+            if (Env::get('LFMIS_DEV_LOG_EMAIL_VERIFICATION_LINK', '0') !== '1') {
                 throw $error;
             }
         }
-        return Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') === '1' ? $link : null;
+        return Env::get('LFMIS_DEV_LOG_EMAIL_VERIFICATION_LINK', '0') === '1' ? $link : null;
     }
 
     public function confirm(string $token): array

@@ -11,7 +11,6 @@ require_once __DIR__ . '/../src/Core/DeliveryException.php';
 require_once __DIR__ . '/../src/Core/Mailer.php';
 require_once __DIR__ . '/../src/Services/AuthService.php';
 require_once __DIR__ . '/../src/Services/RateLimitException.php';
-require_once __DIR__ . '/../src/Services/SmsService.php';
 require_once __DIR__ . '/../src/Services/TwoFactorService.php';
 require_once __DIR__ . '/../src/Services/UserService.php';
 require_once __DIR__ . '/../src/Services/PermissionService.php';
@@ -217,7 +216,7 @@ try {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         $body = $request->body();
-        $twoFactor->startEnrollment($current['id'], (string) ($body['method'] ?? ''), (string) ($body['phone'] ?? ''));
+        $twoFactor->startEnrollment($current['id'], (string) ($body['method'] ?? ''));
         Response::json(['message' => 'A verification code has been sent. Enter it to enable this method.']);
     }
     if ($method === 'POST' && $path === '/api/account/2fa/enroll/verify') {

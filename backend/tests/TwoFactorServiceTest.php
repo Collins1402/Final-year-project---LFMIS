@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Lfmis\Tests;
 
-use Lfmis\Services\SmsService;
 use Lfmis\Services\RateLimitException;
 use Lfmis\Services\TwoFactorService;
 use PDO;
@@ -77,27 +76,12 @@ final class TwoFactorServiceTest extends TestCase
         $this->assertArrayNotHasKey('pending_2fa', $_SESSION);
     }
 
-    public function testSmsEnrollmentNormalisesAndVerifiesPhoneBeforeEnablingMethod(): void
+    public function testSmsEnrollmentIsRejected(): void
     {
-        $code = '';
-        $service = new TwoFactorService(
-            $this->db,
-            null,
-            static function (string $to, string $body) use (&$code): bool {
-                self::assertSame('+254712345678', $to);
-                preg_match('/\b(\d{6})\b/', $body, $matches);
-                $code = $matches[1];
-                return true;
-            }
-        );
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Choose email verification.');
 
-        $service->startEnrollment(1, 'sms', '0712 345 678');
-        $service->completeEnrollment(1, 'sms', $code);
-
-        $status = $service->status(1);
-        $this->assertSame(['sms'], $status['methods']);
-        $this->assertSame('+254712345678', $status['phone']);
-        $this->assertTrue($status['phoneVerified']);
+        (new TwoFactorService($this->db))->startEnrollment(1, 'sms');
     }
 
     public function testFiveIncorrectCodesLockTheChallenge(): void
@@ -154,10 +138,11 @@ final class TwoFactorServiceTest extends TestCase
         $service->completeEnrollment(1, 'email', '123456');
     }
 
-    public function testKenyanPhoneNormalisationRejectsInvalidNumbers(): void
+    public function testLegacySmsOnlyLoginIsRejected(): void
     {
-        $this->assertSame('+254712345678', SmsService::normalisePhone('0712 345 678'));
-        $this->assertSame('+254112345678', SmsService::normalisePhone('254112345678'));
-        $this->assertNull(SmsService::normalisePhone('+254512345678'));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('No two-factor method is enabled');
+
+        (new TwoFactorService($this->db))->beginLogin(1, ['sms']);
     }
 }

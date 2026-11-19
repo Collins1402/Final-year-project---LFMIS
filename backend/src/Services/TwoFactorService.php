@@ -19,17 +19,15 @@ final class TwoFactorService
 
     public function __construct(
         private PDO $db,
-        private ?Closure $deliverEmail = null,
-        private ?Closure $deliverSms = null
+        private ?Closure $deliverEmail = null
     ) {
     }
 
     public function status(int $userId): array
     {
-        $userQuery = $this->db->prepare('SELECT phone, phone_verified_at FROM users WHERE id = ?');
+        $userQuery = $this->db->prepare('SELECT 1 FROM users WHERE id = ?');
         $userQuery->execute([$userId]);
-        $user = $userQuery->fetch();
-        if (!$user) {
+        if (!$userQuery->fetchColumn()) {
             throw new \RuntimeException('Could not load the account security settings.');
         }
 
@@ -37,14 +35,12 @@ final class TwoFactorService
         $methodsQuery->execute([$userId]);
         return [
             'methods' => $methodsQuery->fetchAll(PDO::FETCH_COLUMN),
-            'phone' => $user['phone'],
-            'phoneVerified' => $user['phone_verified_at'] !== null,
         ];
     }
 
     public function beginLogin(int $userId, array $methods): void
     {
-        $allowedMethods = array_values(array_intersect($methods, ['email', 'sms']));
+        $allowedMethods = array_values(array_intersect($methods, ['email']));
         if ($allowedMethods === []) {
             throw new \RuntimeException('No two-factor method is enabled for this account.');
         }
@@ -70,7 +66,7 @@ final class TwoFactorService
         if (!in_array($method, $pending['methods'], true)) {
             throw new \InvalidArgumentException('Choose an enabled verification method.');
         }
-        $user = $this->findDeliveryDetails((int) $pending['user_id'], $method);
+        $user = $this->findEmailDeliveryDetails((int) $pending['user_id']);
         $this->issueCode((int) $pending['user_id'], 'login', $method, $user['destination'], $user['name']);
     }
 
@@ -85,7 +81,7 @@ final class TwoFactorService
         return (int) $pending['user_id'];
     }
 
-    public function startEnrollment(int $userId, string $method, string $phone = ''): void
+    public function startEnrollment(int $userId, string $method): void
     {
         $this->validateMethod($method);
         $existing = $this->db->prepare('SELECT 1 FROM user_two_factor_methods WHERE user_id = ? AND method = ?');
@@ -94,37 +90,14 @@ final class TwoFactorService
             throw new \DomainException('That verification method is already enabled.');
         }
 
-        $user = $this->findDeliveryDetails($userId, $method, $phone);
-        if ($method === 'sms') {
-            $this->assertPhoneAvailable($userId, $user['destination']);
-        }
+        $user = $this->findEmailDeliveryDetails($userId);
         $this->issueCode($userId, 'enroll', $method, $user['destination'], $user['name']);
     }
 
     public function completeEnrollment(int $userId, string $method, string $code): void
     {
         $this->validateMethod($method);
-        $challenge = $this->verifyCode($userId, 'enroll', $method, $code);
-        if ($method === 'sms') {
-            $this->db->beginTransaction();
-            try {
-                $this->assertPhoneAvailable($userId, $challenge['destination']);
-                $this->db->prepare('UPDATE users SET phone = ?, phone_verified_at = ? WHERE id = ?')
-                    ->execute([$challenge['destination'], $this->now(), $userId]);
-                $this->db->prepare('UPDATE customers SET phone = ? WHERE user_id = ?')
-                    ->execute([$challenge['destination'], $userId]);
-                $this->db->prepare('INSERT INTO user_two_factor_methods (user_id, method, enabled_at) VALUES (?, ?, ?)')
-                    ->execute([$userId, $method, $this->now()]);
-                $this->db->commit();
-            } catch (\Throwable $error) {
-                if ($this->db->inTransaction()) {
-                    $this->db->rollBack();
-                }
-                throw $error;
-            }
-            return;
-        }
-
+        $this->verifyCode($userId, 'enroll', $method, $code);
         $this->db->prepare('INSERT INTO user_two_factor_methods (user_id, method, enabled_at) VALUES (?, ?, ?)')
             ->execute([$userId, $method, $this->now()]);
     }
@@ -143,9 +116,6 @@ final class TwoFactorService
         $delete->execute([$userId, $method]);
         if ($delete->rowCount() === 0) {
             throw new \DomainException('That verification method is not enabled.');
-        }
-        if ($method === 'sms') {
-            $this->db->prepare('UPDATE users SET phone_verified_at = NULL WHERE id = ?')->execute([$userId]);
         }
     }
 
@@ -180,12 +150,6 @@ final class TwoFactorService
                 } else {
                     Mailer::send($destination, $subject, $body);
                 }
-            } elseif ($this->deliverSms !== null) {
-                if (!(bool) ($this->deliverSms)($destination, $body)) {
-                    throw new DeliveryException('SMS delivery failed. Check the SMS provider settings and logs.');
-                }
-            } else {
-                (new SmsService())->send($destination, $body);
             }
         } catch (DeliveryException $error) {
             $this->db->prepare('UPDATE two_factor_challenges SET consumed_at = ? WHERE id = ?')->execute([$this->now(), $this->db->lastInsertId()]);
@@ -221,39 +185,19 @@ final class TwoFactorService
         return $challenge;
     }
 
-    private function findDeliveryDetails(int $userId, string $method, string $phone = ''): array
+    private function findEmailDeliveryDetails(int $userId): array
     {
-        $statement = $this->db->prepare('SELECT email, full_name, phone, phone_verified_at FROM users WHERE id = ?');
+        $statement = $this->db->prepare('SELECT email, full_name FROM users WHERE id = ?');
         $statement->execute([$userId]);
         $user = $statement->fetch();
         if (!$user) {
             throw new \RuntimeException('Could not load the account.');
         }
-        if ($method === 'email') {
-            $email = filter_var((string) $user['email'], FILTER_VALIDATE_EMAIL);
-            if ($email === false) {
-                throw new \RuntimeException('The account does not have a valid email address.');
-            }
-            return ['destination' => $email, 'name' => (string) $user['full_name']];
+        $email = filter_var((string) $user['email'], FILTER_VALIDATE_EMAIL);
+        if ($email === false) {
+            throw new \RuntimeException('The account does not have a valid email address.');
         }
-
-        if ($phone === '' && ($user['phone_verified_at'] === null || !is_string($user['phone']))) {
-            throw new \RuntimeException('Verify a phone number before choosing SMS at sign-in.');
-        }
-        $normalised = SmsService::normalisePhone($phone !== '' ? $phone : $user['phone']);
-        if ($normalised === null) {
-            throw new \InvalidArgumentException('Enter a valid Kenyan mobile number, such as +254712345678.');
-        }
-        return ['destination' => $normalised, 'name' => (string) $user['full_name']];
-    }
-
-    private function assertPhoneAvailable(int $userId, string $phone): void
-    {
-        $statement = $this->db->prepare('SELECT id FROM users WHERE phone = ? AND phone_verified_at IS NOT NULL AND id <> ? LIMIT 1');
-        $statement->execute([$phone, $userId]);
-        if ($statement->fetchColumn()) {
-            throw new \DomainException('That phone number is already verified for another account.');
-        }
+        return ['destination' => $email, 'name' => (string) $user['full_name']];
     }
 
     private function pendingLogin(): array
@@ -268,8 +212,8 @@ final class TwoFactorService
 
     private function validateMethod(string $method): void
     {
-        if (!in_array($method, ['email', 'sms'], true)) {
-            throw new \InvalidArgumentException('Choose email or SMS verification.');
+        if ($method !== 'email') {
+            throw new \InvalidArgumentException('Choose email verification.');
         }
     }
 

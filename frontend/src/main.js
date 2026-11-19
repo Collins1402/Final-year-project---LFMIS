@@ -68,9 +68,8 @@ function renderAuth(mode = 'login', notice = '') {
 }
 
 function renderTwoFactorChallenge(methods, notice = '') {
-  const availableMethods = methods.filter((method) => method === 'email' || method === 'sms')
-  const methodButtons = availableMethods.map((method) => `<button type="button" class="secondary-action" data-two-factor-method="${method}">Use ${method === 'email' ? 'email' : 'SMS'}</button>`).join('')
-  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-FACTOR AUTHENTICATION</p><h1>Verify it’s you</h1><p class="muted">Choose where to receive your sign-in code. Codes expire after 10 minutes.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><div class="button-row">${methodButtons}</div><form id="two-factor-code-form" hidden><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and sign in</button><button id="two-factor-resend" class="text-link" type="button">Send another code</button></form><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
+  const methodButtons = methods.includes('email') ? '<button type="button" class="secondary-action" data-two-factor-method="email">Send code to email</button>' : ''
+  app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-FACTOR AUTHENTICATION</p><h1>Verify it’s you</h1><p class="muted">Enter the code sent to your verified account email. Codes expire after 10 minutes.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><div class="button-row">${methodButtons}</div><form id="two-factor-code-form" hidden><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and sign in</button><button id="two-factor-resend" class="text-link" type="button">Send another code</button></form><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
   const codeForm = app.querySelector('#two-factor-code-form')
   let selectedMethod = ''
   const showError = (error) => { app.querySelector('#two-factor-notice').innerHTML = message(error.message, true) }
@@ -78,7 +77,7 @@ function renderTwoFactorChallenge(methods, notice = '') {
     selectedMethod = method
     try {
       await api.sendLoginTwoFactorCode(method)
-      app.querySelector('#two-factor-notice').innerHTML = message(`A code was sent using ${method === 'email' ? 'email' : 'SMS'}.`)
+      app.querySelector('#two-factor-notice').innerHTML = message('A code was sent by email.')
       codeForm.hidden = false
       codeForm.elements.namedItem('code').focus()
     } catch (error) { showError(error) }
@@ -198,8 +197,8 @@ async function renderAccountSecurity() {
   }
 
   const enabled = new Set(status.methods)
-  const methodRows = status.methods.map((method) => `<li><div><strong>${method === 'email' ? 'Email codes' : 'SMS codes'}</strong><p class="muted">${method === 'email' ? 'Sent to your verified account email.' : `Sent to ${escapeHtml(status.phone || 'your verified phone')}.`}</p></div><form class="remove-two-factor-form" data-method="${method}"><label>Current password<input name="password" type="password" autocomplete="current-password" required></label><button class="secondary-action">Remove</button></form></li>`).join('')
-  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Account security</h2><button id="security-back" class="quiet">Back to workspace</button><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="security-logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">ACCOUNT SECURITY</p><h1>Two-factor authentication</h1><p class="muted">Choose email or SMS codes each time you sign in.</p></div><span class="health-pill">${status.methods.length ? 'Two-factor on' : 'Two-factor off'}</span></header><div id="security-notice" aria-live="polite"></div><section class="module-grid"><section class="panel"><h2>Enabled methods</h2><p class="muted">You must verify a new method before it can be used at sign-in.</p><ul class="security-method-list">${methodRows || '<li class="empty">No extra sign-in verification is enabled.</li>'}</ul></section><section class="panel"><h2>Add a method</h2>${enabled.has('email') ? '<p class="muted">Email verification is enabled for your verified account email.</p>' : '<button id="enable-email-two-factor" class="secondary-action">Enable email codes</button>'}${enabled.has('sms') ? `<p class="muted">Your verified phone is ${escapeHtml(status.phone || '')}.</p>` : `<form id="enable-sms-two-factor" class="compact-form"><label>Kenyan mobile number<input name="phone" type="tel" value="${escapeHtml(status.phone || '')}" placeholder="+254712345678" autocomplete="tel" required></label><button>Verify phone and enable SMS</button></form>`}<form id="verify-two-factor-enrollment" hidden><label>6-digit verification code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Confirm method</button></form></section></section></main></div>`
+  const methodRows = status.methods.filter((method) => method === 'email').map(() => `<li><div><strong>Email codes</strong><p class="muted">Sent to your verified account email.</p></div><form class="remove-two-factor-form" data-method="email"><label>Current password<input name="password" type="password" autocomplete="current-password" required></label><button class="secondary-action">Remove</button></form></li>`).join('')
+  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Account security</h2><button id="security-back" class="quiet">Back to workspace</button><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="security-logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">ACCOUNT SECURITY</p><h1>Two-factor authentication</h1><p class="muted">Use email codes each time you sign in.</p></div><span class="health-pill">${methodRows ? 'Two-factor on' : 'Two-factor off'}</span></header><div id="security-notice" aria-live="polite"></div><section class="module-grid"><section class="panel"><h2>Enabled method</h2><p class="muted">You must verify email before it can be used at sign-in.</p><ul class="security-method-list">${methodRows || '<li class="empty">Email verification is not enabled.</li>'}</ul></section><section class="panel"><h2>Email two-factor</h2>${enabled.has('email') ? '<p class="muted">Email verification is enabled for your verified account email.</p>' : '<button id="enable-email-two-factor" class="secondary-action">Enable email codes</button>'}<form id="verify-two-factor-enrollment" hidden><label>6-digit verification code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Confirm method</button></form></section></section></main></div>`
 
   app.querySelector('#security-back').addEventListener('click', renderApp)
   app.querySelector('#security-logout').addEventListener('click', async () => {
@@ -210,22 +209,18 @@ async function renderAccountSecurity() {
   const notice = app.querySelector('#security-notice')
   const codeForm = app.querySelector('#verify-two-factor-enrollment')
   let pendingMethod = ''
-  const beginEnrollment = async (method, phone = '') => {
+  const beginEnrollment = async () => {
     try {
-      await api.startTwoFactorEnrollment({ method, phone })
-      pendingMethod = method
+      await api.startTwoFactorEnrollment({ method: 'email' })
+      pendingMethod = 'email'
       codeForm.hidden = false
       codeForm.querySelector('input').focus()
-      notice.innerHTML = message(`A verification code was sent by ${method === 'email' ? 'email' : 'SMS'}.`)
+      notice.innerHTML = message('A verification code was sent by email.')
     } catch (error) {
       notice.innerHTML = message(error.message, true)
     }
   }
-  app.querySelector('#enable-email-two-factor')?.addEventListener('click', () => beginEnrollment('email'))
-  app.querySelector('#enable-sms-two-factor')?.addEventListener('submit', (event) => {
-    event.preventDefault()
-    beginEnrollment('sms', new FormData(event.currentTarget).get('phone'))
-  })
+  app.querySelector('#enable-email-two-factor')?.addEventListener('click', beginEnrollment)
   codeForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     try {

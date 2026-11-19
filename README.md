@@ -140,10 +140,20 @@ python ml/forecast_service.py
 
 ```powershell
 npm --prefix frontend install
-npm --prefix frontend run dev -- --host 127.0.0.1
+npm --prefix frontend run dev
 ```
 
 Open `http://127.0.0.1:5173/`. On a new database, create the first farm-owner account on the initial setup screen. Passwords must contain at least 12 characters. Public registration is limited to customer and livestock-buyer accounts; administrators create worker and veterinarian accounts under **User accounts**.
+
+#### Open the development app from another computer on your private Wi-Fi
+
+Run the backend and database on the host computer as above. Stop the local Vite server if it is already using port `5173`, then start the LAN frontend:
+
+```powershell
+npm --prefix frontend run dev:lan
+```
+
+Find the host computer's private IPv4 address with `ipconfig` (for example, `192.168.1.20`). On the other computer, open `http://<host-private-ip>:5173/` using that address. Both computers must be on the same trusted private network. If Windows Firewall prompts, allow access on **Private networks only**. The Vite frontend proxies `/api` requests to PHP on the host, so PHP and MySQL remain bound to the host computer; no database port needs to be exposed. Do not router-port-forward this development server or use it as an internet-facing deployment. If the host's address changes, use its current IPv4 address; reserve a private address in your router if you need a stable URL.
 
 Workers can record production, complete assigned activities and record stock movements. Veterinarians can review animal health history and record care. Customers can browse produce listings; livestock buyers can browse livestock listings. Each customer or buyer sees only their own orders, payments and feedback.
 
@@ -170,11 +180,13 @@ LFMIS_APP_URL=http://127.0.0.1:5173
 
 For Gmail, enable Google 2-Step Verification and create an App Password; do not use your regular Google password. Other SMTP services (for example Brevo, Postmark or SendGrid) work with their SMTP host, port, username, password and verified sender address. For local development, Mailpit can capture email without sending it to a real inbox. Never commit `.env.local`. If messages still do not arrive, check the provider's delivery/bounce logs and the recipient's spam folder; production senders may also need SPF/DKIM records. Email confirmation, password reset and login verification now return a service-unavailable error when delivery is not configured rather than silently pretending to send.
 
-Password-reset links expire after one hour and are stored as token hashes. Password-reset requests use the same response whether or not the email matches an active, verified account. `LFMIS_DEV_LOG_PASSWORD_RESET_LINK=1` exposes development links in the API response when delivery is unavailable; use this only locally and keep it disabled in production.
+Password-reset links expire after one hour and are stored as token hashes. Password-reset requests use the same response whether or not the email matches an active, verified account. Keep `LFMIS_DEV_LOG_PASSWORD_RESET_LINK=0`; setting it to `1` exposes password-reset links in API responses.
 
-### Optional email/SMS two-factor authentication
+For a trusted, LAN-only development setup without SMTP, `LFMIS_DEV_LOG_EMAIL_VERIFICATION_LINK=1` returns email-verification links in API responses so the first administrator can activate the account. Open the development confirmation link shown after setup, then set the flag back to `0` and restart the PHP server. This flag is separate from password-reset links; keep password-reset links disabled. Anyone with access to the development API response could use a returned verification link, so configure SMTP and disable this flag before broader use.
 
-Users can enable email codes, SMS codes or both under **Account security** and choose a method after entering their password at sign-in. Email uses the verified account email. SMS is limited to verified Kenyan mobile numbers and uses Africa's Talking. Codes are one-time, expire after 10 minutes, allow five attempts and are rate-limited to three sends per method per hour. SMS is less resistant to SIM-swap attacks than authenticator apps; avoid using it as the only factor for highly sensitive accounts.
+### Optional email two-factor authentication
+
+Users can enable email codes under **Account security**. A one-time code is sent to the verified account email at sign-in. Codes expire after 10 minutes, allow five attempts and are rate-limited to three sends per hour. Email two-factor requires working SMTP settings.
 
 Create a 32-byte OTP hashing key with PHP, then add it to `.env.local`:
 
@@ -184,12 +196,9 @@ php -r "echo bin2hex(random_bytes(32));"
 
 ```dotenv
 LFMIS_2FA_OTP_KEY=generated-64-character-hex-key
-LFMIS_AT_USERNAME=sandbox
-LFMIS_AT_API_KEY=your-africas-talking-api-key
-LFMIS_AT_BASE_URL=https://api.sandbox.africastalking.com/version1/messaging
 ```
 
-Africa's Talking sandbox messages appear in its simulator, not on a real phone. For production, use the production messaging endpoint, account credentials/credits, and a registered sender ID if required by the provider. Keep all API keys server-side in `.env.local`; never put them in frontend code. Apply migration `008_two_factor_email_sms` with `php backend/bin/migrate.php`.
+Keep the key private in `.env.local` and use the SMTP settings described above for email delivery. Apply migration `009_email_only_two_factor` with `php backend/bin/migrate.php`.
 
 ### Current working modules
 
