@@ -20,14 +20,14 @@ final class BackupService
         $configuration = $this->databaseConfiguration();
         $directory = rtrim($this->repositoryRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'backups';
         if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
-            throw new \RuntimeException('The backup directory could not be created.');
+            throw new BackupException('The backup directory could not be created.');
         }
 
         $createdAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $filename = 'lfmis-' . $createdAt->format('Ymd-His-u') . '.sql';
         $path = $directory . DIRECTORY_SEPARATOR . $filename;
         $command = [
-            'mysqldump',
+            $this->dumpExecutable(),
             '--host=' . $configuration['host'],
             '--port=' . $configuration['port'],
             '--user=' . $configuration['user'],
@@ -43,7 +43,7 @@ final class BackupService
             if (is_file($path)) {
                 unlink($path);
             }
-            throw new \RuntimeException('MySQL backup failed. Confirm mysqldump is installed and database settings are valid.');
+            throw new BackupException('MySQL backup failed. Confirm mysqldump is installed and database settings are valid.');
         }
         if (PHP_OS_FAMILY !== 'Windows') {
             chmod($path, 0600);
@@ -84,11 +84,22 @@ final class BackupService
                 $this->repositoryRoot
             );
             if (!is_resource($process)) {
-                throw new \RuntimeException('MySQL backup process could not be started.');
+                throw new BackupException('MySQL backup process could not be started.');
             }
             return proc_close($process);
         } finally {
             putenv($previousPassword === false ? 'MYSQL_PWD' : 'MYSQL_PWD=' . $previousPassword);
         }
+    }
+
+    private function dumpExecutable(): string
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $xamppDump = realpath(dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'mysqldump.exe');
+            if ($xamppDump !== false && is_file($xamppDump)) {
+                return $xamppDump;
+            }
+        }
+        return 'mysqldump';
     }
 }

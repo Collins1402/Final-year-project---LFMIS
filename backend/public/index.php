@@ -30,6 +30,7 @@ require_once __DIR__ . '/../src/Services/ProductionService.php';
 require_once __DIR__ . '/../src/Services/InventoryService.php';
 require_once __DIR__ . '/../src/Services/CommerceService.php';
 require_once __DIR__ . '/../src/Services/AuditService.php';
+require_once __DIR__ . '/../src/Services/BackupException.php';
 require_once __DIR__ . '/../src/Services/BackupService.php';
 require_once __DIR__ . '/../src/Services/MpesaService.php';
 require_once __DIR__ . '/../src/Services/AssistantService.php';
@@ -67,6 +68,7 @@ use Lfmis\Services\InventoryService;
 use Lfmis\Services\CommerceService;
 use Lfmis\Services\AuditService;
 use Lfmis\Services\BackupService;
+use Lfmis\Services\BackupException;
 use Lfmis\Services\MpesaService;
 use Lfmis\Services\AssistantService;
 use Lfmis\Services\NotificationService;
@@ -735,6 +737,8 @@ try {
 } catch (DeliveryException $error) {
     Response::error($error->getMessage(), 503);
 } catch (ForecastUnavailableException $error) {
+    Response::error($error->getMessage(), 503);
+} catch (BackupException $error) {
     Response::error($error->getMessage(), 503);
 } catch (RuntimeException $error) {
     Response::error($error->getMessage(), 401);
