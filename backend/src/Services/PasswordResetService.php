@@ -33,7 +33,9 @@ final class PasswordResetService
         $link = rtrim(Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'), '/') . '/?reset=' . rawurlencode($token);
         $body = "Hello {$user['full_name']},\n\nReset your Flouri Farm password here:\n{$link}\n\nThe link expires in one hour.";
         try {
-            Mailer::send($user['email'], 'Reset your Flouri Farm password', $body);
+            if (!Mailer::send($user['email'], 'Reset your Flouri Farm password', $body)) {
+                throw new DeliveryException('Password reset email could not be delivered.');
+            }
         } catch (DeliveryException $error) {
             if (Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') !== '1') {
                 throw $error;

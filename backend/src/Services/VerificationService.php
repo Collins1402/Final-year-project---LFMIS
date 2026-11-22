@@ -28,7 +28,9 @@ final class VerificationService
         $subject = 'Confirm your Flouri Farm LFMIS account';
         $body = "Hello {$name},\n\nConfirm your Flouri Farm account by opening this link:\n{$link}\n\nThe link expires in 24 hours.";
         try {
-            Mailer::send($email, $subject, $body);
+            if (!Mailer::send($email, $subject, $body)) {
+                throw new DeliveryException('Email confirmation could not be delivered.');
+            }
         } catch (DeliveryException $error) {
             if (Env::get('LFMIS_DEV_LOG_EMAIL_VERIFICATION_LINK', '0') !== '1') {
                 throw $error;
