@@ -31,7 +31,15 @@ final class AuthService
             Session::logout();
             return null;
         }
-        return $this->formatUser($user);
+        $formatted = $this->formatUser($user);
+        if ($formatted['role'] === 'admin') {
+            try {
+                $enabled = $this->db->prepare('SELECT totp_enabled_at FROM users WHERE id = ?');
+                $enabled->execute([$userId]);
+                $formatted['mustEnable2fa'] = $enabled->fetchColumn() === null;
+            } catch (\PDOException) { $formatted['mustEnable2fa'] = false; }
+        }
+        return $formatted;
     }
 
     public function createFirstAdmin(array $input): array
@@ -53,7 +61,7 @@ final class AuthService
         return $this->findUser($id);
     }
 
-    public function login(string $login, string $password): array
+    public function login(string $login, string $password, ?string $trustedDeviceToken = null): array
     {
         unset($_SESSION['pending_2fa']);
         $login = trim($login);
@@ -78,6 +86,14 @@ final class AuthService
         if ($user['email_verified_at'] === null) {
             throw new \RuntimeException('Confirm your email address before signing in.');
         }
+        if (!empty($user['totp_enabled_at'])) {
+            $device = $this->db->prepare('SELECT 1 FROM trusted_devices WHERE user_id = ? AND token_hash = ? AND expires_at > ?');
+            $device->execute([(int) $user['id'], $trustedDeviceToken && preg_match('/^[a-f0-9]{64}$/', $trustedDeviceToken) ? hash('sha256', $trustedDeviceToken) : '', gmdate('Y-m-d H:i:s')]);
+            if (!$device->fetchColumn()) {
+                unset($_SESSION['user_id']);
+                return ['twoFactorRequired' => true, 'methods' => ['totp'], 'pendingUserId' => (int) $user['id']];
+            }
+        }
         $methods = $this->db->prepare('SELECT method FROM user_two_factor_methods WHERE user_id = ? ORDER BY method');
         $methods->execute([(int) $user['id']]);
         $enabledMethods = $methods->fetchAll(PDO::FETCH_COLUMN);
@@ -100,9 +116,9 @@ final class AuthService
             throw new \RuntimeException('This account is no longer available for sign-in.');
         }
         $this->db->prepare(
-            'UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW()
+            'UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = ?
              WHERE id = ? AND is_active = 1 AND email_verified_at IS NOT NULL'
-        )->execute([$userId]);
+        )->execute([gmdate('Y-m-d H:i:s'), $userId]);
         Session::login($userId);
         return $this->currentUser() ?? throw new \RuntimeException('Could not load your account.');
     }

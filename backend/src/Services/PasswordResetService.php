@@ -50,9 +50,9 @@ final class PasswordResetService
             throw new \InvalidArgumentException('Use a valid reset link and a password of at least 12 characters.');
         }
         $statement = $this->db->prepare(
-            'SELECT user_id FROM password_reset_tokens WHERE token_hash = ? AND expires_at > NOW()'
+            'SELECT user_id FROM password_reset_tokens WHERE token_hash = ? AND expires_at > ?'
         );
-        $statement->execute([hash('sha256', $token)]);
+        $statement->execute([hash('sha256', $token), gmdate('Y-m-d H:i:s')]);
         $userId = $statement->fetchColumn();
         if (!$userId) {
             throw new \InvalidArgumentException('The reset link is invalid or has expired.');
@@ -62,6 +62,7 @@ final class PasswordResetService
             'UPDATE users SET password_hash = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?'
         )->execute([password_hash($password, PASSWORD_DEFAULT), (int) $userId]);
         $this->db->prepare('DELETE FROM password_reset_tokens WHERE user_id = ?')->execute([(int) $userId]);
+        $this->db->prepare('DELETE FROM trusted_devices WHERE user_id = ?')->execute([(int) $userId]);
         $this->db->commit();
     }
 }

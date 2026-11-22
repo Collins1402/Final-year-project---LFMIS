@@ -14,6 +14,7 @@ final class PermissionService
         'health.view' => 'View animal health',
         'health.record' => 'Record animal care',
         'users.manage' => 'Manage user accounts',
+        'account.security' => 'Manage personal account security',
         'roles.manage' => 'Manage role permissions',
         'events.manage' => 'Manage farm events',
         'activities.view' => 'View activities',

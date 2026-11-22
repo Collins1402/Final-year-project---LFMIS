@@ -16,7 +16,8 @@ final class AuditServiceTest extends TestCase
         $service->record(7, 'user_created', 'user', 12, ['role' => 'worker'], '203.0.113.8');
         $service->record(null, 'sign_in_failed', 'auth', null, ['reason' => 'invalid_credentials'], '203.0.113.9');
 
-        $records = $service->list(['userId' => '7', 'action' => 'user_', 'from' => '2026-11-19', 'to' => '2026-11-19']);
+        $today = gmdate('Y-m-d');
+        $records = $service->list(['userId' => '7', 'action' => 'user_', 'from' => $today, 'to' => $today]);
 
         $this->assertCount(1, $records);
         $this->assertSame('Farm Admin', $records[0]['user_name']);

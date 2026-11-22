@@ -10,10 +10,12 @@ require_once __DIR__ . '/../src/Core/Session.php';
 require_once __DIR__ . '/../src/Core/RequestSecurity.php';
 require_once __DIR__ . '/../src/Core/DeliveryException.php';
 require_once __DIR__ . '/../src/Core/Mailer.php';
+require_once __DIR__ . '/../src/Core/Totp.php';
 require_once __DIR__ . '/../src/Services/AuthService.php';
 require_once __DIR__ . '/../src/Services/RateLimitException.php';
 require_once __DIR__ . '/../src/Services/RateLimitService.php';
 require_once __DIR__ . '/../src/Services/TwoFactorService.php';
+require_once __DIR__ . '/../src/Services/TotpService.php';
 require_once __DIR__ . '/../src/Services/UserService.php';
 require_once __DIR__ . '/../src/Services/PermissionService.php';
 require_once __DIR__ . '/../src/Services/LoginAlertService.php';
@@ -82,6 +84,7 @@ use Lfmis\Services\ReportService;
 use Lfmis\Services\RateLimitException;
 use Lfmis\Services\RateLimitService;
 use Lfmis\Services\TwoFactorService;
+use Lfmis\Services\TotpService;
 
 Env::load(dirname(__DIR__, 2) . '/.env.local');
 RequestSecurity::sendHeaders();
@@ -111,6 +114,7 @@ try {
     $auth = new AuthService($db);
     $rateLimits = new RateLimitService($db);
     $twoFactor = new TwoFactorService($db);
+    $totp = new TotpService($db);
     $users = new UserService($db);
     $permissions = new PermissionService($db);
     $loginAlerts = new LoginAlertService();
@@ -262,18 +266,30 @@ try {
         $rateLimits->consume('login', 10, 60);
         $body = $request->body();
         try {
-            $user = $auth->login((string) ($body['login'] ?? ''), (string) ($body['password'] ?? ''));
+            $user = $auth->login((string) ($body['login'] ?? ''), (string) ($body['password'] ?? ''), $_COOKIE['lfmis_trusted_device'] ?? null);
         } catch (InvalidArgumentException | RuntimeException $error) {
             $audit->record(null, 'sign_in_failed', 'auth', null, ['reason' => 'credentials_rejected']);
             throw $error;
         }
         if (($user['twoFactorRequired'] ?? false) === true) {
+            if (in_array('totp', $user['methods'], true)) {
+                $totp->beginLogin((int) $user['pendingUserId']);
+                Response::json(['twoFactorRequired' => true, 'methods' => ['totp', 'recovery']]);
+            }
             $twoFactor->beginLogin((int) $user['pendingUserId'], $user['methods']);
             Response::json(['twoFactorRequired' => true, 'methods' => $user['methods']]);
         }
         $audit->record((int) $user['id'], 'sign_in_succeeded', 'auth', (int) $user['id']);
         $loginAlerts->notify($user);
-        Response::json(['user' => $user]);
+        Response::json(['user' => $user, 'mustEnable2fa' => $user['mustEnable2fa'] ?? false]);
+    }
+    if ($method === 'POST' && $path === '/api/login/2fa') {
+        $body = $request->body();
+        $result = $totp->verifyPending((string) ($body['code'] ?? ''), (bool) ($body['rememberDevice'] ?? false));
+        $user = $auth->completeLogin($result['userId']);
+        $audit->record((int) $user['id'], 'sign_in_succeeded', 'auth', (int) $user['id'], ['two_factor' => true, 'recovery_code' => $result['recoveryCodeUsed']]);
+        $loginAlerts->notify($user);
+        Response::json(['user' => $user, 'mustEnable2fa' => $user['mustEnable2fa'] ?? false]);
     }
     if ($method === 'POST' && $path === '/api/login/2fa/send') {
         $twoFactor->sendLoginCode((string) ($request->body()['method'] ?? ''));
@@ -326,9 +342,38 @@ try {
     if ($path === '/api/account/2fa') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'account.security')) Response::error('You do not have permission to manage account security.', 403);
         if ($method === 'GET') {
-            Response::json($twoFactor->status($current['id']));
+            Response::json($totp->status($current['id']));
         }
+    }
+    if ($method === 'POST' && $path === '/api/account/2fa/setup') {
+        $current = $auth->currentUser(); if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'account.security')) Response::error('You do not have permission to manage account security.', 403);
+        Response::json($totp->beginSetup((int) $current['id']));
+    }
+    if ($method === 'POST' && $path === '/api/account/2fa/enable') {
+        $current = $auth->currentUser(); if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'account.security')) Response::error('You do not have permission to manage account security.', 403);
+        Response::json($totp->enable((int) $current['id'], (string) ($request->body()['code'] ?? '')));
+    }
+    if ($method === 'POST' && $path === '/api/account/2fa/disable') {
+        $current = $auth->currentUser(); if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'account.security')) Response::error('You do not have permission to manage account security.', 403);
+        $body = $request->body(); $totp->disable((int) $current['id'], (string) ($body['password'] ?? ''), (string) ($body['code'] ?? ''));
+        Response::json($totp->status((int) $current['id']));
+    }
+    if ($method === 'POST' && $path === '/api/account/2fa/recovery-codes') {
+        $current = $auth->currentUser(); if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'account.security')) Response::error('You do not have permission to manage account security.', 403);
+        $body = $request->body();
+        Response::json(['recoveryCodes' => $totp->regenerateRecoveryCodes((int) $current['id'], (string) ($body['password'] ?? ''), (string) ($body['code'] ?? ''))]);
+    }
+    if ($method === 'POST' && $path === '/api/account/2fa/trusted-devices/revoke') {
+        $current = $auth->currentUser(); if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'account.security')) Response::error('You do not have permission to manage account security.', 403);
+        $totp->revokeAllDevices((int) $current['id']);
+        Response::json($totp->status((int) $current['id']));
     }
     if ($method === 'POST' && $path === '/api/account/2fa/enroll') {
         $current = $auth->currentUser();
@@ -426,6 +471,26 @@ try {
             : 'user_updated';
         $audit->record((int) $current['id'], $action, 'user', (int) $updated['id'], ['role' => $updated['role']]);
         Response::json(['user' => $updated]);
+    }
+    if ($method === 'POST' && preg_match('#^/api/users/(\d+)/reset-2fa$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'users.manage')) Response::error('You do not have permission to perform this action.', 403);
+        $targetId = (int) $matches[1];
+        $targetQuery = $db->prepare('SELECT email FROM users WHERE id = ?');
+        $targetQuery->execute([$targetId]);
+        $targetEmail = $targetQuery->fetchColumn();
+        if (!is_string($targetEmail)) Response::error('User account not found.', 404);
+        $db->beginTransaction();
+        try {
+            $db->prepare('UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL, totp_last_step = 0 WHERE id = ?')->execute([$targetId]);
+            $db->prepare('DELETE FROM recovery_codes WHERE user_id = ?')->execute([$targetId]);
+            $totp->revokeDevices($targetId);
+            $db->commit();
+        } catch (Throwable $error) { if ($db->inTransaction()) $db->rollBack(); throw $error; }
+        $audit->record((int) $current['id'], 'user_two_factor_reset', 'user', $targetId);
+        \Lfmis\Core\Mailer::send($targetEmail, 'LFMIS two-step verification reset', 'An administrator reset two-step verification for your LFMIS account. Set it up again the next time you sign in.');
+        Response::json(['ok' => true]);
     }
     if ($method === 'DELETE' && preg_match('#^/api/users/(\d+)$#', $path, $matches)) {
         $current = $auth->currentUser();
@@ -581,6 +646,9 @@ try {
         Response::error('You do not have permission to perform this action.', 403);
     }
     if ($method === 'POST' && $path === '/api/payments/mpesa/callback') {
+        if (Env::get('LFMIS_MPESA_DEMO_MODE', '0') === '1') {
+            Response::json(['ResultCode' => 0, 'ResultDesc' => 'Demo mode is active; callback ignored.']);
+        }
         $result = $mpesa->handleCallback((string) ($_GET['token'] ?? ''), $request->body());
         Response::json([
             'ResultCode' => 0,

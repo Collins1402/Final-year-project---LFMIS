@@ -68,7 +68,7 @@ final class BackupServiceTest extends TestCase
             $service->create();
             $this->fail('A failed dump must not leave a partial backup.');
         } catch (\RuntimeException $error) {
-            $this->assertStringContainsString('MySQL backup failed', $error->getMessage());
+            $this->assertStringContainsString('Database backup failed', $error->getMessage());
         }
         $this->assertSame([], glob($this->root . DIRECTORY_SEPARATOR . 'backups' . DIRECTORY_SEPARATOR . '*') ?: []);
     }

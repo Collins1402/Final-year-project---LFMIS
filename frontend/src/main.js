@@ -1,6 +1,7 @@
 import './style.css'
 import { api } from './api.js'
 import { renderLanding, formatEventDate } from './landing.js'
+import QRCode from 'qrcode'
 
 const app = document.querySelector('#app')
 let currentUser = null
@@ -80,12 +81,33 @@ function renderAuth(mode = 'login', notice = '') {
         return
       }
       currentUser = result.user
+      if (result.mustEnable2fa || currentUser.mustEnable2fa) {
+        renderAccountSecurity(true)
+        return
+      }
       renderApp()
     } catch (error) { renderAuth(mode, message(error.message, true)) }
   })
 }
 
 function renderTwoFactorChallenge(methods, notice = '') {
+  if (methods.includes('totp')) {
+    app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-STEP VERIFICATION</p><h1>Verify it’s you</h1><p class="muted">Enter the 6-digit code from your authenticator app.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><form id="totp-login-form"><label>6-digit code<input name="code" placeholder="123456 or recovery code" inputmode="text" autocomplete="one-time-code" required></label><label class="checkbox-label"><input type="checkbox" name="rememberDevice"> Remember this device for 30 days</label><button>Verify and sign in</button></form><button id="use-recovery-code" class="text-link" type="button">Use a recovery code instead</button><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
+    const code = app.querySelector('#totp-login-form').elements.namedItem('code')
+    app.querySelector('#use-recovery-code').addEventListener('click', () => { code.placeholder = 'Enter a recovery code'; code.focus() })
+    app.querySelector('#totp-login-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const form = event.currentTarget
+      try {
+        const result = await api.verifyTotpLogin({ code: code.value.trim(), rememberDevice: form.elements.namedItem('rememberDevice').checked })
+        currentUser = result.user
+        if (result.mustEnable2fa || currentUser.mustEnable2fa) renderAccountSecurity(true)
+        else renderApp()
+      } catch (error) { app.querySelector('#two-factor-notice').innerHTML = message(error.message, true) }
+    })
+    app.querySelector('#two-factor-back').addEventListener('click', async () => { try { await api.cancelLoginTwoFactor() } catch {} renderAuth('login') })
+    return
+  }
   const methodButtons = methods.includes('email') ? '<button type="button" class="secondary-action" data-two-factor-method="email">Send code to email</button>' : ''
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-FACTOR AUTHENTICATION</p><h1>Verify it’s you</h1><p class="muted">Enter the code sent to your verified account email. Codes expire after 10 minutes.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><div class="button-row">${methodButtons}</div><form id="two-factor-code-form" hidden><label>6-digit code<input name="code" placeholder="e.g. 123456" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and sign in</button><button id="two-factor-resend" class="text-link" type="button">Send another code</button></form><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
   const codeForm = app.querySelector('#two-factor-code-form')
@@ -204,7 +226,7 @@ function renderRegister(notice = '') {
   })
 }
 
-async function renderAccountSecurity() {
+async function renderAccountSecurity(forced = false) {
   let status
   try {
     status = await api.twoFactorStatus()
@@ -214,40 +236,28 @@ async function renderAccountSecurity() {
     return
   }
 
-  const enabled = new Set(status.methods)
-  const methodRows = status.methods.filter((method) => method === 'email').map(() => `<li><div><strong>Email codes</strong><p class="muted">Sent to your verified account email.</p></div><form class="remove-two-factor-form" data-method="email"><label>Current password<input name="password" type="password" placeholder="Enter your current password" autocomplete="current-password" required></label><button class="secondary-action">Remove</button></form></li>`).join('')
-  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Account security</h2><button id="security-back" class="quiet">Back to workspace</button><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="security-logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">ACCOUNT SECURITY</p><h1>Two-factor authentication</h1><p class="muted">Use email codes each time you sign in.</p></div><span class="health-pill">${methodRows ? 'Two-factor on' : 'Two-factor off'}</span></header><div id="security-notice" aria-live="polite"></div><section class="module-grid"><section class="panel"><h2>Enabled method</h2><p class="muted">You must verify email before it can be used at sign-in.</p><ul class="security-method-list">${methodRows || '<li class="empty">Email verification is not enabled.</li>'}</ul></section>  <section class="panel"><h2>Email two-factor</h2>${enabled.has('email') ? '<p class="muted">Email verification is enabled for your verified account email.</p>' : '<button id="enable-email-two-factor" class="secondary-action">Enable email codes</button>'}<form id="verify-two-factor-enrollment" hidden><label>6-digit verification code<input name="code" placeholder="e.g. 123456" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Confirm method</button></form></section></section></main></div>`
+  const enabledPanel = status.enabled ? `<p>Two-step verification is on.</p><form id="totp-disable-form"><label>Current password<input name="password" type="password" required autocomplete="current-password"></label><label>Current 6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="danger-action">Disable</button></form><hr><h3>New recovery codes</h3><form id="recovery-form"><label>Password<input name="password" type="password" required autocomplete="current-password"></label><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="secondary-action">Generate new recovery codes</button></form><p>Unused recovery codes: ${status.recoveryCodesRemaining}</p><h3>Remembered devices</h3><ul>${status.trustedDevices.map((device) => `<li>${escapeHtml(device.label)} · expires ${escapeHtml(device.expires_at)}</li>`).join('') || '<li>No remembered devices.</li>'}</ul><button id="revoke-devices" class="secondary-action">Sign out of all remembered devices</button>` : `<p>Use Google Authenticator, Microsoft Authenticator, or another TOTP app.</p><button id="start-totp" class="secondary-action">Turn on 2-step verification</button>`
+  app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Account security</h2>${forced ? '' : '<button id="security-back" class="quiet">Back to workspace</button>'}<div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="security-logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">ACCOUNT SECURITY</p><h1>Two-step verification</h1><p class="muted">Use an authenticator app each time you sign in.</p></div><span class="health-pill">Two-factor ${status.enabled ? 'On' : 'Off'}</span></header><div id="security-notice" aria-live="polite">${forced ? message('Administrator accounts must turn on two-step verification before continuing.') : ''}</div><section class="module-grid"><section class="panel"><h2>Authenticator app</h2>${enabledPanel}<div id="totp-setup" hidden><p>Scan this QR code in your authenticator app, or enter the secret manually.</p><canvas id="totp-qr"></canvas><p><strong id="totp-secret"></strong></p><form id="totp-enable-form"><label>First 6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and turn on</button></form></div><div id="recovery-once" hidden><h3>Save these recovery codes</h3><p>Each code works once. They will not be shown again.</p><pre id="recovery-values"></pre><button id="copy-recovery" class="secondary-action">Copy</button><button id="saved-recovery">I saved them</button></div>${forced && status.enabled ? '<button id="continue-after-2fa">Continue to workspace</button>' : ''}</section></section></main></div>`
 
-  app.querySelector('#security-back').addEventListener('click', renderApp)
+  app.querySelector('#security-back')?.addEventListener('click', renderApp)
+  app.querySelector('#continue-after-2fa')?.addEventListener('click', () => { currentUser.mustEnable2fa = false; renderApp() })
   app.querySelector('#security-logout').addEventListener('click', async () => {
     await api.logout()
     currentUser = null
     renderAuth('login')
   })
   const notice = app.querySelector('#security-notice')
-  const codeForm = app.querySelector('#verify-two-factor-enrollment')
-  let pendingMethod = ''
-  const beginEnrollment = async () => {
-    try {
-      await api.startTwoFactorEnrollment({ method: 'email' })
-      pendingMethod = 'email'
-      codeForm.hidden = false
-      codeForm.querySelector('input').focus()
-      notice.innerHTML = message('A verification code was sent by email.')
-    } catch (error) {
-      notice.innerHTML = message(error.message, true)
-    }
-  }
-  app.querySelector('#enable-email-two-factor')?.addEventListener('click', beginEnrollment)
-  codeForm.addEventListener('submit', async (event) => {
-    event.preventDefault()
-    try {
-      await api.verifyTwoFactorEnrollment({ method: pendingMethod, code: codeForm.elements.namedItem('code').value })
-      await renderAccountSecurity()
-    } catch (error) {
-      notice.innerHTML = message(error.message, true)
-    }
+  const showCodes = (codes) => { app.querySelector('#recovery-values').textContent = codes.join('\n'); app.querySelector('#recovery-once').hidden = false }
+  app.querySelector('#start-totp')?.addEventListener('click', async () => {
+    try { const setup = await api.setupTotp(); app.querySelector('#totp-setup').hidden = false; app.querySelector('#totp-secret').textContent = setup.secret; await QRCode.toCanvas(app.querySelector('#totp-qr'), setup.otpauthUri, { width: 220 }); }
+    catch (error) { notice.innerHTML = message(error.message, true) }
   })
+  app.querySelector('#totp-enable-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { const result = await api.enableTotp(event.currentTarget.elements.namedItem('code').value); showCodes(result.recoveryCodes); app.querySelector('#totp-setup').hidden = true; } catch (error) { notice.innerHTML = message(error.message, true) } })
+  app.querySelector('#copy-recovery')?.addEventListener('click', async () => { await navigator.clipboard.writeText(app.querySelector('#recovery-values').textContent); notice.innerHTML = message('Recovery codes copied.') })
+  app.querySelector('#saved-recovery')?.addEventListener('click', () => { if (forced) renderAccountSecurity(true); else renderAccountSecurity() })
+  app.querySelector('#totp-disable-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { const data = Object.fromEntries(new FormData(event.currentTarget)); await api.disableTotp(data); currentUser.mustEnable2fa = currentUser.role === 'admin'; if (currentUser.mustEnable2fa) renderAccountSecurity(true); else renderAccountSecurity(); } catch (error) { notice.innerHTML = message(error.message, true) } })
+  app.querySelector('#recovery-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { showCodes((await api.regenerateRecoveryCodes(Object.fromEntries(new FormData(event.currentTarget)))).recoveryCodes) } catch (error) { notice.innerHTML = message(error.message, true) } })
+  app.querySelector('#revoke-devices')?.addEventListener('click', async () => { try { await api.revokeTrustedDevices(); await renderAccountSecurity() } catch (error) { notice.innerHTML = message(error.message, true) } })
   app.querySelectorAll('.remove-two-factor-form').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(form))
@@ -1152,7 +1162,8 @@ async function start() {
   try {
     const session = await api.session()
     currentUser = session.user
-    await renderApp()
+    if (currentUser.mustEnable2fa) await renderAccountSecurity(true)
+    else await renderApp()
   } catch {
     try {
       const status = await api.setupStatus()
