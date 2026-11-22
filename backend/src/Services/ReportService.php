@@ -11,7 +11,7 @@ final class ReportService
     {
     }
 
-    public function summary(): array
+    public function summary(bool $includeFinance = true): array
     {
         $today = date('Y-m-d');
         $tomorrow = date('Y-m-d', strtotime('+1 day'));
@@ -23,17 +23,19 @@ final class ReportService
             $months[$month] = ['month' => $month, 'sales' => 0.0, 'expenses' => 0.0, 'net' => 0.0, 'production' => []];
         }
 
-        $sales = $this->db->prepare('SELECT sold_at, total_amount FROM sales WHERE sold_at >= ? AND sold_at < ?');
-        $sales->execute([$monthStart, $tomorrow]);
-        foreach ($sales->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $month = substr((string) $row['sold_at'], 0, 7);
-            if (isset($months[$month])) $months[$month]['sales'] += (float) $row['total_amount'];
-        }
-        $expenses = $this->db->prepare('SELECT expense_date, amount FROM expenses WHERE expense_date >= ? AND expense_date < ?');
-        $expenses->execute([$monthStart, $tomorrow]);
-        foreach ($expenses->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $month = substr((string) $row['expense_date'], 0, 7);
-            if (isset($months[$month])) $months[$month]['expenses'] += (float) $row['amount'];
+        if ($includeFinance) {
+            $sales = $this->db->prepare('SELECT sold_at, total_amount FROM sales WHERE sold_at >= ? AND sold_at < ?');
+            $sales->execute([$monthStart, $tomorrow]);
+            foreach ($sales->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $month = substr((string) $row['sold_at'], 0, 7);
+                if (isset($months[$month])) $months[$month]['sales'] += (float) $row['total_amount'];
+            }
+            $expenses = $this->db->prepare('SELECT expense_date, amount FROM expenses WHERE expense_date >= ? AND expense_date < ?');
+            $expenses->execute([$monthStart, $tomorrow]);
+            foreach ($expenses->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $month = substr((string) $row['expense_date'], 0, 7);
+                if (isset($months[$month])) $months[$month]['expenses'] += (float) $row['amount'];
+            }
         }
         $production = $this->db->prepare(
             'SELECT production_date, produce_name, unit, SUM(quantity_produced) AS produced

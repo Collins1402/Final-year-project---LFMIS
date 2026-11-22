@@ -11,7 +11,7 @@ final class OverviewService
     {
     }
 
-    public function summary(): array
+    public function summary(bool $includeFinance = true): array
     {
         $today = date('Y-m-d');
         $tomorrow = date('Y-m-d', strtotime('+1 day'));
@@ -39,10 +39,13 @@ final class OverviewService
              WHERE ' . HealthService::OPEN_FOLLOW_UP . ' AND hr.next_due_date IS NOT NULL AND hr.next_due_date <= ?'
         );
         $health->execute([$dueThrough]);
-        $monthSales = $this->db->prepare('SELECT COALESCE(SUM(total_amount), 0) FROM sales WHERE sold_at >= ? AND sold_at < ?');
-        $monthSales->execute([$monthStart, $tomorrow]);
-        $monthExpenses = $this->db->prepare('SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date >= ? AND expense_date < ?');
-        $monthExpenses->execute([$monthStart, $tomorrow]);
+        $monthSales = null; $monthExpenses = null;
+        if ($includeFinance) {
+            $monthSales = $this->db->prepare('SELECT COALESCE(SUM(total_amount), 0) FROM sales WHERE sold_at >= ? AND sold_at < ?');
+            $monthSales->execute([$monthStart, $tomorrow]);
+            $monthExpenses = $this->db->prepare('SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date >= ? AND expense_date < ?');
+            $monthExpenses->execute([$monthStart, $tomorrow]);
+        }
 
         return [
             'today' => $today,
@@ -54,8 +57,8 @@ final class OverviewService
             'lowStockCount' => (int) $this->db->query('SELECT COUNT(*) FROM inventory_items WHERE is_active = 1 AND quantity_on_hand <= reorder_level')->fetchColumn(),
             'healthFollowUpsDue' => (int) $health->fetchColumn(),
             'pendingOrders' => (int) $this->db->query("SELECT COUNT(*) FROM orders WHERE status IN ('pending', 'quoted')")->fetchColumn(),
-            'salesThisMonth' => (float) $monthSales->fetchColumn(),
-            'expensesThisMonth' => (float) $monthExpenses->fetchColumn(),
+            'salesThisMonth' => $monthSales ? (float) $monthSales->fetchColumn() : null,
+            'expensesThisMonth' => $monthExpenses ? (float) $monthExpenses->fetchColumn() : null,
         ];
     }
 }

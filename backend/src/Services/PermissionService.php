@@ -64,6 +64,16 @@ final class PermissionService
         return (int) $statement->fetchColumn() === 1;
     }
 
+    public function canViewAnalytics(string $role, string $scope): bool
+    {
+        return match ($scope) {
+            'production' => in_array($role, ['admin', 'worker'], true),
+            'health' => in_array($role, ['admin', 'worker', 'veterinarian'], true),
+            'finance' => $role === 'admin',
+            default => false,
+        };
+    }
+
     public function matrix(): array
     {
         $roles = $this->db->query('SELECT id, name FROM roles ORDER BY id')->fetchAll();

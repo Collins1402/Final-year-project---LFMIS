@@ -2,6 +2,7 @@ import './style.css'
 import { api } from './api.js'
 import { renderLanding, formatEventDate } from './landing.js'
 import QRCode from 'qrcode'
+import Chart from 'chart.js/auto'
 
 const app = document.querySelector('#app')
 let currentUser = null
@@ -793,14 +794,22 @@ async function renderAssistantModule(target = app.querySelector('.content')) {
   const rolePermissions = permissionData.permissions || permissionData.matrix?.[currentUser.role] || {}
   const canRunScenarios = Boolean(rolePermissions['scenarios.run']?.allowed)
   content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Farm assistant</h1><p class="muted">Advice from farm records and public agriculture signals.</p></div><span class="health-pill" id="assistant-mode">Rule-based mode</span></header><div class="assistant-layout"><section class="panel assistant-panel"><div id="assistant-messages" class="assistant-messages"><p class="message success">Ask for advice, current agriculture trends, or a review of farm records.</p></div><form id="assistant-form" class="assistant-form"><input name="message" placeholder="Ask a farm question..." required><button>Ask assistant</button></form></section>${canRunScenarios ? `<section class="panel assistant-scenario"><h2>30-day yield scenario</h2><p class="muted">Estimate the effect of adding animals using recent recorded production.</p><form id="assistant-scenario-form"><label>Additional dairy cattle<input name="additionalCows" type="number" min="0" max="250" value="0" required></label><label>Additional laying hens<input name="additionalHens" type="number" min="0" max="250" value="0" required></label><button>Estimate yield</button></form><div id="assistant-scenario-result" aria-live="polite"></div><p class="muted scenario-limitation">Estimates assume added animals perform like the current group. They do not predict feed, health, weather or management effects.</p></section>` : ''}</div>`
+  const starterPrompts = document.createElement('div'); starterPrompts.className = 'assistant-suggestions'
+  for (const text of ['Show milk production for the last 30 days', 'Compare sales and expenses this year', 'How is my farm doing?']) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary-action'; button.textContent = text
+    button.addEventListener('click', () => { const form = content.querySelector('#assistant-form'); form.elements.namedItem('message').value = text; form.requestSubmit() })
+    starterPrompts.append(button)
+  }
+  content.querySelector('#assistant-messages').append(starterPrompts)
   content.querySelector('#assistant-form').addEventListener('submit', async (event) => {
     event.preventDefault()
     const form = event.target
     const input = form.querySelector('input')
     const messages = content.querySelector('#assistant-messages')
-    messages.insertAdjacentHTML('beforeend', `<p class="assistant-question">${escapeHtml(input.value)}</p>`)
-    try { const result = await api.assistantChat(input.value); content.querySelector('#assistant-mode').textContent = result.mode; messages.insertAdjacentHTML('beforeend', `<p class="message success">${escapeHtml(result.answer)}</p>`) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
+    const question = input.value
+    messages.insertAdjacentHTML('beforeend', `<p class="assistant-question">${escapeHtml(question)}</p>`)
     input.value = ''
+    try { const result = await api.assistantChat(question); content.querySelector('#assistant-mode').textContent = result.mode || 'Analytics'; appendAssistantResponse(messages, result) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
   })
   content.querySelector('#assistant-scenario-form')?.addEventListener('submit', async (event) => {
     event.preventDefault()
@@ -820,6 +829,62 @@ async function renderAssistantModule(target = app.querySelector('.content')) {
       result.innerHTML = `${yieldRows}<h3>Feed-use estimate</h3>${feedRows || '<p class="muted">Add feed inventory items and record stock-outs to estimate feed use.</p>'}<p class="muted scenario-limitation">${escapeHtml(forecast.limitations)}</p>`
     } catch (error) { result.innerHTML = message(error.message, true) }
   })
+}
+
+function appendAssistantResponse(messages, result) {
+  const bubble = document.createElement('article')
+  bubble.className = 'assistant-response message success'
+  const answer = document.createElement('p')
+  answer.className = 'assistant-advice'
+  answer.textContent = result.answer || ''
+  bubble.append(answer)
+  const refs = []
+  const palette = ['#176b55', '#c45120', '#315f9a', '#9b4c18', '#6a4c93', '#4f7c42', '#9d334a', '#147a8a']
+  for (const chartData of result.charts || []) {
+    const card = document.createElement('section'); card.className = 'assistant-chart-card'
+    const title = document.createElement('h3'); title.textContent = chartData.title
+    const unit = document.createElement('p'); unit.className = 'assistant-chart-unit'; unit.textContent = `Unit: ${chartData.unit || 'count'}`
+    const stage = document.createElement('div'); stage.className = 'assistant-chart-canvas'
+    const canvas = document.createElement('canvas'); canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', `${chartData.title}. ${chartData.labels.join(', ')}`); stage.append(canvas)
+    const actions = document.createElement('div'); actions.className = 'assistant-chart-actions'
+    const png = document.createElement('button'); png.type = 'button'; png.className = 'secondary-action'; png.textContent = 'Download PNG'
+    const csv = document.createElement('button'); csv.type = 'button'; csv.className = 'secondary-action'; csv.textContent = 'Download data (CSV)'
+    actions.append(png, csv); card.append(title, unit, stage, actions); bubble.append(card)
+    const ink = getComputedStyle(document.documentElement).getPropertyValue('--chart-ink').trim() || '#19352d'
+    const datasets = (chartData.datasets || []).map((set, i) => ({ label: set.label, data: set.data, borderColor: palette[i % palette.length], backgroundColor: chartData.type === 'pie' ? set.data.map((_, j) => palette[j % palette.length]) : `${palette[i % palette.length]}55`, borderWidth: 2, tension: .25, fill: chartData.type === 'line' }))
+    const chart = new Chart(canvas, { type: chartData.type, data: { labels: chartData.labels, datasets }, options: { responsive: true, maintainAspectRatio: false, color: ink, plugins: { legend: { display: chartData.type === 'pie' || datasets.length > 1, labels: { color: ink, usePointStyle: true } }, tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${context.formattedValue} ${chartData.unit || ''}` } } }, scales: chartData.type === 'pie' ? {} : { x: { ticks: { color: ink, maxRotation: 45 }, grid: { color: `${ink}18` } }, y: { beginAtZero: true, ticks: { color: ink }, grid: { color: `${ink}18` }, title: { display: Boolean(chartData.unit), text: chartData.unit, color: ink } } } } })
+    refs.push({ chartData, canvas, chart })
+    const filename = String(chartData.title || 'chart').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    png.addEventListener('click', () => canvas.toBlob((blob) => { if (blob) downloadAssistantFile(blob, `${filename}.png`) }, 'image/png'))
+    csv.addEventListener('click', () => {
+      const rows = [['period', ...(chartData.datasets || []).map((set) => `${set.label} (${chartData.unit || ''})`)]]
+      chartData.labels.forEach((label, row) => rows.push([label, ...(chartData.datasets || []).map((set) => set.data[row] ?? '')]))
+      const csvText = rows.map((line) => line.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n')
+      downloadAssistantFile(new Blob([csvText], { type: 'text/csv;charset=utf-8' }), `${filename}.csv`)
+    })
+  }
+  if (refs.length > 1) {
+    const pdf = document.createElement('button'); pdf.type = 'button'; pdf.className = 'secondary-action assistant-pdf-action'; pdf.textContent = 'Download report (PDF)'
+    pdf.addEventListener('click', () => printAssistantReport(result.answer || '', refs)); bubble.append(pdf)
+  }
+  if (Array.isArray(result.suggestions) && result.suggestions.length) {
+    const suggestions = document.createElement('div'); suggestions.className = 'assistant-suggestions'
+    result.suggestions.forEach((text) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary-action'; button.textContent = text; button.addEventListener('click', () => { const form = messages.parentElement.querySelector('#assistant-form'); form.elements.namedItem('message').value = text; form.requestSubmit() }); suggestions.append(button) })
+    bubble.append(suggestions)
+  }
+  messages.append(bubble); messages.scrollTop = messages.scrollHeight
+}
+
+function downloadAssistantFile(blob, filename) {
+  const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
+function printAssistantReport(advice, charts) {
+  const popup = window.open('', '_blank')
+  if (!popup) return
+  const sections = charts.map(({ chartData, canvas }) => `<section><h2>${escapeHtml(chartData.title)}</h2><p>Unit: ${escapeHtml(chartData.unit || 'count')}</p><img alt="${escapeHtml(chartData.title)} chart" src="${canvas.toDataURL('image/png')}"></section>`).join('')
+  popup.document.write(`<!doctype html><html><head><title>LFMIS farm report</title><style>body{font:16px Arial,sans-serif;color:#19352d;max-width:900px;margin:36px auto;padding:0 24px}h1{font-size:30px}.advice{padding:16px;background:#edf2eb;border-left:4px solid #176b55;line-height:1.6}section{margin:32px 0;break-inside:avoid}img{width:100%;height:auto}@media print{body{margin:0 auto}}</style></head><body><h1>LFMIS farm report</h1><p class="advice">${escapeHtml(advice)}</p>${sections}<script>window.onload=()=>window.print()</script></body></html>`)
+  popup.document.close()
 }
 
 async function renderLivestockModule() {

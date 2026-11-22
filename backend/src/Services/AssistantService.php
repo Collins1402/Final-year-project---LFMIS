@@ -3,17 +3,24 @@ declare(strict_types=1);
 
 namespace Lfmis\Services;
 
+use Closure;
 use Lfmis\Core\Env;
 use PDO;
 
 final class AssistantService
 {
-    public function __construct(private PDO $db) {}
+    public function __construct(private PDO $db, private ?AnalyticsService $analytics = null, private ?Closure $modelCaller = null)
+    {
+        $this->analytics ??= new AnalyticsService($db);
+    }
 
     public function answer(string $question, array $user, array $trends = []): array
     {
         $originalQuestion = trim($question);
         $question = strtolower($originalQuestion);
+        if ($this->isReportReview($question)) return $this->reportDigest($originalQuestion, $user);
+        $requestedMetrics = $this->requestedMetrics($question);
+        if ($requestedMetrics !== []) return $this->chartAnswer($originalQuestion, $user, $requestedMetrics);
         $greeting = $question === '' || preg_match('/^(hi|hello|hey|how are you|how are u|good morning|good afternoon|good evening)\b/', $question);
         $metaQuestion = preg_match('/\b(what do you do|who are you|what can you do|your capabilities|tell me about yourself|what are you)\b/i', $question) === 1;
         $chartQuestion = preg_match('/\b(charts?|graphs?|plots?|visualiz\w*|diagrams?)\b/i', $question) === 1;
@@ -56,13 +63,157 @@ final class AssistantService
         } elseif ($this->canUseModel()) {
             $modelAnswer = $this->modelAnswer($originalQuestion, $context);
             if ($modelAnswer !== null) {
-                return ['mode' => 'llm-assisted', 'answer' => $modelAnswer, 'role' => $user['role']];
+            return ['mode' => 'llm-assisted', 'answer' => $modelAnswer, 'role' => $user['role'], 'charts' => [], 'suggestions' => $this->suggestions()];
             }
             $answer = $this->fallbackAnswer($question, $trendQuestion, $headlines, $hasFarmAccess, $animalCount, $milk, $openTasks, $stock, $healthDue);
         } else {
             $answer = $this->fallbackAnswer($question, $trendQuestion, $headlines, $hasFarmAccess, $animalCount, $milk, $openTasks, $stock, $healthDue);
         }
-        return ['mode' => 'rule-based', 'answer' => $answer, 'role' => $user['role']];
+        return ['mode' => 'rule-based', 'answer' => $answer, 'role' => $user['role'], 'charts' => [], 'suggestions' => $this->suggestions()];
+    }
+
+    private function isReportReview(string $question): bool
+    {
+        return preg_match('/\b(how is my farm doing|review my report|review the report|farm report review|farm performance summary)\b/i', $question) === 1;
+    }
+
+    private function requestedMetrics(string $question): array
+    {
+        $compare = preg_match('/\b(compare|versus|vs\.?|and)\b/', $question) === 1;
+        $metrics = [];
+        if (preg_match('/\b(milk|dairy production)\b/', $question)) $metrics[] = 'milk';
+        if (preg_match('/\b(eggs?|egg production)\b/', $question)) $metrics[] = 'eggs';
+        if (preg_match('/\b(sales?|revenue)\b/', $question)) $metrics[] = 'sales';
+        if (preg_match('/\b(expenses?|costs?)\b/', $question)) $metrics[] = 'expenses';
+        if (preg_match('/\b(net|profit)\b/', $question)) $metrics[] = 'net';
+        if (preg_match('/\b(stock levels?|inventory levels?)\b/', $question)) $metrics[] = 'stock_levels';
+        if (preg_match('/\b(animals? by species|species breakdown)\b/', $question)) $metrics[] = 'animals_by_species';
+        if (preg_match('/\b(animals? by status|animal status)\b/', $question)) $metrics[] = 'animals_by_status';
+        if (preg_match('/\b(health follow.?ups?|follow.?ups? due)\b/', $question)) $metrics[] = 'health_followups_due';
+        if (preg_match('/\b(orders? by status|order status)\b/', $question)) $metrics[] = 'orders_by_status';
+        if (preg_match('/\b(chart|graph|plot|show|compare|report)\b/', $question) && count($metrics) > 1 && $compare) return array_values(array_unique($metrics));
+        return $metrics === [] ? [] : [array_values(array_unique($metrics))[0]];
+    }
+
+    private function chartAnswer(string $question, array $user, array $metrics): array
+    {
+        $role = (string)($user['role'] ?? 'unknown');
+        $request = $this->modelChartRequest($question) ?? [];
+        $period = (string)($request['period'] ?? $this->requestedPeriod(strtolower($question)));
+        if (!in_array($period, ['7d','30d','90d','12m'], true)) $period = $this->requestedPeriod(strtolower($question));
+        $type = isset($request['chartType']) && in_array($request['chartType'], ['bar','line','pie'], true) ? $request['chartType'] : null;
+        $charts = [];
+        try {
+            foreach ($metrics as $metric) {
+                $requestedMetric = isset($request['metric']) && count($metrics) === 1 && in_array($request['metric'], AnalyticsService::metricNames(), true)
+                    ? (string)$request['metric'] : $metric;
+                $charts[] = $this->analytics->series($requestedMetric, $period, null, $type, $role);
+            }
+        } catch (AnalyticsAccessException) {
+            return ['mode' => 'rule-based', 'answer' => 'This account cannot access private farm operating records or that report. Ask the farm administrator for access.', 'role' => $role, 'charts' => [], 'suggestions' => $this->suggestions()];
+        }
+        $answer = $this->insight($charts, $question);
+        return ['mode' => 'analytics', 'answer' => $answer, 'role' => $role, 'charts' => $charts, 'suggestions' => $this->suggestions()];
+    }
+
+    private function reportDigest(string $question, array $user): array
+    {
+        $role = (string)($user['role'] ?? 'unknown');
+        if (!in_array($role, ['admin','worker','veterinarian'], true)) {
+            throw new AnalyticsAccessException('This account cannot access farm reports or operating records.');
+        }
+        // The digest checks report services for context; chart values are always recomputed from SQL below.
+        $canReviewOperations = in_array($role, ['admin', 'worker'], true);
+        $includeFinance = $role === 'admin';
+        $overview = $canReviewOperations ? (new OverviewService($this->db))->summary($includeFinance) : [];
+        $operations = $canReviewOperations ? (new ReportService($this->db))->summary($includeFinance) : [];
+        try { $forecastContext = $role === 'veterinarian' ? ['observations' => []] : (new ForecastService($this->db))->trainingData(); } catch (\Throwable) { $forecastContext = ['observations' => []]; }
+        $scopes = $role === 'veterinarian' ? ['health'] : ($role === 'worker' ? ['production','health'] : ['production','health','finance']);
+        $days = 0;
+        foreach ($scopes as $scope) $days = max($days, $this->analytics->recordedDays($scope));
+        if ($days < 7) {
+            return ['mode' => 'analytics', 'answer' => "There are only {$days} recorded data days in the recent period. I need at least seven recorded days before I can review farm performance without guessing.", 'role' => $role, 'charts' => [], 'suggestions' => $this->suggestions()];
+        }
+        $metrics = match ($role) {
+            'admin' => ['milk','eggs','net','health_followups_due'],
+            'worker' => ['milk','eggs','stock_levels','health_followups_due'],
+            default => ['health_followups_due','health_records_by_type'],
+        };
+        $charts = [];
+        foreach ($metrics as $metric) {
+            $group = $metric === 'health_followups_due' ? 'day' : null;
+            $charts[] = $this->analytics->series($metric, '30d', $group, null, $role);
+        }
+        $advice = $this->digestAdvice($charts, $overview, $operations, count($forecastContext['observations'] ?? []), $question);
+        return ['mode' => 'analytics', 'answer' => $advice, 'role' => $role, 'charts' => $charts, 'suggestions' => $this->suggestions()];
+    }
+
+    private function digestAdvice(array $charts, array $overview, array $operations, int $forecastDays, string $question): string
+    {
+        $actions = [];
+        foreach ($charts as $chart) {
+            if (!$chart['hasData']) continue;
+            if ($chart['title'] === 'Health follow-ups due' && ($chart['stats']['total'] ?? 0) > 0) $actions[] = 'prioritize the recorded health follow-ups due';
+            if ($chart['title'] === 'Net sales less expenses' && ($chart['stats']['total'] ?? 0) < 0) $actions[] = 'review expenses against recorded sales';
+            if ($chart['title'] === 'Milk production' && ($chart['stats']['trend'] ?? '') === 'down') $actions[] = 'check recent milk entries and investigate the downward production trend';
+            if ($chart['title'] === 'Egg production' && ($chart['stats']['trend'] ?? '') === 'down') $actions[] = 'check recent egg entries and investigate the downward production trend';
+        }
+        $overdue = (int)($operations['health']['overdueFollowUps'] ?? 0);
+        if ($overdue > 0) array_unshift($actions, "address {$overdue} overdue health follow-up(s)");
+        if ((int)($overview['lowStockCount'] ?? 0) > 0) $actions[] = 'replenish inventory items at or below their reorder level';
+        if ($actions === []) $actions[] = 'continue recording daily production and review the chart trends weekly';
+        $swahili = preg_match('/\b(vipi|shamba|maziwa|mayai|ripoti|uzalishaji)\b/i', $question) === 1;
+        $prefix = $swahili ? 'Kutokana na rekodi zilizopo, kipaumbele ni ' : 'Based on the recorded report data, prioritize ';
+        $answer = $prefix . implode('; ', array_unique($actions)) . '.';
+        if ($forecastDays < 21) $answer .= $swahili ? ' Data ya uzalishaji bado haitoshi kwa utabiri.' : ' There are not yet 21 consecutive production days for a forecast.';
+        return $answer;
+    }
+
+    private function insight(array $charts, string $question): string
+    {
+        $swahili = preg_match('/\b(vipi|shamba|maziwa|mayai|mauzo|gharama)\b/i', $question) === 1;
+        foreach ($charts as $chart) {
+            if (!$chart['hasData']) continue;
+            $stats = $chart['stats'];
+            if (!empty($stats['anomalies'])) return $swahili ? 'Rekodi ina mabadiliko yasiyo ya kawaida; kagua thamani hiyo kabla ya kuchukua hatua.' : 'The records show an unusual value; review that period before taking action.';
+            if ($stats['trend'] === 'down') return $swahili ? 'Mwelekeo wa rekodi unashuka; kagua vipindi vya hivi karibuni na sababu zinazowezekana.' : 'The recorded trend is down; review recent entries and investigate possible causes.';
+            if ($stats['trend'] === 'up') return $swahili ? 'Mwelekeo wa rekodi unapanda; endelea kufuatilia na uthibitishe rekodi.' : 'The recorded trend is up; keep monitoring it and verify entries.';
+        }
+        return $swahili ? 'Hakuna rekodi za kutosha kwa ushauri wa kipindi hiki.' : 'There is no recorded data for this metric and period, so I cannot draw a conclusion.';
+    }
+
+    private function requestedPeriod(string $question): string
+    {
+        if (preg_match('/\b(12 months|12m|year|this year|last year)\b/', $question)) return '12m';
+        if (preg_match('/\b(90 days|90d|three months)\b/', $question)) return '90d';
+        if (preg_match('/\b(7 days|7d|week|weekly)\b/', $question)) return '7d';
+        return '30d';
+    }
+
+    private function modelChartRequest(string $question): ?array
+    {
+        try {
+            if ($this->modelCaller !== null) {
+                $result = ($this->modelCaller)($question);
+                return is_array($result) ? $result : (is_string($result) ? (json_decode($result, true) ?: null) : null);
+            }
+            if (!$this->canUseModel()) return null;
+            $payload = json_encode(['model' => Env::get('LFMIS_AI_MODEL','gpt-4o-mini'), 'temperature' => 0, 'response_format' => ['type'=>'json_object'], 'messages' => [
+                ['role'=>'system','content'=>'Return only JSON with keys metric, period, chartType. Select a metric from milk, eggs, sales, expenses, net, stock_levels, animals_by_species, animals_by_status, health_followups_due, orders_by_status, health_records_by_type. period must be 7d, 30d, 90d, or 12m. chartType must be bar, line, or pie. Do not return numbers, datasets, labels, advice, or chart values.'],
+                ['role'=>'user','content'=>$question],
+            ]]);
+            $curl = curl_init(rtrim((string)Env::get('LFMIS_AI_API_URL'),'/').'/chat/completions');
+            curl_setopt_array($curl, [CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$payload,CURLOPT_HTTPHEADER=>['Content-Type: application/json','Authorization: Bearer '.Env::get('LFMIS_AI_API_KEY')],CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>10]);
+            $response = curl_exec($curl); $status = (int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE); curl_close($curl);
+            if ($response === false || $status < 200 || $status >= 300) return null;
+            $content = json_decode($response,true)['choices'][0]['message']['content'] ?? null;
+            return is_string($content) ? (json_decode($content,true) ?: null) : null;
+        } catch (\Throwable) { return null; }
+    }
+
+    private function suggestions(): array
+    {
+        return ['Show milk production for the last 30 days', 'Compare sales and expenses this year', 'How is my farm doing?'];
     }
 
     private function fallbackAnswer(string $question, bool $trendQuestion, array $headlines, bool $hasFarmAccess, int $animalCount, float $milk, int $openTasks, int $stock, int $healthDue): string

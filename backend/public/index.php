@@ -44,6 +44,8 @@ require_once __DIR__ . '/../src/Services/ForecastUnavailableException.php';
 require_once __DIR__ . '/../src/Services/ForecastService.php';
 require_once __DIR__ . '/../src/Services/OverviewService.php';
 require_once __DIR__ . '/../src/Services/ReportService.php';
+require_once __DIR__ . '/../src/Services/AnalyticsService.php';
+require_once __DIR__ . '/../src/Services/AnalyticsAccessException.php';
 
 use Lfmis\Core\Database;
 use Lfmis\Core\DeliveryException;
@@ -81,6 +83,8 @@ use Lfmis\Services\ForecastService;
 use Lfmis\Services\ForecastUnavailableException;
 use Lfmis\Services\OverviewService;
 use Lfmis\Services\ReportService;
+use Lfmis\Services\AnalyticsService;
+use Lfmis\Services\AnalyticsAccessException;
 use Lfmis\Services\RateLimitException;
 use Lfmis\Services\RateLimitService;
 use Lfmis\Services\TwoFactorService;
@@ -117,6 +121,7 @@ try {
     $totp = new TotpService($db);
     $users = new UserService($db);
     $permissions = new PermissionService($db);
+    $analytics = new AnalyticsService($db, $permissions);
     $loginAlerts = new LoginAlertService();
     $trends = new TrendsService($db);
     $synthetic = new SyntheticTrendsService($db);
@@ -133,7 +138,7 @@ try {
     $audit = new AuditService($db);
     $backup = new BackupService(dirname(__DIR__, 2), null, $db);
     $mpesa = new MpesaService($db);
-    $assistant = new AssistantService($db);
+    $assistant = new AssistantService($db, $analytics);
     $notifications = new NotificationService($db);
     $feedback = new FeedbackService($db);
     $demo = new DemoService($db);
@@ -751,6 +756,12 @@ try {
         if ($current['role'] !== 'admin') Response::error('You do not have permission to perform this action.', 403);
         Response::json(['runs' => $forecast->history()]);
     }
+    if ($method === 'GET' && preg_match('#^/api/analytics/([a-z_]+)$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        $chart = $analytics->series($matches[1], (string)($_GET['period'] ?? '30d'), isset($_GET['groupBy']) ? (string)$_GET['groupBy'] : null, isset($_GET['type']) ? (string)$_GET['type'] : null, (string)$current['role']);
+        Response::json($chart);
+    }
     if ($path === '/api/assistant/chat' && $method === 'POST') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
@@ -814,6 +825,8 @@ try {
     Response::error($error->getMessage(), 503);
 } catch (BackupException $error) {
     Response::error($error->getMessage(), 503);
+} catch (AnalyticsAccessException $error) {
+    Response::error($error->getMessage(), 403);
 } catch (RuntimeException $error) {
     Response::error($error->getMessage(), 401);
 } catch (Throwable $error) {

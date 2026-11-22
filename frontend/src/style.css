@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root { color: #19352d; background: #edf2eb; font-family: 'DM Sans', sans-serif; font-synthesis: none; }
+:root { --chart-ink: #19352d; --chart-surface: #fffdf7; --chart-border: #d9e2d8; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 button, input, select { font: inherit; }
@@ -74,6 +75,20 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .quick-action:hover { background: #d3e4cd; }
 .quick-action span { font-size: 2rem; }
 .quick-action strong { text-align: center; }
+.assistant-response { max-width: 100%; width: 100%; color: #19352d; }
+.assistant-advice { margin: 0; line-height: 1.6; white-space: pre-line; }
+.assistant-chart-card { margin-top: 1rem; padding: 1rem; border: 1px solid var(--chart-border); border-radius: 10px; background: var(--chart-surface); color: var(--chart-ink); }
+.assistant-chart-card h3 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 1rem; }
+.assistant-chart-unit { margin: .3rem 0 .75rem; color: #526b63; font-size: .82rem; }
+.assistant-chart-canvas { position: relative; height: 280px; width: 100%; }
+.assistant-chart-canvas canvas { max-width: 100%; }
+.assistant-chart-actions, .assistant-suggestions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.assistant-pdf-action { margin-top: .85rem; }
+@media (prefers-color-scheme: dark) {
+  :root { --chart-ink: #e6eee9; --chart-surface: #203a33; --chart-border: #49665b; }
+  .assistant-chart-unit { color: #bed0c5; }
+}
+@media print { .assistant-chart-actions, .assistant-suggestions, .assistant-pdf-action { display: none !important; } }
 @media (max-width: 800px) { .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 550px) { .audit-filters { grid-template-columns: 1fr; } }
 @media (max-width: 550px) { .workspace-header-actions { flex-wrap: wrap; margin-top: 1rem; }.quick-action-grid { grid-template-columns: 1fr; }.quick-action { min-height: 100px; } }

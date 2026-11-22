@@ -81,6 +81,7 @@ export const api = {
   forecastReport: () => request('/api/reports/forecast'),
   forecastHistory: () => request('/api/reports/forecast/history'),
   assistantChat: (message) => post('/api/assistant/chat', { message }),
+  analytics: (metric, params = {}) => request(`/api/analytics/${encodeURIComponent(metric)}?${new URLSearchParams(params)}`),
   assistantScenario: (data) => post('/api/assistant/scenario', data),
   notifications: () => request('/api/notifications'),
   markNotificationRead: (id) => request(`/api/notifications/${id}`, { method: 'PATCH', body: '{}' }),
