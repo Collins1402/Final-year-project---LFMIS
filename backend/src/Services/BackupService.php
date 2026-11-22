@@ -5,12 +5,14 @@ namespace Lfmis\Services;
 
 use Closure;
 use Lfmis\Core\Env;
+use PDO;
+use Throwable;
 
 final class BackupService
 {
     private ?Closure $runDump;
 
-    public function __construct(private string $repositoryRoot, ?Closure $runDump = null)
+    public function __construct(private string $repositoryRoot, ?Closure $runDump = null, private ?PDO $db = null)
     {
         $this->runDump = $runDump;
     }
@@ -43,7 +45,17 @@ final class BackupService
             if (is_file($path)) {
                 unlink($path);
             }
-            throw new BackupException('MySQL backup failed. Confirm mysqldump is installed and database settings are valid.');
+            if ($this->db !== null) {
+                try {
+                    $this->writePdoDump($path);
+                } catch (Throwable $error) {
+                    if (is_file($path)) unlink($path);
+                    error_log('PDO database backup fallback failed: ' . $error->getMessage());
+                }
+            }
+            if (!is_file($path) || filesize($path) === 0) {
+                throw new BackupException('Database backup failed. Check the database connection and server logs.');
+            }
         }
         if (PHP_OS_FAMILY !== 'Windows') {
             chmod($path, 0600);
@@ -101,5 +113,69 @@ final class BackupService
             }
         }
         return 'mysqldump';
+    }
+
+    private function writePdoDump(string $path): void
+    {
+        if ($this->db === null) throw new BackupException('A database connection is required for the SQL backup fallback.');
+        $stream = fopen($path, 'wb');
+        if ($stream === false) throw new BackupException('The SQL backup file could not be opened.');
+        try {
+            $this->write($stream, "-- LFMIS SQL backup created " . gmdate(DATE_ATOM) . "\nSET FOREIGN_KEY_CHECKS=0;\n\n");
+            $tables = $this->db->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")->fetchAll(PDO::FETCH_NUM);
+            foreach ($tables as $tableRow) {
+                $table = (string) $tableRow[0];
+                $quotedTable = $this->quoteIdentifier($table);
+                $create = $this->db->query('SHOW CREATE TABLE ' . $quotedTable)->fetch(PDO::FETCH_NUM);
+                if (!isset($create[1])) throw new BackupException('A database table definition could not be read.');
+                $this->write($stream, 'DROP TABLE IF EXISTS ' . $quotedTable . ";\n" . $create[1] . ";\n\n");
+
+                $columnRows = $this->db->query('SHOW COLUMNS FROM ' . $quotedTable)->fetchAll(PDO::FETCH_ASSOC);
+                $columns = array_map(static fn(array $column): string => (string) $column['Field'], $columnRows);
+                $binaryColumns = [];
+                foreach ($columnRows as $column) {
+                    $type = strtolower((string) $column['Type']);
+                    if (preg_match('/^(?:tiny|medium|long)?blob|^(?:var)?binary|^bit\\b|^geometry\\b/', $type)) {
+                        $binaryColumns[] = true;
+                    } else {
+                        $binaryColumns[] = false;
+                    }
+                }
+                if ($columns === []) continue;
+                $data = $this->db->query('SELECT * FROM ' . $quotedTable);
+                while (($values = $data->fetch(PDO::FETCH_NUM)) !== false) {
+                    $encoded = [];
+                    foreach ($values as $index => $value) {
+                        if ($value === null) {
+                            $encoded[] = 'NULL';
+                        } elseif ($binaryColumns[$index] ?? false) {
+                            $encoded[] = "X'" . bin2hex((string) $value) . "'";
+                        } else {
+                            $quoted = $this->db->quote((string) $value, PDO::PARAM_STR);
+                            if ($quoted === false) throw new BackupException('A database value could not be encoded for backup.');
+                            $encoded[] = $quoted;
+                        }
+                    }
+                    $quotedColumns = implode(', ', array_map(fn(string $column): string => $this->quoteIdentifier($column), $columns));
+                    $this->write($stream, 'INSERT INTO ' . $quotedTable . ' (' . $quotedColumns . ') VALUES (' . implode(', ', $encoded) . ");\n");
+                }
+                $this->write($stream, "\n");
+            }
+            $this->write($stream, "SET FOREIGN_KEY_CHECKS=1;\n");
+        } finally {
+            fclose($stream);
+        }
+    }
+
+    private function quoteIdentifier(string $identifier): string
+    {
+        return '`' . str_replace('`', '``', $identifier) . '`';
+    }
+
+    private function write($stream, string $contents): void
+    {
+        if (fwrite($stream, $contents) !== strlen($contents)) {
+            throw new BackupException('The SQL backup file could not be written completely.');
+        }
     }
 }

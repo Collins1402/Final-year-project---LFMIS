@@ -127,7 +127,7 @@ try {
     $inventory = new InventoryService($db);
     $commerce = new CommerceService($db);
     $audit = new AuditService($db);
-    $backup = new BackupService(dirname(__DIR__, 2));
+    $backup = new BackupService(dirname(__DIR__, 2), null, $db);
     $mpesa = new MpesaService($db);
     $assistant = new AssistantService($db);
     $notifications = new NotificationService($db);
