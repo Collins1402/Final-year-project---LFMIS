@@ -712,7 +712,13 @@ try {
         if ($method === 'POST' && $permissions->allows($current['role'], 'finance.manage')) {
             if ($path === '/api/sales') Response::json(['sale' => $commerce->createSale($request->body(), $current['id'])], 201);
             if ($path === '/api/expenses') Response::json(['expense' => $commerce->createExpense($request->body(), $current['id'])], 201);
-            Response::json(['payment' => $commerce->createPayment($request->body(), $current['id'])], 201);
+            $paymentBody = $request->body();
+            if (($paymentBody['method'] ?? '') === 'mpesa') {
+                $orderId = filter_var($paymentBody['orderId'] ?? null, FILTER_VALIDATE_INT);
+                if (!$orderId) Response::error('Choose a valid order.', 422);
+                Response::json(['payment' => $mpesa->simulate((int) $orderId, $current)], 201);
+            }
+            Response::json(['payment' => $commerce->createPayment($paymentBody, $current['id'])], 201);
         }
         Response::error('You do not have permission to perform this action.', 403);
     }

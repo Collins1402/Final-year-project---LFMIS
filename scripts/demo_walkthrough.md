@@ -1,6 +1,6 @@
 # Flouri Farm LFMIS: 10-minute defence demo
 
-Use a staging database and Daraja sandbox account. Before the timed demo, apply migrations, start the PHP API, Vite frontend and ML service, and prepare active admin, worker, veterinarian, buyer, and throwaway lockout accounts. Configure email delivery and enroll email two-factor authentication for the demo admin. Have one active livestock/produce listing and an M-PESA sandbox phone ready. Do not use real customer data or production credentials.
+Use a staging database. Before the timed demo, apply migrations, start the PHP API, Vite frontend and ML service, and prepare active admin, worker, veterinarian, buyer, and throwaway lockout accounts. Configure email delivery and enroll email two-factor authentication for the demo admin. Have one active livestock/produce listing ready. M-PESA payments are simulated locally; no Daraja account, phone prompt, or real charge is used.
 
 Set these PowerShell variables for local commands. Replace only the demo account names/passwords with credentials created for staging; do not copy credentials from `.env.local`.
 
@@ -39,14 +39,14 @@ Expected: a `treatment` row for the selected animal, recorded by the veterinaria
 
 | Time | Demo steps and expected results |
 |---|---|
-| 6:00–7:15 | Sign in as the buyer, select an available listing, place an order, and open **My orders**. Choose **Pay with M-PESA** using the sandbox test phone. The prompt should appear on the phone; approve it with the sandbox PIN. Expected: the UI first says to check the phone, then shows paid after the Daraja callback; if sandbox credentials/callback connectivity are unavailable, show the pending/failure state and explicitly call out that live gateway delivery was not demonstrated. |
+| 6:00–7:15 | Sign in as the buyer, select an available listing, place an order, and open **My orders**. Choose **Simulate M-PESA payment**. Expected: the app records a `SIM-` receipt, marks the order paid, and records the sale. No phone prompt or real payment occurs. |
 | 7:15–8:00 | Confirm settlement records with MySQL: |
 
 ```powershell
 mysql.exe --host=127.0.0.1 --port=4321 --user=flouri_admin -p lfmis -e "SELECT id, order_id, method, status, transaction_reference, paid_at FROM payments ORDER BY id DESC LIMIT 1; SELECT id, status, total_amount FROM orders ORDER BY id DESC LIMIT 1; SELECT id, order_id, description, total_amount FROM sales ORDER BY id DESC LIMIT 1;"
 ```
 
-Expected after a confirmed sandbox callback: payment status `confirmed` with a receipt reference and paid time, order status `paid`, and a sale linked to the order. The callback is idempotent, so repeating it does not add another sale.
+Expected after the local simulation: payment status `confirmed` with a `SIM-` receipt reference and paid time, order status `paid`, and a sale linked to the order. Simulated payment records are clearly distinguished from real transactions.
 
 | Time | Demo steps and expected results |
 |---|---|
