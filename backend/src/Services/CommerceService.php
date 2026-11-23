@@ -172,6 +172,11 @@ final class CommerceService
         if (!in_array($status, ['fulfilled', 'cancelled'], true)) {
             throw new \InvalidArgumentException('Bulk actions can only fulfill or cancel orders.');
         }
+        foreach ($orderIds as $orderId) {
+            if (filter_var($orderId, FILTER_VALIDATE_INT) === false) {
+                throw new \InvalidArgumentException('Every selected order must have a valid ID.');
+            }
+        }
         $orderIds = array_values(array_unique(array_map('intval', $orderIds)));
         if ($orderIds === [] || count($orderIds) > 300 || min($orderIds) < 1) {
             throw new \InvalidArgumentException('Select between 1 and 300 valid orders.');

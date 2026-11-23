@@ -40,6 +40,8 @@ aside { padding: 2rem; background: #173f35; color: #f7f3e8; }.brand { margin: 0;
 .table-tools .table-search { flex: 1 1 14rem; max-width: 24rem; }
 .table-tools .table-status-filter { min-width: 9rem; }
 .table-result-count { margin-left: auto; color: #668078; font-size: .78rem; }
+.table-bulk-actions { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.table-bulk-feedback { color: #8f321f; font-size: .8rem; }
 tr[hidden] { display: none; }
 .button-row { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 .security-method-list { list-style: none; padding: 0; display: grid; gap: 1rem; }
