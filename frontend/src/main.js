@@ -21,6 +21,106 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
 const roleCopy = (english, swahili) => roleLanguage === 'sw' && ['worker', 'veterinarian'].includes(currentUser?.role) ? swahili : english
+function enableSortableTable(table, columnTypes = []) {
+  const headers = table?.tHead?.rows[0]?.cells
+  if (!headers || table.dataset.sortReady === 'true') return
+  table.dataset.sortReady = 'true'
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+  Array.from(headers).forEach((header, index) => {
+    const label = header.textContent.trim()
+    if (!label || /^action$/i.test(label)) return
+    const normalizedLabel = label.toLowerCase()
+    const type = columnTypes[index] || (/order|amount|total|quantity|price|balance|count|stock/i.test(normalizedLabel) ? 'number' : 'text')
+    header.dataset.sortLabel = label
+    header.innerHTML = `<button type="button" class="table-sort" aria-label="Sort by ${escapeHtml(label)}">${escapeHtml(label)} <span aria-hidden="true">&harr;</span></button>`
+    header.querySelector('button').addEventListener('click', () => {
+      const sameColumn = table.dataset.sortColumn === String(index)
+      const direction = sameColumn && table.dataset.sortDirection === 'asc' ? 'desc' : 'asc'
+      table.dataset.sortColumn = String(index)
+      table.dataset.sortDirection = direction
+      header.setAttribute('aria-sort', direction === 'asc' ? 'ascending' : 'descending')
+      const rows = [...table.tBodies[0].rows]
+      rows.sort((left, right) => {
+        const leftEmpty = left.cells.length === 1 && left.cells[0].colSpan > 1
+        const rightEmpty = right.cells.length === 1 && right.cells[0].colSpan > 1
+        if (leftEmpty || rightEmpty) return leftEmpty ? 1 : -1
+        const a = left.cells[index]?.textContent.trim() || ''
+        const b = right.cells[index]?.textContent.trim() || ''
+        const comparison = type === 'number'
+          ? (Number(a.replace(/[^\d.-]/g, '')) || 0) - (Number(b.replace(/[^\d.-]/g, '')) || 0)
+          : collator.compare(a, b)
+        return comparison * (direction === 'asc' ? 1 : -1)
+      })
+      rows.forEach((row) => table.tBodies[0].append(row))
+    })
+  })
+}
+
+function enhanceDataTable(table) {
+  if (table.dataset.tableToolsReady === 'true' || !table.tHead || !table.tBodies.length) return
+  const wrapper = table.closest('.table-wrap')
+  if (!wrapper) return
+  table.dataset.tableToolsReady = 'true'
+  enableSortableTable(table)
+
+  const headers = Array.from(table.tHead.rows[0].cells)
+  const statusIndex = headers.findIndex((header) => (header.dataset.sortLabel || header.textContent).trim().toLowerCase() === 'status')
+  const toolbar = document.createElement('div')
+  toolbar.className = 'table-tools'
+  const search = document.createElement('input')
+  search.type = 'search'
+  search.className = 'table-search'
+  search.placeholder = 'Search records'
+  search.setAttribute('aria-label', 'Search records in this table')
+  toolbar.append(search)
+
+  let statusFilter = null
+  if (statusIndex >= 0) {
+    const values = [...new Set(Array.from(table.tBodies[0].rows)
+      .filter((row) => !(row.cells.length === 1 && row.cells[0].colSpan > 1))
+      .map((row) => row.cells[statusIndex]?.textContent.trim())
+      .filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    statusFilter = document.createElement('select')
+    statusFilter.className = 'table-status-filter'
+    statusFilter.setAttribute('aria-label', 'Filter records by status')
+    statusFilter.innerHTML = '<option value="">All statuses</option>' + values.map((value) => `<option value="${escapeHtml(value.toLowerCase())}">${escapeHtml(value)}</option>`).join('')
+    toolbar.append(statusFilter)
+  }
+
+  const resultCount = document.createElement('span')
+  resultCount.className = 'table-result-count'
+  resultCount.setAttribute('aria-live', 'polite')
+  toolbar.append(resultCount)
+  wrapper.parentElement.insertBefore(toolbar, wrapper)
+
+  const filterRows = () => {
+    const query = search.value.trim().toLocaleLowerCase()
+    const wantedStatus = statusFilter?.value || ''
+    let visible = 0
+    let total = 0
+    Array.from(table.tBodies[0].rows).forEach((row) => {
+      if (row.cells.length === 1 && row.cells[0].colSpan > 1) {
+        row.hidden = false
+        return
+      }
+      total += 1
+      const matchesSearch = !query || row.textContent.toLocaleLowerCase().includes(query)
+      const rowStatus = statusIndex >= 0 ? row.cells[statusIndex]?.textContent.trim().toLowerCase() : ''
+      const matchesStatus = !wantedStatus || rowStatus === wantedStatus
+      row.hidden = !(matchesSearch && matchesStatus)
+      if (!row.hidden) visible += 1
+    })
+    resultCount.textContent = visible === total ? `${total} records` : `${visible} of ${total} records`
+  }
+  search.addEventListener('input', filterRows)
+  statusFilter?.addEventListener('change', filterRows)
+  filterRows()
+}
+
+const tableObserver = new MutationObserver(() => {
+  app.querySelectorAll('.content .table-wrap table').forEach(enhanceDataTable)
+})
+tableObserver.observe(app, { childList: true, subtree: true })
 const roleModuleLabel = (module) => {
   if (!['worker', 'veterinarian'].includes(currentUser?.role)) return module
   const labels = {
@@ -535,13 +635,16 @@ async function renderCommerceModule() {
   const content = app.querySelector('.content')
   try {
     const [orders, sales, payments, expenses, products] = await Promise.all([api.orders(), api.sales(), api.payments(), api.expenses(), api.products()])
-    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Sales & orders</h1><p class="muted">Create orders, record sales and track payments.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create order</h2><form id="order-form" class="compact-form"><input name="customerName" placeholder="e.g. Mary Wanjiku" required><input name="customerPhone" placeholder="e.g. 0712 345 678"><select name="productId" required><option value="">Choose a listed product</option>${products.products.filter((item) => Number(item.available_quantity) > 0).map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity)} ${escapeHtml(item.unit)}</option>`).join('')}</select><input name="quantity" type="number" min=".01" step=".01" placeholder="e.g. 5 litres" required><input name="unitPrice" type="number" min="0" step=".01" placeholder="Price per unit, e.g. 75"><button>Create quote</button></form><h2>Orders</h2><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Status</th><th>Total</th></tr></thead><tbody>${orders.orders.length ? orders.orders.map((item) => `<tr><td>${escapeHtml(item.customer)}</td><td>${escapeHtml(item.status)}</td><td>${item.total_amount}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record sale</h2><form id="sale-form" class="compact-form"><input name="description"     placeholder="e.g. 10 litres sold at market"><input name="quantity" type="number" min=".01" step=".01"     placeholder="e.g. 10"><input name="unit"     placeholder="e.g. litres or trays"><input name="unitPrice" type="number" min="0" step=".01"     placeholder="KES per unit"><input name="soldAt" type="datetime-local" required><button>Save sale</button></form><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${payments.payments.length ? payments.payments.map((item) => `<tr><td>#${item.order_id}</td><td>${item.method}</td><td>${item.status}</td><td>${item.amount}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No payments yet.</td></tr>'}</tbody></table></div></section></section>`
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Sales & orders</h1><p class="muted">Create orders, record sales and track payments.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create order</h2><form id="order-form" class="compact-form"><input name="customerName" placeholder="e.g. Mary Wanjiku" required><input name="customerPhone" placeholder="e.g. 0712 345 678"><select name="productId" required><option value="">Choose a listed product</option>${products.products.filter((item) => Number(item.available_quantity) > 0).map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity)} ${escapeHtml(item.unit)}</option>`).join('')}</select><input name="quantity" type="number" min=".01" step=".01" placeholder="e.g. 5 litres" required><input name="unitPrice" type="number" min="0" step=".01" placeholder="Price per unit, e.g. 75"><button>Create quote</button></form><h2>Orders</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Status</th><th>Total</th></tr></thead><tbody>${orders.orders.length ? orders.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.customer)}</td><td>${escapeHtml(item.status)}</td><td>${item.total_amount}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record sale</h2><form id="sale-form" class="compact-form"><input name="description"     placeholder="e.g. 10 litres sold at market"><input name="quantity" type="number" min=".01" step=".01"     placeholder="e.g. 10"><input name="unit"     placeholder="e.g. litres or trays"><input name="unitPrice" type="number" min="0" step=".01"     placeholder="KES per unit"><input name="soldAt" type="datetime-local" required><button>Save sale</button></form><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${payments.payments.length ? payments.payments.map((item) => `<tr><td>#${item.order_id}</td><td>${item.method}</td><td>${item.status}</td><td>${item.amount}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No payments yet.</td></tr>'}</tbody></table></div></section></section>`
     content.querySelector('#order-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createOrder(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
     content.querySelector('#sale-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createSale(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
     const commerceTools = document.createElement('section')
     commerceTools.className = 'module-grid commerce-tools'
     commerceTools.innerHTML = `<section class="panel"><h2>Product catalogue</h2><form id="product-form" class="compact-form"><input name="name"     placeholder="e.g. Fresh milk" maxlength="140" required><select name="productType"><option value="produce">Produce</option><option value="livestock">Livestock</option><option value="other">Other</option></select><select name="productionKind"><option value="">Unlinked produce</option><option value="milk">Milk</option><option value="eggs">Eggs</option><option value="wool">Wool</option></select><select name="species"><option value="">Species, for livestock</option><option value="cattle">Cattle</option><option value="goat">Goat</option><option value="sheep">Sheep</option><option value="rabbit">Rabbit</option><option value="chicken">Chicken</option><option value="other">Other</option></select><input name="unit"     placeholder="e.g. litres or head" required><input name="availableQuantity" type="number" min="0" step="0.01"     placeholder="e.g. 100" value="0"><input name="unitPrice" type="number" min="0" step="0.01"     placeholder="Price per unit (KES)" required><button>Add listing</button></form><div class="table-wrap"><table><thead><tr><th>Listing</th><th>Type</th><th>Available</th><th>Price</th></tr></thead><tbody>${products.products.length ? products.products.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.product_type)}</td><td>${Number(item.available_quantity).toLocaleString()} ${escapeHtml(item.unit)}</td><td>KES ${Math.round(Number(item.unit_price)).toLocaleString()}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No active listings.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Expenses</h2><form id="expense-form" class="compact-form"><select name="category"><option value="feed">Feed</option><option value="veterinary">Veterinary</option><option value="labour">Labour</option><option value="equipment">Equipment</option><option value="utilities">Utilities</option><option value="transport">Transport</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select><input name="description"     placeholder="e.g. Dairy meal delivered" required><input name="amount" type="number" min="0.01" step="0.01"     placeholder="Amount in KES" required><input name="expenseDate" type="date" value="${nairobiDate()}" required><button>Record expense</button></form><div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead><tbody>${expenses.expenses.length ? expenses.expenses.map((item) => `<tr><td>${escapeHtml(item.expense_date)}</td><td>${escapeHtml(item.category)}</td><td>${escapeHtml(item.description)}</td><td>KES ${Math.round(Number(item.amount)).toLocaleString()}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No expenses recorded.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record payment</h2><form id="payment-form" class="compact-form"><select name="orderId" required><option value="">Choose order</option>${orders.orders.filter((item) => !['cancelled', 'fulfilled'].includes(item.status)).map((item) => `<option value="${Number(item.id)}">#${Number(item.id)} · ${escapeHtml(item.customer)} · KES ${Math.round(Number(item.total_amount)).toLocaleString()}</option>`).join('')}</select><select name="method"><option value="cash">Cash</option><option value="mpesa">M-Pesa (simulate locally)</option><option value="bank">Bank</option><option value="other">Other</option></select><input name="transactionReference" placeholder="Receipt or reference (cash/bank/other)"><button>Record payment</button></form><p class="muted">M-PESA is simulated locally. No Daraja request or real charge is made.</p></section></section>`
     content.append(commerceTools)
+    const commerceTables = content.querySelectorAll('.module-grid > .panel table')
+    enableSortableTable(commerceTables[0], ['number', 'text', 'text', 'text', 'number'])
+    enableSortableTable(commerceTables[1], ['number', 'text', 'text', 'number'])
     const orderTable = content.querySelector('.module-grid .panel table')
     const orderBody = orderTable?.querySelector('tbody')
     if (orderTable && orderBody && orders.orders.length) {

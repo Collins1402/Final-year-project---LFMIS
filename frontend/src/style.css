@@ -32,6 +32,15 @@ aside { padding: 2rem; background: #173f35; color: #f7f3e8; }.brand { margin: 0;
 @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } aside { padding: 1.2rem 1.5rem; }.user-chip { margin-top: 1.2rem; }.grid { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .role-grid { grid-template-columns: 1fr; } }
 @media (max-width: 550px) { .content header { display: block; }.health-pill { display: inline-block; margin-top: 1rem; }.stats { grid-template-columns: 1fr; }.compact-form { grid-template-columns: 1fr; }.compact-form button { grid-column: auto; } }
+.table-sort { display: inline-flex; align-items: center; gap: .25rem; padding: 0; background: transparent; color: inherit; text-align: left; font: inherit; text-transform: inherit; white-space: nowrap; }
+.table-sort:hover { background: transparent; color: #c75e2d; }
+.table-sort:focus-visible { outline: 2px solid #c75e2d; outline-offset: 3px; }
+.table-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin: .8rem 0; }
+.table-tools .table-search, .table-tools .table-status-filter { width: auto; max-width: 100%; padding: .5rem .65rem; font-size: .82rem; }
+.table-tools .table-search { flex: 1 1 14rem; max-width: 24rem; }
+.table-tools .table-status-filter { min-width: 9rem; }
+.table-result-count { margin-left: auto; color: #668078; font-size: .78rem; }
+tr[hidden] { display: none; }
 .button-row { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 .security-method-list { list-style: none; padding: 0; display: grid; gap: 1rem; }
 .security-method-list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e3e9df; }
