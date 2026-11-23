@@ -167,6 +167,55 @@ final class CommerceService
         }
     }
 
+    public function updateOrdersBulk(array $orderIds, string $status, int $userId): array
+    {
+        if (!in_array($status, ['fulfilled', 'cancelled'], true)) {
+            throw new \InvalidArgumentException('Bulk actions can only fulfill or cancel orders.');
+        }
+        $orderIds = array_values(array_unique(array_map('intval', $orderIds)));
+        if ($orderIds === [] || count($orderIds) > 300 || min($orderIds) < 1) {
+            throw new \InvalidArgumentException('Select between 1 and 300 valid orders.');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $updated = [];
+            foreach ($orderIds as $id) {
+                $query = 'SELECT id, customer_id, status FROM orders WHERE id = ?';
+                if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $query .= ' FOR UPDATE';
+                $orderQuery = $this->db->prepare($query);
+                $orderQuery->execute([$id]);
+                $order = $orderQuery->fetch(PDO::FETCH_ASSOC);
+                if (!$order) throw new \DomainException('Order #' . $id . ' was not found. No orders were changed.');
+
+                $currentStatus = (string) $order['status'];
+                $transitions = [
+                    'pending' => ['cancelled'],
+                    'quoted' => ['cancelled'],
+                    'accepted' => ['fulfilled', 'cancelled'],
+                ];
+                if (!in_array($status, $transitions[$currentStatus] ?? [], true)) {
+                    throw new \DomainException('Order #' . $id . ' cannot move from ' . $currentStatus . ' to ' . $status . '. No orders were changed.');
+                }
+
+                if ($status === 'cancelled' && $currentStatus === 'accepted') $this->releaseOrderItems($id);
+                if ($status === 'fulfilled') $this->recordOrderSales($id, (int) $order['customer_id']);
+                $statement = $this->db->prepare(
+                    "UPDATE orders SET status = ?, handled_by = ?,
+                     fulfilled_at = CASE WHEN ? = 'fulfilled' THEN CURRENT_TIMESTAMP ELSE fulfilled_at END
+                     WHERE id = ?"
+                );
+                $statement->execute([$status, $userId, $status, $id]);
+                $updated[] = ['id' => $id, 'from' => $currentStatus, 'to' => $status];
+            }
+            $this->db->commit();
+            return $updated;
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
+    }
+
     public function sales(): array { return $this->db->query('SELECT * FROM sales ORDER BY sold_at DESC LIMIT 300')->fetchAll(); }
     public function createSale(array $input, int $userId): array
     {

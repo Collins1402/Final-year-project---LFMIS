@@ -87,6 +87,55 @@ function enhanceDataTable(table) {
     toolbar.append(statusFilter)
   }
 
+  let updateBulkButtons = () => {}
+  if (table.dataset.bulkOrders === 'true') {
+    const actions = document.createElement('div')
+    actions.className = 'table-bulk-actions'
+    const fulfill = document.createElement('button')
+    fulfill.type = 'button'
+    fulfill.className = 'small-action'
+    const cancel = document.createElement('button')
+    cancel.type = 'button'
+    cancel.className = 'small-action danger-action'
+    const feedback = document.createElement('span')
+    feedback.className = 'table-bulk-feedback'
+    feedback.setAttribute('aria-live', 'polite')
+    actions.append(fulfill, cancel, feedback)
+    toolbar.append(actions)
+
+    const visibleOrders = () => [...table.tBodies[0].rows].filter((row) => !row.hidden && row.dataset.orderId)
+    const fulfillIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'accepted').map((row) => Number(row.dataset.orderId))
+    const cancelIds = () => visibleOrders().filter((row) => ['pending', 'quoted', 'accepted'].includes(row.dataset.orderStatus)).map((row) => Number(row.dataset.orderId))
+    updateBulkButtons = () => {
+      const fulfillCount = fulfillIds().length
+      const cancelCount = cancelIds().length
+      fulfill.textContent = `Fulfill visible (${fulfillCount})`
+      cancel.textContent = `Cancel visible (${cancelCount})`
+      fulfill.disabled = fulfillCount === 0
+      cancel.disabled = cancelCount === 0
+    }
+
+    const submitBulkAction = async (status, ids) => {
+      if (ids.length === 0) return
+      const confirmText = status === 'fulfilled'
+        ? `Fulfill ${ids.length} accepted order(s) matching the current filters? This records their sales.`
+        : `Cancel ${ids.length} open order(s) matching the current filters? Reserved stock will be released.`
+      if (!window.confirm(confirmText)) return
+      fulfill.disabled = true
+      cancel.disabled = true
+      feedback.textContent = 'Updating orders…'
+      try {
+        await api.updateOrdersBulk({ orderIds: ids, status })
+        await renderCommerceModule()
+      } catch (error) {
+        feedback.textContent = error.message
+        updateBulkButtons()
+      }
+    }
+    fulfill.addEventListener('click', () => submitBulkAction('fulfilled', fulfillIds()))
+    cancel.addEventListener('click', () => submitBulkAction('cancelled', cancelIds()))
+  }
+
   const resultCount = document.createElement('span')
   resultCount.className = 'table-result-count'
   resultCount.setAttribute('aria-live', 'polite')
@@ -111,6 +160,7 @@ function enhanceDataTable(table) {
       if (!row.hidden) visible += 1
     })
     resultCount.textContent = visible === total ? `${total} records` : `${visible} of ${total} records`
+    updateBulkButtons()
   }
   search.addEventListener('input', filterRows)
   statusFilter?.addEventListener('change', filterRows)
