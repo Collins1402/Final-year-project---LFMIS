@@ -90,6 +90,47 @@ final class MpesaService
         ];
     }
 
+    /** Complete a clearly identified local payment simulation without contacting Daraja. */
+    public function simulate(int $orderId, array $user): array
+    {
+        $orderQuery = $this->db->prepare(
+            'SELECT o.id, o.customer_id, o.status, o.total_amount, c.user_id
+             FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ?'
+        );
+        $orderQuery->execute([$orderId]);
+        $order = $orderQuery->fetch(PDO::FETCH_ASSOC);
+        if (!$order || (in_array($user['role'] ?? '', ['customer', 'buyer'], true) && (int) $order['user_id'] !== (int) ($user['id'] ?? 0))) {
+            throw new \DomainException('Order not found.');
+        }
+        if (in_array($order['status'], ['paid', 'fulfilled', 'cancelled'], true)) {
+            throw new \DomainException('This order is not awaiting payment.');
+        }
+        if ((float) $order['total_amount'] <= 0) {
+            throw new \InvalidArgumentException('The order must have a positive M-PESA amount.');
+        }
+        $items = $this->db->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = ?');
+        $items->execute([$orderId]);
+        if ((int) $items->fetchColumn() === 0) {
+            throw new \DomainException('The order has no items to pay for.');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $insert = $this->db->prepare(
+                "INSERT INTO payments (order_id, customer_id, amount, method, status, transaction_reference, result_desc, paid_at, recorded_by)
+                 VALUES (?, ?, ?, 'mpesa', 'pending', NULL, 'Local M-PESA simulation', NULL, ?)"
+            );
+            $insert->execute([$orderId, $order['customer_id'], round((float) $order['total_amount']), $user['id'] ?? null]);
+            $payment = ['id' => (int) $this->db->lastInsertId(), 'order_id' => $orderId, 'amount' => $order['total_amount']];
+            $this->confirmPayment($payment, ['MpesaReceiptNumber' => 'SIM-' . strtoupper(bin2hex(random_bytes(5))), 'Amount' => round((float) $order['total_amount'])], 'Simulated locally; no real M-PESA payment was made.');
+            $this->db->commit();
+            return ['paymentId' => $payment['id'], 'status' => 'confirmed', 'simulated' => true];
+        } catch (Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
+    }
+
     public function handleCallback(string $providedSecret, array $payload): array
     {
         $secret = Env::get('LFMIS_MPESA_CALLBACK_SECRET', '');

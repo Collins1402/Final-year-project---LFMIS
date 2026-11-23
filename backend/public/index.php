@@ -651,14 +651,7 @@ try {
         Response::error('You do not have permission to perform this action.', 403);
     }
     if ($method === 'POST' && $path === '/api/payments/mpesa/callback') {
-        if (Env::get('LFMIS_MPESA_DEMO_MODE', '0') === '1') {
-            Response::json(['ResultCode' => 0, 'ResultDesc' => 'Demo mode is active; callback ignored.']);
-        }
-        $result = $mpesa->handleCallback((string) ($_GET['token'] ?? ''), $request->body());
-        Response::json([
-            'ResultCode' => 0,
-            'ResultDesc' => !empty($result['duplicate']) ? 'Duplicate callback acknowledged.' : 'Callback processed.',
-        ]);
+        Response::error('M-PESA callbacks are disabled; this installation uses local payment simulation.', 410);
     }
     if ($method === 'POST' && $path === '/api/payments/mpesa/initiate') {
         $current = $auth->currentUser();
@@ -667,21 +660,18 @@ try {
             || $permissions->allows($current['role'], 'orders.manage')
             || $permissions->allows($current['role'], 'finance.manage');
         if (!$allowed) Response::error('You do not have permission to perform this action.', 403);
-        if (Env::get('LFMIS_MPESA_DEMO_MODE', '0') === '1') {
-            Response::error('M-PESA demo mode is active; no payment request was sent.', 409);
-        }
         $rateLimits->consume('payments.mpesa.initiate', 5, 60, (string) $current['id'] . ':' . (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
         $body = $request->body();
         $orderId = filter_var($body['orderId'] ?? null, FILTER_VALIDATE_INT);
         if ($orderId === false || $orderId === null) Response::error('Choose a valid order.', 422);
-        Response::json(['payment' => $mpesa->initiate((int) $orderId, $current, isset($body['phone']) ? (string) $body['phone'] : null)], 201);
+        Response::json(['payment' => $mpesa->simulate((int) $orderId, $current)], 201);
     }
     if ($path === '/api/orders') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if ($method === 'GET' && $permissions->allows($current['role'], 'orders.view')) Response::json([
             'orders' => $commerce->orders($current['role'] === 'admin' ? null : (int) $current['id']),
-            'mpesaDemoMode' => Env::get('LFMIS_MPESA_DEMO_MODE', '0') === '1',
+            'mpesaDemoMode' => true,
         ]);
         if ($method === 'POST' && $permissions->allows($current['role'], 'orders.manage')) Response::json(['order' => $commerce->createOrder($request->body(), $current['id'])], 201);
         if ($method === 'POST' && $permissions->allows($current['role'], 'orders.create')) {

@@ -1151,17 +1151,22 @@ async function renderRoleModule(module) {
         const payment = latestPayment.get(orderId)
         const payable = !['paid', 'fulfilled', 'cancelled'].includes(item.status)
         const paymentStatus = payment?.status === 'failed' ? 'Payment failed. You can retry.' : payment?.status === 'confirmed' ? 'Paid.' : ''
-        const paymentAction = !payable ? '' : mpesaDemoMode
-          ? `<button type="button" class="small-action" data-mpesa-demo="${orderId}">Simulate M-PESA</button>`
-          : `<label class="sr-only" for="mpesa-phone-${orderId}">M-PESA phone number</label><input id="mpesa-phone-${orderId}" type="tel" inputmode="tel" placeholder="07XXXXXXXX" value="${escapeHtml(item.phone || '')}" aria-label="M-PESA phone number for order ${orderId}"><button type="button" class="small-action" data-mpesa-pay="${orderId}">Pay with M-PESA</button>`
+        const paymentAction = !payable ? '' : `<button type="button" class="small-action" data-mpesa-demo="${orderId}">Simulate M-PESA payment</button>`
         return `<tr><td>#${orderId}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.total_amount)).toLocaleString()}</td><td>${paymentAction}<span data-mpesa-status="${orderId}" aria-live="polite">${escapeHtml(paymentStatus)}</span></td></tr>`
       }).join('')
-      content.innerHTML = `<section class="module-grid"><section class="panel"><h2>My orders</h2>${mpesaDemoMode ? message('Demo mode: M-PESA is simulated. No request is sent to Safaricom and no payment is recorded.') : ''}<div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th><th>Payment</th></tr></thead><tbody>${orders || '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Payments</h2><p class="muted">${mpesaDemoMode ? 'Demo mode does not charge or add payment records.' : 'After starting a payment, check your phone and enter your M-PESA PIN.'}</p><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${paymentData.payments.map((item) => `<tr><td>#${Number(item.order_id)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.amount)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No payments recorded.</td></tr>'}</tbody></table></div></section></section>`
-      content.querySelectorAll('[data-mpesa-demo]').forEach((button) => button.addEventListener('click', () => {
+      content.innerHTML = `<section class="module-grid orders-payments-grid"><section class="panel"><h2>My orders</h2>${message('M-PESA is simulated locally for this project. No phone prompt or real payment is made.') }<div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th><th>Payment</th></tr></thead><tbody>${orders || '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Payments</h2><p class="muted">Simulated payments are recorded with a SIM receipt reference. No real money moves.</p><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${paymentData.payments.map((item) => `<tr><td>#${Number(item.order_id)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.amount)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No payments recorded.</td></tr>'}</tbody></table></div></section></section>`
+      content.querySelectorAll('[data-mpesa-demo]').forEach((button) => button.addEventListener('click', async () => {
         const orderId = Number(button.dataset.mpesaDemo)
         button.disabled = true
-        button.textContent = 'Demo complete'
-        content.querySelector(`[data-mpesa-status="${orderId}"]`).textContent = 'Simulated only — no M-PESA request or payment record was created.'
+        button.textContent = 'Simulating…'
+        try {
+          await api.initiateMpesaPayment({ orderId })
+          await renderRoleModule(module)
+        } catch (error) {
+          button.disabled = false
+          button.textContent = 'Simulate M-PESA payment'
+          content.querySelector(`[data-mpesa-status="${orderId}"]`).textContent = error.message
+        }
       }))
       content.querySelectorAll('[data-mpesa-pay]').forEach((button) => button.addEventListener('click', async () => {
         const orderId = Number(button.dataset.mpesaPay)
