@@ -28,6 +28,11 @@ final class Database
                 PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
             ];
             self::$connection = new PDO($dsn, Env::required('LFMIS_DB_USER'), $password, $options);
+            $timezone = new \DateTimeZone(Env::get('LFMIS_TIMEZONE', 'Africa/Nairobi'));
+            $offsetSeconds = $timezone->getOffset(new \DateTimeImmutable('now', $timezone));
+            $absoluteOffset = abs($offsetSeconds);
+            $offset = sprintf('%s%02d:%02d', $offsetSeconds < 0 ? '-' : '+', intdiv($absoluteOffset, 3600), intdiv($absoluteOffset % 3600, 60));
+            self::$connection->exec("SET time_zone = '{$offset}'");
         }
         return self::$connection;
     }

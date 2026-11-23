@@ -15,6 +15,8 @@ final class Env
         }
         self::$loaded = true;
         if (!is_readable($file)) {
+            $timezone = self::get('LFMIS_TIMEZONE', 'Africa/Nairobi');
+            if ($timezone !== null && in_array($timezone, timezone_identifiers_list(), true)) date_default_timezone_set($timezone);
             return;
         }
         foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
@@ -29,6 +31,10 @@ final class Env
             $value = preg_replace('/^(["\'])(.*)\1$/', '$2', $value);
             putenv("{$key}={$value}");
             $_ENV[$key] = $value;
+        }
+        $timezone = self::get('LFMIS_TIMEZONE', 'Africa/Nairobi');
+        if ($timezone !== null && in_array($timezone, timezone_identifiers_list(), true)) {
+            date_default_timezone_set($timezone);
         }
     }
 

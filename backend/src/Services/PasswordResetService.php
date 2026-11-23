@@ -52,7 +52,7 @@ final class PasswordResetService
         $statement = $this->db->prepare(
             'SELECT user_id FROM password_reset_tokens WHERE token_hash = ? AND expires_at > ?'
         );
-        $statement->execute([hash('sha256', $token), gmdate('Y-m-d H:i:s')]);
+        $statement->execute([hash('sha256', $token), date('Y-m-d H:i:s')]);
         $userId = $statement->fetchColumn();
         if (!$userId) {
             throw new \InvalidArgumentException('The reset link is invalid or has expired.');
