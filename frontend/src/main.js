@@ -41,29 +41,25 @@ function installFixedSidebar() {
   }))
 }
 
-function renderPhoneAccessModule() {
+async function renderPhoneAccessModule() {
   const content = app.querySelector('.content')
-  const currentHost = window.location.hostname
-  const isPrivateHost = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(currentHost)
-  content.innerHTML = `<header><div><p class="kicker">LOCAL NETWORK</p><h1>Phone access</h1><p class="muted">Create a QR code that opens LFMIS in a phone browser on the same Wi-Fi network.</p></div><span class="health-pill">Private Wi-Fi</span></header><section class="panel phone-access-panel"><h2>Connect a phone</h2><p class="muted">Enter this computer's private IPv4 address from <strong>ipconfig</strong>. Start the frontend with <code>npm --prefix frontend run dev:lan</code> and keep the PHP API and database running.</p><form id="phone-qr-form" class="compact-form"><label>Computer's private IPv4 address<input name="host" inputmode="decimal" placeholder="e.g. 192.168.1.20" value="${isPrivateHost ? escapeHtml(currentHost) : ''}" required></label><button>Generate phone QR code</button></form><div id="phone-qr-feedback" aria-live="polite"></div><canvas id="phone-access-qr" width="240" height="240" aria-label="QR code for opening LFMIS on a phone" hidden></canvas><p id="phone-access-url" class="muted" hidden></p><p class="muted">Both devices must be on the same trusted Wi-Fi. Keep this development app off the public internet.</p></section>`
-  content.querySelector('#phone-qr-form').addEventListener('submit', async (event) => {
-    event.preventDefault()
-    const host = event.currentTarget.elements.host.value.trim()
-    const octets = host.split('.').map(Number)
-    const validAddress = octets.length === 4 && octets.every((part, index) => /^\d{1,3}$/.test(host.split('.')[index]) && part >= 0 && part <= 255)
-    const privateAddress = validAddress && (octets[0] === 10 || (octets[0] === 192 && octets[1] === 168) || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31))
-    const feedback = content.querySelector('#phone-qr-feedback')
-    if (!privateAddress) { feedback.innerHTML = message('Enter a private IPv4 address, such as 192.168.1.20.', true); return }
-    const url = `http://${host}:5173/`
-    try {
-      await QRCode.toCanvas(content.querySelector('#phone-access-qr'), url, { width: 240, margin: 2 })
-      content.querySelector('#phone-access-qr').hidden = false
-      const link = content.querySelector('#phone-access-url')
-      link.textContent = url
-      link.hidden = false
-      feedback.innerHTML = message('Scan this code while connected to the same Wi-Fi.')
-    } catch (error) { feedback.innerHTML = message(error.message, true) }
-  })
+  content.innerHTML = `<header><div><p class="kicker">LOCAL NETWORK</p><h1>Phone access</h1><p class="muted">Scan a code with a phone on the same Wi-Fi to open LFMIS in its browser.</p></div><span class="health-pill">Private Wi-Fi</span></header><section class="panel phone-access-panel"><h2>Scan to connect</h2><p class="muted">LFMIS detected these private network addresses for this computer. Keep the frontend, PHP API and database running while phones use the app.</p><div id="phone-qr-list" class="phone-qr-list"><p class="muted">Finding this computer's Wi-Fi address…</p></div><p class="muted">If more than one code appears, try the one for the Wi-Fi network your phone is using. Keep this development app on a trusted private network.</p></section>`
+  const list = content.querySelector('#phone-qr-list')
+  try {
+    const data = await api.localNetworkAddresses()
+    const addresses = data.addresses || []
+    if (!addresses.length) {
+      list.innerHTML = message('No active private network address was detected. Connect this computer to Wi-Fi, then reopen Phone QR access.', true)
+      return
+    }
+    list.innerHTML = addresses.map((item, index) => {
+      const url = `http://${item.address}:5173/`
+      return `<section class="phone-qr-item"><h3>${addresses.length > 1 ? `Network ${index + 1}` : 'Phone access link'}</h3><p>${escapeHtml(item.interface)} · ${escapeHtml(item.address)}</p><canvas data-phone-qr="${escapeHtml(url)}" width="240" height="240" aria-label="QR code for ${escapeHtml(url)}"></canvas><p class="phone-qr-url">${escapeHtml(url)}</p></section>`
+    }).join('')
+    await Promise.all([...list.querySelectorAll('[data-phone-qr]')].map((canvas) => QRCode.toCanvas(canvas, canvas.dataset.phoneQr, { width: 240, margin: 2 })))
+  } catch (error) {
+    list.innerHTML = message(error.message || 'Could not detect the computer address. Check the network connection and try again.', true)
+  }
 }
 
 function enableSortableTable(table, columnTypes = []) {

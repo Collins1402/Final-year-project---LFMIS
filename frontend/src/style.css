@@ -105,11 +105,13 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .shell > aside { position: fixed; inset: 0 auto 0 0; width: 260px; height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; z-index: 20; }
 .shell > .content { grid-column: 2; min-width: 0; }
 .sidebar-toggle { display: none; }
-.phone-access-panel { max-width: 680px; margin-top: 1.5rem; }
-.phone-access-panel form label { grid-column: 1 / -1; }
-.phone-access-panel canvas { display: block; width: 240px; max-width: 100%; height: auto; margin: 1rem auto; image-rendering: pixelated; }
-.phone-access-panel canvas[hidden] { display: none; }
-.phone-access-panel code { white-space: nowrap; }
+.phone-access-panel { max-width: 940px; margin-top: 1.5rem; }
+.phone-qr-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.phone-qr-item { min-width: 0; padding: 1rem; border: 1px solid #e3e9df; border-radius: 8px; text-align: center; }
+.phone-qr-item h3 { margin: 0; font: 700 1rem 'Space Grotesk', sans-serif; }
+.phone-qr-item p { color: #668078; overflow-wrap: anywhere; }
+.phone-qr-item canvas { display: block; width: 240px; max-width: 100%; height: auto; margin: 1rem auto; image-rendering: pixelated; }
+.phone-qr-url { font-weight: 700; }
 
 @media (max-width: 900px) {
   .shell { display: block; min-height: 100vh; }
