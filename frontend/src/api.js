@@ -8,6 +8,8 @@ async function request(path, options = {}) {
   if (!response.ok) {
     const error = new Error(body.error || `Request failed (${response.status})`)
     error.status = response.status
+    error.existingRecord = body.existingRecord || null
+    error.warning = body.warning === true
     throw error
   }
   return body
@@ -60,6 +62,7 @@ export const api = {
   production: () => request('/api/production'),
   productionSummary: () => request('/api/production/summary'),
   recordProduction: (data) => post('/api/production', data),
+  updateProduction: (id, data) => request(`/api/production/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   inventory: () => request('/api/inventory'),
   inventoryTransactions: () => request('/api/inventory/transactions'),
   createInventoryItem: (data) => post('/api/inventory/items', data),

@@ -614,7 +614,7 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
-    if ($path === '/api/production' || $path === '/api/production/summary') {
+    if ($path === '/api/production' || $path === '/api/production/summary' || preg_match('#^/api/production/\d+$#', $path)) {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if ($method === 'GET' && $path === '/api/production/summary' && $permissions->allows($current['role'], 'production.view')) Response::json($production->summary());
@@ -623,6 +623,11 @@ try {
             $record = $production->record($request->body(), $current['id']);
             $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'create', 'farm_produce', $record['id']]);
             Response::json(['record' => $record], 201);
+        }
+        if ($method === 'PATCH' && preg_match('#^/api/production/(\d+)$#', $path, $matches) && $permissions->allows($current['role'], 'production.record')) {
+            $record = $production->update((int) $matches[1], $request->body(), $current['id']);
+            $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update', 'farm_produce', $record['id']]);
+            Response::json(['record' => $record]);
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
@@ -825,6 +830,10 @@ try {
         $feedback->resolve((int)$matches[1], $current['id']); Response::json(['ok'=>true]);
     }
     Response::error('Endpoint not found.', 404);
+} catch (Lfmis\Services\DuplicateProductionException $error) {
+    Response::json(['error' => $error->getMessage(), 'existingRecord' => $error->existingRecord], 409);
+} catch (Lfmis\Services\ProductionPlausibilityWarning $error) {
+    Response::json(['error' => $error->getMessage(), 'warning' => true], 422);
 } catch (DomainException $error) {
     Response::error($error->getMessage(), 409);
 } catch (InvalidArgumentException $error) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Lfmis\Services;
 
 use PDO;
+use PDOException;
 
 final class AnimalService
 {
@@ -32,15 +33,27 @@ final class AnimalService
         if ($weight !== null && (!is_numeric($weight) || (float) $weight <= 0)) {
             throw new \InvalidArgumentException('Weight must be a positive number.');
         }
+        $tagCheck = $this->db->prepare('SELECT 1 FROM animals WHERE tag_number = ? LIMIT 1');
+        $tagCheck->execute([$tag]);
+        if ($tagCheck->fetchColumn()) {
+            throw new \DomainException("Tag {$tag} is already registered.");
+        }
         $dateOfBirth = $this->dateOrNull($input['dateOfBirth'] ?? null);
         $statement = $this->db->prepare(
             'INSERT INTO animals (tag_number, species, breed, name, sex, date_of_birth, weight_kg, notes, created_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $statement->execute([
-            $tag, $species, $this->textOrNull($input['breed'] ?? null), $this->textOrNull($input['name'] ?? null), $sex,
-            $dateOfBirth, $weight === null ? null : (float) $weight, $this->textOrNull($input['notes'] ?? null), $userId,
-        ]);
+        try {
+            $statement->execute([
+                $tag, $species, $this->textOrNull($input['breed'] ?? null), $this->textOrNull($input['name'] ?? null), $sex,
+                $dateOfBirth, $weight === null ? null : (float) $weight, $this->textOrNull($input['notes'] ?? null), $userId,
+            ]);
+        } catch (PDOException $error) {
+            if ($error->getCode() === '23000' || (int) ($error->errorInfo[1] ?? 0) === 1062) {
+                throw new \DomainException("Tag {$tag} is already registered.");
+            }
+            throw $error;
+        }
         return $this->find((int) $this->db->lastInsertId());
     }
 

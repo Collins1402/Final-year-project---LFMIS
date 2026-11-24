@@ -46,6 +46,45 @@ final class ProductionServiceTest extends TestCase
         ], 7);
     }
 
+    public function testRejectsDuplicateMilkAndReturnsExistingRecordForEditing(): void
+    {
+        $service = $this->service();
+        $input = ['produceName' => 'Milk', 'productionDate' => date('Y-m-d'), 'session' => 'morning', 'animalId' => '1', 'quantityProduced' => '12', 'unit' => 'litres'];
+        $service->record($input, 7);
+        try {
+            $service->record($input, 7);
+            $this->fail('Expected duplicate production to be rejected.');
+        } catch (\Lfmis\Services\DuplicateProductionException $error) {
+            $this->assertStringContainsString('Edit the existing record', $error->getMessage());
+            $this->assertSame(1, (int) $error->existingRecord['id']);
+        }
+        $updated = $service->update(1, array_merge($input, ['quantityProduced' => '13']), 7);
+        $this->assertSame(1, $updated['id']);
+        $this->assertEquals(13, $service->records()[0]['quantity_produced']);
+    }
+
+    public function testRejectsDuplicateEggsForSameDateAndSession(): void
+    {
+        $service = $this->service();
+        $input = ['produceName' => 'Eggs', 'productionDate' => date('Y-m-d'), 'session' => '', 'quantityProduced' => '20', 'unit' => 'trays'];
+        $service->record($input, 7);
+        $this->expectException(\Lfmis\Services\DuplicateProductionException::class);
+        $service->record($input, 7);
+    }
+
+    public function testWarnsAndDoesNotSaveImplausibleMilkAmount(): void
+    {
+        $db = $this->database();
+        $service = new ProductionService($db);
+        try {
+            $service->record(['produceName' => 'Milk', 'productionDate' => date('Y-m-d'), 'session' => 'morning', 'quantityProduced' => '5000', 'unit' => 'litres'], 7);
+            $this->fail('Expected an implausible amount warning.');
+        } catch (\Lfmis\Services\ProductionPlausibilityWarning $warning) {
+            $this->assertStringContainsString('not saved', $warning->getMessage());
+        }
+        $this->assertCount(0, $service->records());
+    }
+
     public function testSummaryGroupsRecentDailyAndMonthToDateProduction(): void
     {
         $db = $this->database();
@@ -72,6 +111,9 @@ final class ProductionServiceTest extends TestCase
     {
         $db = new PDO('sqlite::memory:');
         $db->exec('CREATE TABLE farm_produce (id INTEGER PRIMARY KEY AUTOINCREMENT, produce_name TEXT NOT NULL, production_date TEXT NOT NULL, production_session TEXT NULL, quantity_produced REAL NOT NULL, quantity_sold REAL NOT NULL, quantity_damaged REAL NOT NULL, unit TEXT NOT NULL, notes TEXT NULL, recorded_by INTEGER NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+        $db->exec('ALTER TABLE farm_produce ADD COLUMN animal_id INTEGER NULL');
+        $db->exec('CREATE TABLE animals (id INTEGER PRIMARY KEY, tag_number TEXT NOT NULL UNIQUE)');
+        $db->exec("INSERT INTO animals (id, tag_number) VALUES (1, 'SIM-C001')");
         $db->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, production_kind TEXT, available_quantity REAL, is_active INTEGER)');
         return $db;
     }
