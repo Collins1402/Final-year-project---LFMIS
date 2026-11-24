@@ -222,5 +222,10 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .trend-chart { margin: 0; padding: .75rem; background: #f5f7f1; border-radius: 7px; }
 .trend-chart figcaption { color: #668078; font-size: .78rem; }
 .trend-chart svg { width: 100%; height: 120px; }
+.data-export-form fieldset { border: 1px solid #dce4db; border-radius: 8px; padding: .8rem; }
+.data-export-form legend { padding: 0 .3rem; font-weight: 700; }
+.export-section-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .5rem; margin-top: .65rem; }
+.export-section-option { display: flex !important; align-items: center; gap: .5rem; }
+.export-section-option input { width: auto; margin: 0; }
 @media (max-width: 900px) { .synthetic-grid, .trends-farm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.trend-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 550px) { .trend-tabs { display: grid; grid-template-columns: repeat(3, 1fr); }.trend-article, .weather-grid, .trend-history-charts { display: grid; grid-template-columns: 1fr; }.synthetic-grid, .trends-farm-stats, .trend-status-grid { grid-template-columns: 1fr; } }

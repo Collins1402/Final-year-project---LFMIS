@@ -541,6 +541,12 @@ try {
             'to' => $_GET['to'] ?? '',
         ])]);
     }
+    if ($path === '/api/data/export/options' && $method === 'GET') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'data.export')) Response::error('You do not have permission to export data.', 403);
+        Response::json(['sections' => $dataExports->availableSections((int) $current['id'], (string) $current['role'])]);
+    }
     if ($method === 'POST' && $path === '/api/data/export') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
@@ -548,11 +554,12 @@ try {
         $body = $request->body();
         $format = (string) ($body['format'] ?? '');
         if (!in_array($format, ['pdf', 'csv', 'excel', 'json'], true)) Response::error('Choose PDF, CSV, Excel or JSON as the download format.', 422);
+        if (!isset($body['sections']) || !is_array($body['sections'])) Response::error('Choose one or more record groups to download.', 422);
         $rateLimits->consume('data.export', 5, 300, (string) $current['id']);
         $totp->verifySensitiveAction((int) $current['id'], (string) ($body['code'] ?? ''));
-        $export = $dataExports->export((int) $current['id'], (string) $current['role']);
+        $export = $dataExports->export((int) $current['id'], (string) $current['role'], $body['sections']);
         $recordCounts = array_map('count', array_filter($export, 'is_array'));
-        $audit->record((int) $current['id'], 'data_exported', 'export', null, ['format' => $format, 'sections' => array_keys($export), 'recordCounts' => $recordCounts]);
+        $audit->record((int) $current['id'], 'data_exported', 'export', null, ['format' => $format, 'selectedGroups' => $body['sections'], 'sections' => array_keys($export), 'recordCounts' => $recordCounts]);
         Response::json(['generatedAt' => date(DATE_ATOM), 'format' => $format, 'role' => $current['role'], 'data' => $export]);
     }
     if ($method === 'POST' && $path === '/api/admin/backup') {

@@ -9,23 +9,78 @@ final class DataExportService
 {
     public function __construct(private PDO $db, private PermissionService $permissions) {}
 
-    public function export(int $userId, string $role): array
+    public function availableSections(int $userId, string $role): array
     {
-        if ($role === 'admin') return $this->administratorData($userId);
-        if ($role === 'veterinarian' && $this->permissions->allows($role, 'health.view')) return ['animal_health_records' => $this->query(
+        $groups = [
+            'admin' => [
+                ['id' => 'account', 'label' => 'My account details', 'sections' => ['account']],
+                ['id' => 'user_accounts', 'label' => 'User accounts', 'sections' => ['user_accounts']],
+                ['id' => 'animals', 'label' => 'Animal register', 'sections' => ['animals']],
+                ['id' => 'animal_health', 'label' => 'Animal health records', 'sections' => ['animal_health_records']],
+                ['id' => 'production', 'label' => 'Production records', 'sections' => ['production_records']],
+                ['id' => 'activities', 'label' => 'Farm activities', 'sections' => ['farm_activities']],
+                ['id' => 'inventory', 'label' => 'Inventory and stock movements', 'sections' => ['inventory', 'inventory_transactions']],
+                ['id' => 'listings', 'label' => 'Product listings', 'sections' => ['product_listings']],
+                ['id' => 'customers_orders', 'label' => 'Customers and orders', 'sections' => ['customers', 'orders', 'order_items', 'livestock_order_links']],
+                ['id' => 'sales', 'label' => 'Sales records', 'sections' => ['sales']],
+                ['id' => 'payments', 'label' => 'Payment records', 'sections' => ['payments']],
+                ['id' => 'expenses', 'label' => 'Farm expenses', 'sections' => ['farm_expenses']],
+                ['id' => 'maintenance', 'label' => 'Maintenance records', 'sections' => ['maintenance_records']],
+                ['id' => 'feedback', 'label' => 'Feedback', 'sections' => ['feedback']],
+                ['id' => 'events', 'label' => 'Farm events', 'sections' => ['farm_events']],
+                ['id' => 'audit_log', 'label' => 'Audit log', 'sections' => ['audit_log']],
+            ],
+            'worker' => array_merge(
+                [['id' => 'account', 'label' => 'My account details', 'sections' => ['account']]],
+                $this->permissions->allows($role, 'animals.view') ? [['id' => 'animals', 'label' => 'Animal register', 'sections' => ['animals']]] : [],
+                $this->permissions->allows($role, 'health.view') ? [['id' => 'animal_health', 'label' => 'Animal health records', 'sections' => ['animal_health_records']]] : [],
+                $this->permissions->allows($role, 'production.view') ? [['id' => 'production', 'label' => 'Production records', 'sections' => ['production_records']]] : [],
+                $this->permissions->allows($role, 'activities.view') ? [['id' => 'activities', 'label' => 'Farm activities', 'sections' => ['farm_activities']]] : [],
+                $this->permissions->allows($role, 'inventory.view') ? [['id' => 'inventory', 'label' => 'Inventory and stock movements', 'sections' => ['inventory', 'inventory_transactions']]] : []
+            ),
+            'veterinarian' => $this->permissions->allows($role, 'health.view') ? [['id' => 'animal_health', 'label' => 'Animal health records', 'sections' => ['animal_health_records']]] : [],
+            'customer' => array_merge(
+                [['id' => 'account', 'label' => 'My account details', 'sections' => ['account']]],
+                $this->permissions->allows($role, 'orders.view') ? [['id' => 'purchases', 'label' => 'My purchases and spending', 'sections' => ['purchase_summary', 'purchases', 'purchase_items']]] : [],
+                $this->permissions->allows($role, 'payments.view') ? [['id' => 'payments', 'label' => 'My payments', 'sections' => ['payments']]] : []
+            ),
+            'buyer' => array_merge(
+                [['id' => 'account', 'label' => 'My account details', 'sections' => ['account']]],
+                $this->permissions->allows($role, 'orders.view') ? [['id' => 'purchases', 'label' => 'My purchases and spending', 'sections' => ['purchase_summary', 'purchases', 'purchase_items']]] : [],
+                $this->permissions->allows($role, 'payments.view') ? [['id' => 'payments', 'label' => 'My payments', 'sections' => ['payments']]] : [],
+                [['id' => 'animal_health', 'label' => 'Health records for livestock I purchased', 'sections' => ['animal_health_records']]]
+            ),
+        ];
+        return $groups[$role] ?? [];
+    }
+
+    public function export(int $userId, string $role, array $selectedGroups): array
+    {
+        $groups = $this->availableSections($userId, $role);
+        $selectedGroups = array_values(array_unique(array_map('strval', $selectedGroups)));
+        if ($selectedGroups === []) throw new \InvalidArgumentException('Select at least one record group to download.');
+        $available = [];
+        foreach ($groups as $group) $available[$group['id']] = $group['sections'];
+        foreach ($selectedGroups as $group) {
+            if (!isset($available[$group])) throw new \DomainException('One or more selected data groups are not available to your role.');
+        }
+        $selectedSections = array_unique(array_merge(...array_map(static fn(string $group): array => $available[$group], $selectedGroups)));
+
+        if ($role === 'admin') $data = $this->administratorData($userId);
+        elseif ($role === 'veterinarian' && $this->permissions->allows($role, 'health.view')) $data = ['animal_health_records' => $this->query(
             'SELECT a.tag_number, a.species, a.name AS animal_name, h.record_type, h.description, h.medication,
                     h.dosage, h.cost, h.record_date, h.next_due_date
              FROM health_records h JOIN animals a ON a.id = h.animal_id
              ORDER BY h.record_date DESC, h.id DESC'
         )];
-        if ($role === 'customer') return $this->customerData($userId, $role);
-        if ($role === 'buyer') {
+        elseif ($role === 'customer') $data = $this->customerData($userId, $role);
+        elseif ($role === 'buyer') {
             $data = $this->customerData($userId, $role);
             $data['animal_health_records'] = $this->ownedAnimalHealthRecords($userId);
-            return $data;
-        }
-        if ($role === 'worker') return $this->workerData($userId);
-        throw new \DomainException('Data export is not available for this account role.');
+        } elseif ($role === 'worker') $data = $this->workerData($userId);
+        else throw new \DomainException('Data export is not available for this account role.');
+
+        return array_intersect_key($data, array_fill_keys($selectedSections, true));
     }
 
     private function administratorData(int $userId): array

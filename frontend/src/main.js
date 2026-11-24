@@ -21,7 +21,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
 const roleCopy = (english, swahili) => roleLanguage === 'sw' && ['worker', 'veterinarian'].includes(currentUser?.role) ? swahili : english
-const dataExportForm = (id = 'data-export-form') => `<form id="${id}" class="compact-form data-export-form"><label>Download format<select name="format"><option value="pdf">PDF document</option><option value="csv">CSV spreadsheet</option><option value="excel">Excel workbook (.xls)</option><option value="json">JSON data</option></select></label><label>Current authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required></label><button>Download my accessible data</button></form>`
+const dataExportForm = (groups, id = 'data-export-form') => `<form id="${id}" class="compact-form data-export-form"><fieldset><legend>Choose records to include</legend><label class="export-section-option"><input type="checkbox" data-export-select-all> Select all available groups</label><div class="export-section-list">${groups.map((group) => `<label class="export-section-option"><input type="checkbox" name="sections" value="${escapeHtml(group.id)}"> ${escapeHtml(group.label)}</label>`).join('')}</div></fieldset><label>Download format<select name="format"><option value="pdf">PDF document</option><option value="csv">CSV spreadsheet</option><option value="excel">Excel workbook (.xls)</option><option value="json">JSON data</option></select></label><label>Current authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required></label><button>Download selected records</button></form>`
 
 function downloadDataExport(result) {
   const filename = `lfmis-${String(result.role || 'user')}-data-${nairobiDate()}`
@@ -110,16 +110,30 @@ function downloadDataExport(result) {
 function bindDataExportForm(container, formId = 'data-export-form') {
   const form = container.querySelector(`#${formId}`)
   if (!form) return
+  const selectAll = form.querySelector('[data-export-select-all]')
+  const sectionInputs = [...form.querySelectorAll('input[name="sections"]')]
+  selectAll?.addEventListener('change', () => sectionInputs.forEach((input) => { input.checked = selectAll.checked }))
+  sectionInputs.forEach((input) => input.addEventListener('change', () => {
+    if (selectAll) selectAll.checked = sectionInputs.length > 0 && sectionInputs.every((item) => item.checked)
+  }))
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const button = form.querySelector('button[type="submit"], button:not([type])')
     const feedback = container.querySelector('[data-export-feedback]')
+    const formData = new FormData(form)
+    const sections = formData.getAll('sections').map(String)
+    if (!sections.length) {
+      if (feedback) feedback.innerHTML = message('Select at least one record group to download.', true)
+      return
+    }
     button.disabled = true
     try {
-      const result = await api.exportData(Object.fromEntries(new FormData(form)))
+      const result = await api.exportData({ format: formData.get('format'), code: formData.get('code'), sections })
       downloadDataExport(result)
       if (feedback) feedback.innerHTML = message('Your role-accessible data was downloaded.')
       form.elements.namedItem('code').value = ''
+      sectionInputs.forEach((input) => { input.checked = false })
+      if (selectAll) selectAll.checked = false
     } catch (error) {
       if (feedback) feedback.innerHTML = message(error.message, true)
       else alert(error.message)
@@ -1405,14 +1419,14 @@ async function renderPermissionsModule() {
 async function renderAuditModule(filters = {}) {
   const content = app.querySelector('.content')
   try {
-    const [auditData, userData] = await Promise.all([api.auditLogs(filters), api.users()])
+    const [auditData, userData, exportOptions] = await Promise.all([api.auditLogs(filters), api.users(), api.exportSections()])
     const users = userData.users.map((user) => `<option value="${Number(user.id)}" ${String(filters.userId || '') === String(user.id) ? 'selected' : ''}>${escapeHtml(user.full_name)} · ${escapeHtml(user.role)}</option>`).join('')
     const rows = auditData.logs.map((log) => {
       let details = log.details || ''
       try { details = JSON.stringify(JSON.parse(details), null, 2) } catch {}
       return `<tr><td>${escapeHtml(log.created_at)}</td><td>${escapeHtml(log.user_name || 'System/unknown')}</td><td>${escapeHtml(log.action)}</td><td>${escapeHtml(log.entity_type)}${log.entity_id ? ` #${Number(log.entity_id)}` : ''}</td><td><pre>${escapeHtml(details)}</pre></td><td>${escapeHtml(log.ip_address || '—')}</td></tr>`
     }).join('')
-    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><div class="button-row"><button id="audit-export" class="secondary-action">Export farm data</button><button id="backup-now">Back up now</button></div></header><section class="panel" id="audit-export-panel" hidden><h2>Download farm data</h2><p class="muted">Choose a format and enter a fresh code from your authenticator app.</p>${dataExportForm('audit-data-export-form')}<div data-export-feedback aria-live="polite"></div></section><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action    <input name="action" placeholder="e.g. sign_in_succeeded" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
+    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><div class="button-row"><button id="audit-export" class="secondary-action">Export farm data</button><button id="backup-now">Back up now</button></div></header><section class="panel" id="audit-export-panel" hidden><h2>Download farm data</h2><p class="muted">Select the records and format, then enter a fresh code from your authenticator app.</p>${dataExportForm(exportOptions.sections || [], 'audit-data-export-form')}<div data-export-feedback aria-live="polite"></div></section><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action    <input name="action" placeholder="e.g. sign_in_succeeded" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
     content.querySelector('#audit-filter-form').addEventListener('submit', (event) => {
       event.preventDefault()
       renderAuditModule(Object.fromEntries(new FormData(event.target)))
@@ -1449,10 +1463,13 @@ async function renderRightsModule(target = app.querySelector('.content')) {
       buyer: 'your own orders and payments, plus health records for livestock linked to your purchases',
     }[data.role] || 'records available through your assigned role permissions'
     let secondFactor = null
+    let exportSections = []
     if (canExport) {
-      try { secondFactor = await api.twoFactorStatus() } catch {}
+      const [factorStatus, sections] = await Promise.allSettled([api.twoFactorStatus(), api.exportSections()])
+      if (factorStatus.status === 'fulfilled') secondFactor = factorStatus.value
+      if (sections.status === 'fulfilled') exportSections = sections.value.sections || []
     }
-    const exportPanel = !canExport ? '' : `<section class="panel"><h2>Download your data</h2><p class="muted">You can download ${escapeHtml(exportScope)}. Choose a format and enter a fresh code from your authenticator app for each download.</p>${secondFactor?.enabled ? `${dataExportForm()}<div data-export-feedback aria-live="polite"></div>` : `<p class="message danger">Turn on authenticator 2-step verification before downloading data.</p><button type="button" id="export-enable-2fa">Set up authenticator</button>`}</section>`
+    const exportPanel = !canExport ? '' : `<section class="panel"><h2>Download your data</h2><p class="muted">You can download ${escapeHtml(exportScope)}. Select the record groups and format, then enter a fresh code from your authenticator app for each download.</p>${!exportSections.length ? '<p class="message danger">No exportable record groups are available to this account.</p>' : secondFactor?.enabled ? `${dataExportForm(exportSections)}<div data-export-feedback aria-live="polite"></div>` : `<p class="message danger">Turn on authenticator 2-step verification before downloading data.</p><button type="button" id="export-enable-2fa">Set up authenticator</button>`}</section>`
     content.innerHTML = `<header><div><p class="kicker">ACCOUNT & DATA</p><h1>Your rights</h1><p class="muted">Access is based on your assigned role: ${escapeHtml(data.role)}.</p></div><span class="health-pill">${grants.length} granted actions</span></header><section class="panel rights-panel"><h2>Your access</h2><ul class="rights-permissions">${grants.map((permission) => `<li>${escapeHtml(permission.label)}</li>`).join('') || '<li>No module permissions are currently assigned.</li>'}</ul><h2>Personal data</h2><div class="rights-copy"><p>You may access records made available to your role and ask the farm administrator to correct your account details or a farm record.</p><p>You may request a copy of your personal account data or ask for your account to be deleted or deactivated. Some transaction and audit records may need to be retained for farm operations or legal obligations; the administrator can explain what applies.</p><p>Your sign-in email address is used for security alerts. Contact the farm administrator to update it or discuss a data request.</p></div></section>${exportPanel}`
     bindDataExportForm(content)
     content.querySelector('#export-enable-2fa')?.addEventListener('click', () => renderAccountSecurity())
