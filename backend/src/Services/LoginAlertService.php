@@ -7,6 +7,7 @@ use Closure;
 use Lfmis\Core\DeliveryException;
 use Lfmis\Core\Env;
 use Lfmis\Core\Mailer;
+use Lfmis\Core\RequestSecurity;
 
 final class LoginAlertService
 {
@@ -27,7 +28,7 @@ final class LoginAlertService
             return false;
         }
         $requestDetails = $requestDetails ?? [
-            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'Unavailable',
+            'ip' => RequestSecurity::clientIp(),
             'agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unavailable',
         ];
         $agent = preg_replace('/[\x00-\x1F\x7F]/', '', (string) ($requestDetails['agent'] ?? 'Unavailable'));

@@ -5,6 +5,19 @@ namespace Lfmis\Core;
 
 final class RequestSecurity
 {
+    public static function clientIp(): string
+    {
+        $remoteAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        if (in_array($remoteAddress, ['127.0.0.1', '::1'], true)) {
+            $forwarded = explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''));
+            foreach (array_reverse($forwarded) as $candidate) {
+                $candidate = trim($candidate);
+                if (filter_var($candidate, FILTER_VALIDATE_IP)) return $candidate;
+            }
+        }
+        return filter_var($remoteAddress, FILTER_VALIDATE_IP) ? $remoteAddress : 'Unavailable';
+    }
+
     public static function sendHeaders(): void
     {
         header('X-Content-Type-Options: nosniff');
@@ -49,6 +62,10 @@ final class RequestSecurity
     private static function isPrivateHost(string $host): bool
     {
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                $parts = array_map('intval', explode('.', $host));
+                if ($parts[0] === 100 && $parts[1] >= 64 && $parts[1] <= 127) return true;
+            }
             return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
         }
         return false;

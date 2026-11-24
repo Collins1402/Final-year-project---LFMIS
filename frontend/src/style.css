@@ -112,6 +112,9 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .phone-qr-item p { color: #668078; overflow-wrap: anywhere; }
 .phone-qr-item canvas { display: block; width: 240px; max-width: 100%; height: auto; margin: 1rem auto; image-rendering: pixelated; }
 .phone-qr-url { font-weight: 700; }
+.phone-network-trust { display: flex; grid-template-columns: auto 1fr; align-items: flex-start; gap: .7rem; margin: 1rem 0; padding: 1rem; background: #fff4df; border-radius: 8px; }
+.phone-network-trust input { width: auto; margin-top: .2rem; }
+#manual-phone-qr-form label { grid-column: 1 / -1; }
 
 @media (max-width: 900px) {
   .shell { display: block; min-height: 100vh; }

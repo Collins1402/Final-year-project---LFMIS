@@ -145,7 +145,7 @@ npm --prefix frontend run dev
 
 Open `http://127.0.0.1:5173/`. On a new database, create the first farm-owner account on the initial setup screen. Passwords must contain at least 12 characters. Public registration is limited to customer and livestock-buyer accounts; administrators create worker and veterinarian accounts under **User accounts**.
 
-#### Open the development app from another computer on your private Wi-Fi
+#### Open the development app from another device on the same Wi-Fi
 
 Run the backend and database on the host computer as above. Stop the local Vite server if it is already using port `5173`, then start the LAN frontend:
 
@@ -155,7 +155,9 @@ npm --prefix frontend run dev:lan
 
 Find the host computer's private IPv4 address with `ipconfig` (for example, `192.168.1.20`). On the other computer, open `http://<host-private-ip>:5173/` using that address. Both computers must be on the same trusted private network. If Windows Firewall prompts, allow access on **Private networks only**. The Vite frontend proxies `/api` requests to PHP on the host, so PHP and MySQL remain bound to the host computer; no database port needs to be exposed. Do not router-port-forward this development server or use it as an internet-facing deployment. If the host's address changes, use its current IPv4 address; reserve a private address in your router if you need a stable URL.
 
-An administrator can open **Phone QR access** in the farm sidebar to display QR codes generated from the host's active private network addresses; no address entry is needed. Start Vite with `dev:lan` first; the QR code opens the local web app in the phone's browser. The host computer and its backend must stay running while the phone uses the app. If multiple network codes appear, scan the one for the Wi-Fi network connected to the phone.
+An administrator can open **Phone QR access** in the farm sidebar and confirm the network is trusted before displaying QR codes generated from the host's active network addresses. If automatic detection misses an adapter, the admin can enter the host's Wi-Fi IPv4 address from `ipconfig`; phone users only scan the code. The host computer and its backend must stay running while the phone uses the app. If multiple network codes appear, scan the one for the Wi-Fi network connected to the phone.
+
+Some school, hotel and public Wi-Fi networks isolate connected devices, which prevents a phone from reaching the host even when both are on the same Wi-Fi. Ask the network administrator whether local device-to-device access is allowed; the QR code cannot bypass that restriction. The trust checkbox is an administrator confirmation, not an access-control or encryption feature. This development app uses HTTP, so do not enter real passwords or use it on an untrusted/open public network. Successful sign-ins email the registered user with the connecting IP and device details; shared Wi-Fi may make the IP correspond to the device's local network address rather than a unique person. Never router-port-forward this development server.
 
 Workers can record production, complete assigned activities and record stock movements. Veterinarians can review animal health history and record care. Customers can browse produce listings; livestock buyers can browse livestock listings. Each customer or buyer sees only their own orders, payments and feedback.
 
