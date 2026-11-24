@@ -103,6 +103,6 @@ export const api = {
     const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== ''))
     return request(`/api/audit-logs${query.size ? `?${query}` : ''}`)
   },
-  exportData: () => request('/api/admin/export'),
+  exportData: (data) => post('/api/data/export', data),
   createBackup: () => post('/api/admin/backup', {}),
 }

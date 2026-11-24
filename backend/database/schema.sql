@@ -454,7 +454,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 
 INSERT IGNORE INTO permissions (code, label) VALUES
   ('audit.view', 'View audit log'),
-  ('data.export', 'Export farm data'),
+  ('data.export', 'Export role-accessible data'),
   ('backup.create', 'Create database backup');
 
 INSERT IGNORE INTO role_permissions (role_id, permission_code, is_allowed)

@@ -12,15 +12,15 @@ final class DataExportService
     public function export(int $userId, string $role): array
     {
         if ($role === 'admin') return $this->administratorData($userId);
-        if ($role === 'veterinarian') return ['animal_health_records' => $this->query(
+        if ($role === 'veterinarian' && $this->permissions->allows($role, 'health.view')) return ['animal_health_records' => $this->query(
             'SELECT a.tag_number, a.species, a.name AS animal_name, h.record_type, h.description, h.medication,
                     h.dosage, h.cost, h.record_date, h.next_due_date
              FROM health_records h JOIN animals a ON a.id = h.animal_id
              ORDER BY h.record_date DESC, h.id DESC'
         )];
-        if ($role === 'customer') return $this->customerData($userId);
+        if ($role === 'customer') return $this->customerData($userId, $role);
         if ($role === 'buyer') {
-            $data = $this->customerData($userId);
+            $data = $this->customerData($userId, $role);
             $data['animal_health_records'] = $this->ownedAnimalHealthRecords($userId);
             return $data;
         }
@@ -40,11 +40,14 @@ final class DataExportService
             'inventory' => $this->query('SELECT id, name, category, unit, quantity_on_hand, reorder_level, unit_cost, is_active FROM inventory_items ORDER BY name'),
             'inventory_transactions' => $this->query('SELECT id, item_id, transaction_type, quantity_change, unit_cost, reason, transaction_date FROM inventory_transactions ORDER BY transaction_date DESC'),
             'product_listings' => $this->query('SELECT id, name, product_type, production_kind, species, unit, available_quantity, unit_price, is_active, created_at FROM products ORDER BY name'),
+            'customers' => $this->query('SELECT id, user_id, name, phone, email, created_at FROM customers ORDER BY name'),
             'orders' => $this->query('SELECT o.id, c.name AS customer, c.phone AS customer_phone, o.status, o.total_amount, o.notes, o.ordered_at, o.accepted_at, o.fulfilled_at FROM orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.ordered_at DESC'),
             'order_items' => $this->query('SELECT oi.id, oi.order_id, p.name AS listing, oi.item_name, oi.quantity, oi.unit, oi.unit_price FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id ORDER BY oi.order_id, oi.id'),
+            'livestock_order_links' => $this->query('SELECT oa.order_id, a.tag_number, a.species, a.name AS animal_name FROM order_animals oa JOIN animals a ON a.id = oa.animal_id ORDER BY oa.order_id'),
             'payments' => $this->query('SELECT id, order_id, customer_id, amount, method, status, transaction_reference, result_desc, paid_at, created_at FROM payments ORDER BY created_at DESC'),
             'sales' => $this->query('SELECT id, order_id, customer_id, description, quantity, unit, unit_price, total_amount, sold_at FROM sales ORDER BY sold_at DESC'),
             'farm_expenses' => $this->query('SELECT id, category, description, amount, expense_date, created_at FROM expenses ORDER BY expense_date DESC'),
+            'maintenance_records' => $this->query('SELECT id, asset_name, asset_type, maintenance_date, description, cost, next_due_date, notes, created_at FROM maintenance_records ORDER BY maintenance_date DESC'),
             'feedback' => $this->query('SELECT id, user_id, category, message, status, resolved_by, resolved_at, created_at FROM feedback ORDER BY created_at DESC'),
             'farm_events' => $this->query('SELECT id, title, description, event_date, start_time, end_time, location, status, created_at FROM farm_events ORDER BY event_date DESC'),
             'audit_log' => $this->query('SELECT id, user_id, action, entity_type, entity_id, details, ip_address, created_at FROM audit_logs ORDER BY created_at DESC'),
@@ -65,16 +68,28 @@ final class DataExportService
         return $data;
     }
 
-    private function customerData(int $userId): array
+    private function customerData(int $userId, string $role): array
     {
         $customerId = $this->db->prepare('SELECT id FROM customers WHERE user_id = ?');
         $customerId->execute([$userId]);
         $id = $customerId->fetchColumn();
-        $data = ['account' => $this->account($userId), 'purchases' => [], 'purchase_items' => [], 'payments' => []];
+        $data = ['account' => $this->account($userId)];
+        if (!$this->permissions->allows($role, 'orders.view') && !$this->permissions->allows($role, 'payments.view')) return $data;
+        $data['purchase_summary'] = [['order_total' => 0, 'confirmed_payments' => 0]];
+        $data['purchases'] = [];
+        $data['purchase_items'] = [];
+        $data['payments'] = [];
         if ($id === false) return $data;
-        $data['purchases'] = $this->query('SELECT id, status, total_amount, ordered_at, accepted_at, fulfilled_at FROM orders WHERE customer_id = ? ORDER BY ordered_at DESC', [(int) $id]);
-        $data['purchase_items'] = $this->query('SELECT oi.order_id, oi.item_name, oi.quantity, oi.unit, oi.unit_price FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.customer_id = ? ORDER BY oi.order_id, oi.id', [(int) $id]);
-        $data['payments'] = $this->query('SELECT p.order_id, p.amount, p.method, p.status, p.transaction_reference, p.paid_at, p.created_at FROM payments p JOIN orders o ON o.id = p.order_id WHERE o.customer_id = ? ORDER BY p.created_at DESC', [(int) $id]);
+        if ($this->permissions->allows($role, 'orders.view')) {
+            $data['purchase_summary'] = $this->query("SELECT COALESCE(SUM(o.total_amount), 0) AS order_total,
+                                                          COALESCE((SELECT SUM(p.amount) FROM payments p JOIN orders po ON po.id = p.order_id WHERE po.customer_id = c.id AND p.status = 'confirmed'), 0) AS confirmed_payments
+                                                   FROM customers c LEFT JOIN orders o ON o.customer_id = c.id WHERE c.id = ? GROUP BY c.id", [(int) $id]);
+            $data['purchases'] = $this->query('SELECT id, status, total_amount, ordered_at, accepted_at, fulfilled_at FROM orders WHERE customer_id = ? ORDER BY ordered_at DESC', [(int) $id]);
+            $data['purchase_items'] = $this->query('SELECT oi.order_id, oi.item_name, oi.quantity, oi.unit, oi.unit_price FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.customer_id = ? ORDER BY oi.order_id, oi.id', [(int) $id]);
+        }
+        if ($this->permissions->allows($role, 'payments.view')) {
+            $data['payments'] = $this->query('SELECT p.order_id, p.amount, p.method, p.status, p.transaction_reference, p.paid_at, p.created_at FROM payments p JOIN orders o ON o.id = p.order_id WHERE o.customer_id = ? ORDER BY p.created_at DESC', [(int) $id]);
+        }
         return $data;
     }
 

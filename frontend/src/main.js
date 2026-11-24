@@ -21,6 +21,113 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
 const roleCopy = (english, swahili) => roleLanguage === 'sw' && ['worker', 'veterinarian'].includes(currentUser?.role) ? swahili : english
+const dataExportForm = (id = 'data-export-form') => `<form id="${id}" class="compact-form data-export-form"><label>Download format<select name="format"><option value="pdf">PDF document</option><option value="csv">CSV spreadsheet</option><option value="excel">Excel workbook (.xls)</option><option value="json">JSON data</option></select></label><label>Current authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required></label><button>Download my accessible data</button></form>`
+
+function downloadDataExport(result) {
+  const filename = `lfmis-${String(result.role || 'user')}-data-${nairobiDate()}`
+  const sections = Object.entries(result.data).filter(([, rows]) => Array.isArray(rows))
+  let blob
+  let extension
+  if (result.format === 'json') {
+    blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json;charset=utf-8' })
+    extension = 'json'
+  } else if (result.format === 'csv') {
+    const csvRows = []
+    for (const [section, rows] of sections) {
+      csvRows.push([section], ...(!rows.length ? [['No records']] : []))
+      if (rows.length) {
+        const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))]
+        csvRows.push(headers)
+        rows.forEach((row) => csvRows.push(headers.map((header) => row[header] ?? '')))
+      }
+      csvRows.push([])
+    }
+    const cell = (value) => {
+      let text = String(value ?? '')
+      if (/^[\s]*[=+@\-]/.test(text)) text = `'${text}`
+      return `"${text.replace(/"/g, '""')}"`
+    }
+    blob = new Blob(['\uFEFF' + csvRows.map((row) => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    extension = 'csv'
+  } else if (result.format === 'excel') {
+    const xmlEscape = (value) => String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+    const worksheet = (name, rows) => {
+      const sheetName = name.replace(/[\\/:?*\[\]]/g, '_').slice(0, 31) || 'Records'
+      const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))]
+      const cell = (value) => {
+        const numeric = typeof value === 'number' && Number.isFinite(value)
+        return `<Cell><Data ss:Type="${numeric ? 'Number' : 'String'}">${xmlEscape(numeric ? value : value ?? '')}</Data></Cell>`
+      }
+      const headerRow = headers.length ? `<Row>${headers.map((header) => cell(header)).join('')}</Row>` : ''
+      const dataRows = rows.map((row) => `<Row>${headers.map((header) => cell(row[header])).join('')}</Row>`).join('')
+      return `<Worksheet ss:Name="${xmlEscape(sheetName)}"><Table>${headerRow}${dataRows || `<Row>${cell('No records')}</Row>`}</Table></Worksheet>`
+    }
+    const workbook = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${sections.map(([name, rows]) => worksheet(name, rows)).join('')}</Workbook>`
+    blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8' })
+    extension = 'xls'
+  } else {
+    const lines = [`LFMIS ${String(result.role || '').toUpperCase()} DATA EXPORT`, `Generated: ${result.generatedAt}`, '']
+    sections.forEach(([name, rows]) => {
+      lines.push(name.toUpperCase())
+      if (!rows.length) lines.push('No records')
+      rows.forEach((row) => lines.push(Object.entries(row).map(([key, value]) => `${key}: ${String(value ?? '').replace(/[\r\n\t]+/g, ' ')}`).join(' | ')))
+      lines.push('')
+    })
+    const ascii = lines.flatMap((line) => {
+      const normalized = line.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '?')
+      const chunks = normalized.match(/.{1,92}/g) || ['']
+      return chunks
+    })
+    const pages = []
+    for (let index = 0; index < ascii.length; index += 58) pages.push(ascii.slice(index, index + 58))
+    if (!pages.length) pages.push(['No records'])
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      `<< /Type /Pages /Kids [${pages.map((_, index) => `${4 + index * 2} 0 R`).join(' ')}] /Count ${pages.length} >>`,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    ]
+    pages.forEach((page, index) => {
+      const stream = `BT /F1 9 Tf 42 800 Td 12 TL ${page.map((line) => `(${line.replace(/[\\()]/g, '\\$&')}) Tj T*`).join(' ')} ET`
+      objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + index * 2} 0 R >>`)
+      objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`)
+    })
+    let pdf = '%PDF-1.4\n'
+    const offsets = [0]
+    objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n` })
+    const xrefOffset = pdf.length
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+    blob = new Blob([pdf], { type: 'application/pdf' })
+    extension = 'pdf'
+  }
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${filename}.${extension}`
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function bindDataExportForm(container, formId = 'data-export-form') {
+  const form = container.querySelector(`#${formId}`)
+  if (!form) return
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const button = form.querySelector('button[type="submit"], button:not([type])')
+    const feedback = container.querySelector('[data-export-feedback]')
+    button.disabled = true
+    try {
+      const result = await api.exportData(Object.fromEntries(new FormData(form)))
+      downloadDataExport(result)
+      if (feedback) feedback.innerHTML = message('Your role-accessible data was downloaded.')
+      form.elements.namedItem('code').value = ''
+    } catch (error) {
+      if (feedback) feedback.innerHTML = message(error.message, true)
+      else alert(error.message)
+    } finally {
+      button.disabled = false
+    }
+  })
+}
 function installFixedSidebar() {
   const sidebar = app.querySelector('.shell > aside')
   if (!sidebar || sidebar.dataset.fixedSidebar === 'true') return
@@ -1305,30 +1412,13 @@ async function renderAuditModule(filters = {}) {
       try { details = JSON.stringify(JSON.parse(details), null, 2) } catch {}
       return `<tr><td>${escapeHtml(log.created_at)}</td><td>${escapeHtml(log.user_name || 'System/unknown')}</td><td>${escapeHtml(log.action)}</td><td>${escapeHtml(log.entity_type)}${log.entity_id ? ` #${Number(log.entity_id)}` : ''}</td><td><pre>${escapeHtml(details)}</pre></td><td>${escapeHtml(log.ip_address || '—')}</td></tr>`
     }).join('')
-    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><div class="button-row"><button id="audit-export" class="secondary-action">Export farm data</button><button id="backup-now">Back up now</button></div></header><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action    <input name="action" placeholder="e.g. sign_in_succeeded" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
+    content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><div class="button-row"><button id="audit-export" class="secondary-action">Export farm data</button><button id="backup-now">Back up now</button></div></header><section class="panel" id="audit-export-panel" hidden><h2>Download farm data</h2><p class="muted">Choose a format and enter a fresh code from your authenticator app.</p>${dataExportForm('audit-data-export-form')}<div data-export-feedback aria-live="polite"></div></section><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action    <input name="action" placeholder="e.g. sign_in_succeeded" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
     content.querySelector('#audit-filter-form').addEventListener('submit', (event) => {
       event.preventDefault()
       renderAuditModule(Object.fromEntries(new FormData(event.target)))
     })
-    content.querySelector('#audit-export').addEventListener('click', async (event) => {
-      const button = event.currentTarget
-      button.disabled = true
-      try {
-        const result = await api.exportData()
-        const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `lfmis-farm-export-${nairobiDate()}.json`
-        link.click()
-        URL.revokeObjectURL(url)
-        content.querySelector('#audit-notice').innerHTML = message('Farm data export downloaded.')
-      } catch (error) {
-        content.querySelector('#audit-notice').innerHTML = message(error.message, true)
-      } finally {
-        button.disabled = false
-      }
-    })
+    content.querySelector('#audit-export').addEventListener('click', () => { content.querySelector('#audit-export-panel').hidden = !content.querySelector('#audit-export-panel').hidden })
+    bindDataExportForm(content, 'audit-data-export-form')
     content.querySelector('#backup-now').addEventListener('click', async (event) => {
       const button = event.currentTarget
       button.disabled = true
@@ -1350,7 +1440,22 @@ async function renderRightsModule(target = app.querySelector('.content')) {
     const data = await api.permissions()
     const permissions = data.permissions || data.matrix?.[data.role] || {}
     const grants = Object.values(permissions).filter((permission) => permission.allowed)
-    content.innerHTML = `<header><div><p class="kicker">ACCOUNT & DATA</p><h1>Your rights</h1><p class="muted">Access is based on your assigned role: ${escapeHtml(data.role)}.</p></div><span class="health-pill">${grants.length} granted actions</span></header><section class="panel rights-panel"><h2>Your access</h2><ul class="rights-permissions">${grants.map((permission) => `<li>${escapeHtml(permission.label)}</li>`).join('') || '<li>No module permissions are currently assigned.</li>'}</ul><h2>Personal data</h2><div class="rights-copy"><p>You may access records made available to your role and ask the farm administrator to correct your account details or a farm record.</p><p>You may request a copy of your personal account data or ask for your account to be deleted or deactivated. Some transaction and audit records may need to be retained for farm operations or legal obligations; the administrator can explain what applies.</p><p>Your sign-in email address is used for security alerts. Contact the farm administrator to update it or discuss a data request.</p></div></section>`
+    const canExport = Boolean(permissions['data.export']?.allowed)
+    const exportScope = {
+      admin: 'all farm operational, animal, health, financial, customer, and audit records',
+      worker: 'farm records available through your assigned operational permissions',
+      veterinarian: 'animal health records',
+      customer: 'your own orders, purchased items, and payments',
+      buyer: 'your own orders and payments, plus health records for livestock linked to your purchases',
+    }[data.role] || 'records available through your assigned role permissions'
+    let secondFactor = null
+    if (canExport) {
+      try { secondFactor = await api.twoFactorStatus() } catch {}
+    }
+    const exportPanel = !canExport ? '' : `<section class="panel"><h2>Download your data</h2><p class="muted">You can download ${escapeHtml(exportScope)}. Choose a format and enter a fresh code from your authenticator app for each download.</p>${secondFactor?.enabled ? `${dataExportForm()}<div data-export-feedback aria-live="polite"></div>` : `<p class="message danger">Turn on authenticator 2-step verification before downloading data.</p><button type="button" id="export-enable-2fa">Set up authenticator</button>`}</section>`
+    content.innerHTML = `<header><div><p class="kicker">ACCOUNT & DATA</p><h1>Your rights</h1><p class="muted">Access is based on your assigned role: ${escapeHtml(data.role)}.</p></div><span class="health-pill">${grants.length} granted actions</span></header><section class="panel rights-panel"><h2>Your access</h2><ul class="rights-permissions">${grants.map((permission) => `<li>${escapeHtml(permission.label)}</li>`).join('') || '<li>No module permissions are currently assigned.</li>'}</ul><h2>Personal data</h2><div class="rights-copy"><p>You may access records made available to your role and ask the farm administrator to correct your account details or a farm record.</p><p>You may request a copy of your personal account data or ask for your account to be deleted or deactivated. Some transaction and audit records may need to be retained for farm operations or legal obligations; the administrator can explain what applies.</p><p>Your sign-in email address is used for security alerts. Contact the farm administrator to update it or discuss a data request.</p></div></section>${exportPanel}`
+    bindDataExportForm(content)
+    content.querySelector('#export-enable-2fa')?.addEventListener('click', () => renderAccountSecurity())
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 

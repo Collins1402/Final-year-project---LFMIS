@@ -549,9 +549,9 @@ try {
         $format = (string) ($body['format'] ?? '');
         if (!in_array($format, ['pdf', 'csv', 'excel', 'json'], true)) Response::error('Choose PDF, CSV, Excel or JSON as the download format.', 422);
         $rateLimits->consume('data.export', 5, 300, (string) $current['id']);
-        $export = $dataExports->export((int) $current['id'], (string) $current['role']);
         $totp->verifySensitiveAction((int) $current['id'], (string) ($body['code'] ?? ''));
-        $recordCounts = array_map('count', $export);
+        $export = $dataExports->export((int) $current['id'], (string) $current['role']);
+        $recordCounts = array_map('count', array_filter($export, 'is_array'));
         $audit->record((int) $current['id'], 'data_exported', 'export', null, ['format' => $format, 'sections' => array_keys($export), 'recordCounts' => $recordCounts]);
         Response::json(['generatedAt' => date(DATE_ATOM), 'format' => $format, 'role' => $current['role'], 'data' => $export]);
     }
