@@ -48,6 +48,11 @@ final class TotpService
         return ['enabled' => !empty($user['totp_enabled_at']), 'recoveryCodesRemaining' => (int) $count->fetchColumn(), 'trustedDevices' => $devices->fetchAll(PDO::FETCH_ASSOC)];
     }
 
+    public function verifySensitiveAction(int $userId, string $code): void
+    {
+        $this->consumeCurrentTotpStep($this->user($userId), $code);
+    }
+
     public function disable(int $userId, string $password, string $code): void
     {
         $user = $this->user($userId);

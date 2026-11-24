@@ -45,6 +45,7 @@ require_once __DIR__ . '/../src/Services/ForecastService.php';
 require_once __DIR__ . '/../src/Services/OverviewService.php';
 require_once __DIR__ . '/../src/Services/ReportService.php';
 require_once __DIR__ . '/../src/Services/AnalyticsService.php';
+require_once __DIR__ . '/../src/Services/DataExportService.php';
 require_once __DIR__ . '/../src/Services/AnalyticsAccessException.php';
 
 use Lfmis\Core\Database;
@@ -84,6 +85,7 @@ use Lfmis\Services\ForecastUnavailableException;
 use Lfmis\Services\OverviewService;
 use Lfmis\Services\ReportService;
 use Lfmis\Services\AnalyticsService;
+use Lfmis\Services\DataExportService;
 use Lfmis\Services\AnalyticsAccessException;
 use Lfmis\Services\RateLimitException;
 use Lfmis\Services\RateLimitService;
@@ -146,6 +148,7 @@ try {
     $forecast = new ForecastService($db);
     $overview = new OverviewService($db);
     $reports = new ReportService($db);
+    $dataExports = new DataExportService($db, $permissions);
     $method = $request->method();
     $path = $request->path();
     if ($method === 'GET' && $path === '/api/health') {
@@ -538,24 +541,19 @@ try {
             'to' => $_GET['to'] ?? '',
         ])]);
     }
-    if ($method === 'GET' && $path === '/api/admin/export') {
+    if ($method === 'POST' && $path === '/api/data/export') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if (!$permissions->allows($current['role'], 'data.export')) Response::error('You do not have permission to perform this action.', 403);
-        $export = [
-            'animals' => $db->query('SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, notes, created_at FROM animals')->fetchAll(),
-            'health_records' => $db->query('SELECT id, animal_id, record_type, description, medication, dosage, cost, record_date, next_due_date, created_at FROM health_records')->fetchAll(),
-            'farm_activities' => $db->query('SELECT id, activity_type, description, animal_id, assigned_to, activity_at, status, completed_at, created_at FROM farm_activities')->fetchAll(),
-            'farm_produce' => $db->query('SELECT id, produce_name, production_date, production_session, animal_id, quantity_produced, quantity_sold, quantity_damaged, unit, notes, created_at FROM farm_produce')->fetchAll(),
-            'inventory_items' => $db->query('SELECT id, name, category, unit, quantity_on_hand, reorder_level, unit_cost, is_active FROM inventory_items')->fetchAll(),
-            'orders' => $db->query('SELECT id, customer_id, status, total_amount, notes, ordered_at, accepted_at, fulfilled_at FROM orders')->fetchAll(),
-            'order_items' => $db->query('SELECT id, order_id, product_id, item_name, quantity, unit, unit_price FROM order_items')->fetchAll(),
-            'payments' => $db->query('SELECT id, order_id, customer_id, amount, method, status, transaction_reference, checkout_request_id, phone, paid_at, created_at FROM payments')->fetchAll(),
-            'sales' => $db->query('SELECT id, order_id, customer_id, description, quantity, unit, unit_price, sold_at FROM sales')->fetchAll(),
-            'expenses' => $db->query('SELECT id, category, description, amount, expense_date FROM expenses')->fetchAll(),
-        ];
-        $audit->record((int) $current['id'], 'data_exported', 'export', null, ['tables' => array_keys($export)]);
-        Response::json(['generatedAt' => date(DATE_ATOM), 'data' => $export]);
+        $body = $request->body();
+        $format = (string) ($body['format'] ?? '');
+        if (!in_array($format, ['pdf', 'csv', 'excel', 'json'], true)) Response::error('Choose PDF, CSV, Excel or JSON as the download format.', 422);
+        $rateLimits->consume('data.export', 5, 300, (string) $current['id']);
+        $export = $dataExports->export((int) $current['id'], (string) $current['role']);
+        $totp->verifySensitiveAction((int) $current['id'], (string) ($body['code'] ?? ''));
+        $recordCounts = array_map('count', $export);
+        $audit->record((int) $current['id'], 'data_exported', 'export', null, ['format' => $format, 'sections' => array_keys($export), 'recordCounts' => $recordCounts]);
+        Response::json(['generatedAt' => date(DATE_ATOM), 'format' => $format, 'role' => $current['role'], 'data' => $export]);
     }
     if ($method === 'POST' && $path === '/api/admin/backup') {
         $current = $auth->currentUser();

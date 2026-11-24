@@ -461,3 +461,8 @@ INSERT IGNORE INTO role_permissions (role_id, permission_code, is_allowed)
 SELECT roles.id, permissions.code, 1
 FROM roles CROSS JOIN permissions
 WHERE roles.name = 'admin' AND permissions.code IN ('audit.view', 'data.export', 'backup.create');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_code, is_allowed)
+SELECT roles.id, permissions.code, 1
+FROM roles CROSS JOIN permissions
+WHERE roles.name IN ('worker', 'veterinarian', 'customer', 'buyer') AND permissions.code = 'data.export';
