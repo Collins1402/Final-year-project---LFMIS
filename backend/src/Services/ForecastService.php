@@ -161,8 +161,9 @@ final class ForecastService
         $observations = $trainingData['observations'];
         if (count($observations) < 21) {
             throw new \InvalidArgumentException(sprintf(
-                'At least 21 consecutive recorded production days are required; %d are available.',
-                count($observations)
+                'At least 21 consecutive recorded production days are required; %d %s available.',
+                count($observations),
+                count($observations) === 1 ? 'is' : 'are'
             ));
         }
 

@@ -85,6 +85,13 @@ function enhanceDataTable(table) {
 
   const headers = Array.from(table.tHead.rows[0].cells)
   const statusIndex = headers.findIndex((header) => (header.dataset.sortLabel || header.textContent).trim().toLowerCase() === 'status')
+  const pageTitle = app.querySelector('.content h1')?.textContent.trim() || 'records'
+  const panel = table.closest('.panel')
+  const panelHeadings = [...(panel?.querySelectorAll('h2') || [])].filter((heading) => heading.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING)
+  const panelTitle = panelHeadings.at(-1)?.textContent.trim() || ''
+  const stateKey = `lfmis-table-filter:${pageTitle}:${panelTitle}:${headers.map((header) => (header.dataset.sortLabel || header.textContent).trim()).join('|')}`
+  let savedState = {}
+  try { savedState = JSON.parse(sessionStorage.getItem(stateKey) || '{}') } catch { savedState = {} }
   const toolbar = document.createElement('div')
   toolbar.className = 'table-tools'
   const search = document.createElement('input')
@@ -103,9 +110,14 @@ function enhanceDataTable(table) {
     statusFilter = document.createElement('select')
     statusFilter.className = 'table-status-filter'
     statusFilter.setAttribute('aria-label', 'Filter records by status')
+    const savedStatus = String(savedState.status || '')
+    if (savedStatus && !values.some((value) => value.toLowerCase() === savedStatus)) values.push(savedStatus)
+    values.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
     statusFilter.innerHTML = '<option value="">All statuses</option>' + values.map((value) => `<option value="${escapeHtml(value.toLowerCase())}">${escapeHtml(value)}</option>`).join('')
+    statusFilter.value = savedStatus
     toolbar.append(statusFilter)
   }
+  search.value = String(savedState.search || '')
 
   let updateBulkButtons = () => {}
   if (table.dataset.bulkOrders === 'true') {
@@ -114,23 +126,30 @@ function enhanceDataTable(table) {
     const fulfill = document.createElement('button')
     fulfill.type = 'button'
     fulfill.className = 'small-action'
+    const quote = document.createElement('button')
+    quote.type = 'button'
+    quote.className = 'small-action'
     const cancel = document.createElement('button')
     cancel.type = 'button'
     cancel.className = 'small-action danger-action'
     const feedback = document.createElement('span')
     feedback.className = 'table-bulk-feedback'
     feedback.setAttribute('aria-live', 'polite')
-    actions.append(fulfill, cancel, feedback)
+    actions.append(quote, fulfill, cancel, feedback)
     toolbar.append(actions)
 
     const visibleOrders = () => [...table.tBodies[0].rows].filter((row) => !row.hidden && row.dataset.orderId)
+    const quoteIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'pending').map((row) => Number(row.dataset.orderId))
     const fulfillIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'accepted').map((row) => Number(row.dataset.orderId))
     const cancelIds = () => visibleOrders().filter((row) => ['pending', 'quoted', 'accepted'].includes(row.dataset.orderStatus)).map((row) => Number(row.dataset.orderId))
     updateBulkButtons = () => {
+      const quoteCount = quoteIds().length
       const fulfillCount = fulfillIds().length
       const cancelCount = cancelIds().length
+      quote.textContent = `Quote visible (${quoteCount})`
       fulfill.textContent = `Fulfill visible (${fulfillCount})`
       cancel.textContent = `Cancel visible (${cancelCount})`
+      quote.disabled = quoteCount === 0
       fulfill.disabled = fulfillCount === 0
       cancel.disabled = cancelCount === 0
     }
@@ -152,6 +171,35 @@ function enhanceDataTable(table) {
         updateBulkButtons()
       }
     }
+    const quoteVisibleOrders = async () => {
+      const ids = quoteIds()
+      if (!ids.length) return
+      if (!window.confirm(`Quote ${ids.length} pending order(s) matching the current filters? You will enter a total for each order.`)) return
+      const totalAmounts = {}
+      for (const id of ids) {
+        const row = visibleOrders().find((item) => Number(item.dataset.orderId) === id)
+        const currentTotal = row?.cells[4]?.textContent.trim() || '0'
+        const total = window.prompt(`Enter the quoted total in KES for order #${id}.`, currentTotal)
+        if (total === null) return
+        if (total.trim() === '' || !Number.isFinite(Number(total)) || Number(total) < 0) {
+          feedback.textContent = `Enter a valid non-negative quote for order #${id}. No orders were changed.`
+          return
+        }
+        totalAmounts[id] = Number(total)
+      }
+      quote.disabled = true
+      cancel.disabled = true
+      fulfill.disabled = true
+      feedback.textContent = 'Quoting orders…'
+      try {
+        await api.updateOrdersBulk({ orderIds: ids, status: 'quoted', totalAmounts })
+        await renderCommerceModule()
+      } catch (error) {
+        feedback.textContent = error.message
+        updateBulkButtons()
+      }
+    }
+    quote.addEventListener('click', quoteVisibleOrders)
     fulfill.addEventListener('click', () => submitBulkAction('fulfilled', fulfillIds()))
     cancel.addEventListener('click', () => submitBulkAction('cancelled', cancelIds()))
   }
@@ -181,6 +229,7 @@ function enhanceDataTable(table) {
     })
     resultCount.textContent = visible === total ? `${total} records` : `${visible} of ${total} records`
     updateBulkButtons()
+    try { sessionStorage.setItem(stateKey, JSON.stringify({ search: search.value, status: statusFilter?.value || '' })) } catch {}
   }
   search.addEventListener('input', filterRows)
   statusFilter?.addEventListener('change', filterRows)

@@ -167,10 +167,10 @@ final class CommerceService
         }
     }
 
-    public function updateOrdersBulk(array $orderIds, string $status, int $userId): array
+    public function updateOrdersBulk(array $orderIds, string $status, int $userId, array $totalAmounts = []): array
     {
-        if (!in_array($status, ['fulfilled', 'cancelled'], true)) {
-            throw new \InvalidArgumentException('Bulk actions can only fulfill or cancel orders.');
+        if (!in_array($status, ['quoted', 'fulfilled', 'cancelled'], true)) {
+            throw new \InvalidArgumentException('Bulk actions can only quote, fulfill or cancel orders.');
         }
         foreach ($orderIds as $orderId) {
             if (filter_var($orderId, FILTER_VALIDATE_INT) === false) {
@@ -180,6 +180,14 @@ final class CommerceService
         $orderIds = array_values(array_unique(array_map('intval', $orderIds)));
         if ($orderIds === [] || count($orderIds) > 300 || min($orderIds) < 1) {
             throw new \InvalidArgumentException('Select between 1 and 300 valid orders.');
+        }
+        if ($status === 'quoted') {
+            foreach ($orderIds as $id) {
+                $amount = $totalAmounts[$id] ?? null;
+                if (!is_numeric($amount) || !is_finite((float) $amount) || (float) $amount < 0) {
+                    throw new \InvalidArgumentException('Enter a valid quote total for every selected order.');
+                }
+            }
         }
 
         $this->db->beginTransaction();
@@ -195,7 +203,7 @@ final class CommerceService
 
                 $currentStatus = (string) $order['status'];
                 $transitions = [
-                    'pending' => ['cancelled'],
+                    'pending' => ['quoted', 'cancelled'],
                     'quoted' => ['cancelled'],
                     'accepted' => ['fulfilled', 'cancelled'],
                 ];
@@ -206,11 +214,11 @@ final class CommerceService
                 if ($status === 'cancelled' && $currentStatus === 'accepted') $this->releaseOrderItems($id);
                 if ($status === 'fulfilled') $this->recordOrderSales($id, (int) $order['customer_id']);
                 $statement = $this->db->prepare(
-                    "UPDATE orders SET status = ?, handled_by = ?,
+                    "UPDATE orders SET status = ?, total_amount = COALESCE(?, total_amount), handled_by = ?,
                      fulfilled_at = CASE WHEN ? = 'fulfilled' THEN CURRENT_TIMESTAMP ELSE fulfilled_at END
                      WHERE id = ?"
                 );
-                $statement->execute([$status, $userId, $status, $id]);
+                $statement->execute([$status, $status === 'quoted' ? (float) $totalAmounts[$id] : null, $userId, $status, $id]);
                 $updated[] = ['id' => $id, 'from' => $currentStatus, 'to' => $status];
             }
             $this->db->commit();

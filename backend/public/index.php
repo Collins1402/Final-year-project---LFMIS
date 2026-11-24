@@ -692,7 +692,8 @@ try {
         if (!$permissions->allows($current['role'], 'orders.manage')) Response::error('You do not have permission to perform this action.', 403);
         $body = $request->body();
         if (!isset($body['orderIds']) || !is_array($body['orderIds'])) Response::error('Choose the orders to update.', 422);
-        $updated = $commerce->updateOrdersBulk($body['orderIds'], (string) ($body['status'] ?? ''), (int) $current['id']);
+        $totalAmounts = isset($body['totalAmounts']) && is_array($body['totalAmounts']) ? $body['totalAmounts'] : [];
+        $updated = $commerce->updateOrdersBulk($body['orderIds'], (string) ($body['status'] ?? ''), (int) $current['id'], $totalAmounts);
         foreach ($updated as $order) {
             $audit->record((int) $current['id'], 'order_status_changed', 'order', $order['id'], [
                 'from' => $order['from'],
