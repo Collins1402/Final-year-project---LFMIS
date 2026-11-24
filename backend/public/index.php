@@ -344,41 +344,6 @@ try {
         $user = $auth->currentUser();
         Response::json($user ? ['user' => $user] : ['user' => null], $user ? 200 : 401);
     }
-    if ($method === 'GET' && $path === '/api/network/local-addresses') {
-        $current = $auth->currentUser();
-        if ($current === null) Response::error('Please sign in to continue.', 401);
-        if ($current['role'] !== 'admin') Response::error('Only administrators can generate phone access QR codes.', 403);
-        $addresses = [];
-        $isPrivate = static function (string $address): bool {
-            $parts = explode('.', $address);
-            if (count($parts) !== 4 || filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) return false;
-            $first = (int) $parts[0]; $second = (int) $parts[1];
-            return $first === 10 || ($first === 172 && $second >= 16 && $second <= 31) || ($first === 192 && $second === 168);
-        };
-        if (function_exists('net_get_interfaces')) {
-            foreach (net_get_interfaces() as $interface) {
-                if (empty($interface['up'])) continue;
-                $description = (string) ($interface['description'] ?? 'Network adapter');
-                if (preg_match('/virtual|hyper-v|vmware|virtualbox|docker|wsl|vpn|loopback|bluetooth|tunnel/i', $description)) continue;
-                foreach ($interface['unicast'] ?? [] as $address) {
-                    $ip = (string) ($address['address'] ?? '');
-                    if (($address['family'] ?? null) === 2 && $isPrivate($ip)) {
-                        $rank = preg_match('/wi.?fi|wireless/i', $description) ? 0 : 1;
-                        $addresses[$ip] = ['address' => $ip, 'interface' => $description, 'rank' => $rank];
-                    }
-                }
-            }
-        } else {
-            foreach (gethostbynamel(gethostname()) ?: [] as $ip) {
-                if ($isPrivate($ip)) $addresses[$ip] = ['address' => $ip, 'interface' => 'Private network adapter', 'rank' => 1];
-            }
-        }
-        $addresses = array_values($addresses);
-        usort($addresses, static fn (array $left, array $right): int => $left['rank'] <=> $right['rank']);
-        foreach ($addresses as &$address) unset($address['rank']);
-        unset($address);
-        Response::json(['addresses' => $addresses]);
-    }
     if ($path === '/api/account/2fa') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);

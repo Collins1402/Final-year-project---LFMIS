@@ -46,7 +46,6 @@ export const api = {
   removeTwoFactorMethod: (data) => post('/api/account/2fa/remove', data),
   logout: () => post('/api/logout', {}),
   session: () => request('/api/session'),
-  localNetworkAddresses: () => request('/api/network/local-addresses'),
   overview: () => request('/api/overview'),
   animals: () => request('/api/animals'),
   createAnimal: (data) => post('/api/animals', data),

@@ -36,46 +36,9 @@ function installFixedSidebar() {
     toggle.setAttribute('aria-expanded', String(open))
     toggle.textContent = open ? 'Close menu' : 'Menu'
   })
-  sidebar.querySelectorAll('nav button, #logout, #security-back, #account-security, #phone-qr-access').forEach((button) => button.addEventListener('click', () => {
+  sidebar.querySelectorAll('nav button, #logout, #security-back, #account-security').forEach((button) => button.addEventListener('click', () => {
     if (window.matchMedia('(max-width: 900px)').matches) sidebar.classList.remove('sidebar-open')
   }))
-}
-
-async function renderPhoneAccessModule() {
-  const content = app.querySelector('.content')
-  content.innerHTML = `<header><div><p class="kicker">LOCAL NETWORK</p><h1>Phone access</h1><p class="muted">Create a local QR code for phones connected to this same Wi-Fi network.</p></div><span class="health-pill">Shared Wi-Fi</span></header><section class="panel phone-access-panel"><h2>Enable access on this network</h2><p class="muted">On shared or public Wi-Fi, nearby devices may be able to reach the sign-in page. Accounts and passwords are still required, and successful sign-ins send an email alert with the connecting IP address.</p><label class="phone-network-trust"><input id="phone-network-trust" type="checkbox"> I trust this Wi-Fi network and am allowed to connect devices for LFMIS.</label><div id="phone-network-qr-content" hidden><p class="muted">Keep the frontend, PHP API and database running. A QR link only works if the Wi-Fi lets devices communicate with each other.</p><div id="phone-qr-list" class="phone-qr-list"><p class="muted">Finding this computer's network address…</p></div><form id="manual-phone-qr-form" class="compact-form"><label>Computer address for this Wi-Fi<input name="host" inputmode="decimal" placeholder="IPv4 address, e.g. 192.168.1.20" required></label><button>Generate QR from address</button></form><p class="muted">Use the address shown by <code>ipconfig</code> on this computer if automatic detection misses the active Wi-Fi adapter. This address entry is only for the host admin; phone users just scan the code.</p></div></section>`
-  const list = content.querySelector('#phone-qr-list')
-  const qrContent = content.querySelector('#phone-network-qr-content')
-  let addresses = []
-  const showCards = async (items) => {
-    list.innerHTML = items.length ? items.map((item, index) => {
-      const url = `http://${item.address}:5173/`
-      const label = item.interface || `Network ${index + 1}`
-      return `<section class="phone-qr-item"><h3>${items.length > 1 ? `Network ${index + 1}` : 'Phone access link'}</h3><p>${escapeHtml(label)} · ${escapeHtml(item.address)}</p><canvas data-phone-qr="${escapeHtml(url)}" width="240" height="240" aria-label="QR code for ${escapeHtml(url)}"></canvas><p class="phone-qr-url">${escapeHtml(url)}</p></section>`
-    }).join('') : message('No active address was detected automatically. Enter the computer address below to create the QR code.', true)
-    await Promise.all([...list.querySelectorAll('[data-phone-qr]')].map((canvas) => QRCode.toCanvas(canvas, canvas.dataset.phoneQr, { width: 240, margin: 2 })))
-  }
-  content.querySelector('#phone-network-trust').addEventListener('change', async (event) => {
-    qrContent.hidden = !event.currentTarget.checked
-    if (event.currentTarget.checked) await showCards(addresses)
-  })
-  try {
-    const data = await api.localNetworkAddresses()
-    addresses = data.addresses || []
-    if (content.querySelector('#phone-network-trust').checked) await showCards(addresses)
-  } catch (error) {
-    addresses = []
-    list.innerHTML = message(error.message || 'Could not detect the computer address automatically.', true)
-  }
-  content.querySelector('#manual-phone-qr-form').addEventListener('submit', async (event) => {
-    event.preventDefault()
-    const host = event.currentTarget.elements.host.value.trim()
-    const parts = host.split('.').map(Number)
-    const valid = parts.length === 4 && parts.every((part, index) => /^\d{1,3}$/.test(host.split('.')[index]) && part >= 0 && part <= 255)
-    const privateAddress = valid && (parts[0] === 10 || (parts[0] === 192 && parts[1] === 168) || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127))
-    if (!privateAddress) { list.innerHTML = message('Enter the computer’s private or shared-network IPv4 address.', true); return }
-    await showCards([{ address: host, interface: 'Manually entered active network' }])
-  })
 }
 
 function enableSortableTable(table, columnTypes = []) {
@@ -506,13 +469,6 @@ async function renderApp() {
   accountSecurityButton.textContent = 'Account security'
   app.querySelector('aside .user-chip').before(accountSecurityButton)
   accountSecurityButton.addEventListener('click', renderAccountSecurity)
-  const phoneAccessButton = document.createElement('button')
-  phoneAccessButton.id = 'phone-qr-access'
-  phoneAccessButton.className = 'quiet'
-  phoneAccessButton.type = 'button'
-  phoneAccessButton.textContent = 'Phone QR access'
-  app.querySelector('aside .user-chip').before(phoneAccessButton)
-  phoneAccessButton.addEventListener('click', () => { app.querySelector('.shell > aside')?.classList.remove('sidebar-open'); renderPhoneAccessModule() })
   const stats = app.querySelector('.stats')
   stats.classList.add('overview-stats')
   const milkTotal = Number(overviewData.milkToday?.morning || 0) + Number(overviewData.milkToday?.evening || 0)

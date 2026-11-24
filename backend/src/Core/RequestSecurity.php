@@ -62,10 +62,6 @@ final class RequestSecurity
     private static function isPrivateHost(string $host): bool
     {
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-                $parts = array_map('intval', explode('.', $host));
-                if ($parts[0] === 100 && $parts[1] >= 64 && $parts[1] <= 127) return true;
-            }
             return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
         }
         return false;

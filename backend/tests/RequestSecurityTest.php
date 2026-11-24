@@ -28,11 +28,6 @@ final class RequestSecurityTest extends TestCase
         $this->assertFalse(RequestSecurity::isTrustedOrigin('http://203.0.113.20:5173', null, 'http://127.0.0.1:5173'));
     }
 
-    public function testSharedNetworkOriginsAreAcceptedForLocalDevelopment(): void
-    {
-        $this->assertTrue(RequestSecurity::isTrustedOrigin('http://100.96.10.20:5173', null, 'http://127.0.0.1:5173'));
-    }
-
     public function testClientIpUsesForwardedAddressOnlyBehindLocalProxy(): void
     {
         $original = $_SERVER;
