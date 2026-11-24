@@ -19,7 +19,7 @@ final class PasswordResetServiceTest extends TestCase
         $oldHash = password_hash('old-password-value', PASSWORD_DEFAULT);
         $db->prepare('INSERT INTO users (id, password_hash, totp_secret_enc, totp_enabled_at) VALUES (1, ?, ?, ?)')->execute([$oldHash, 'encrypted-test-secret', gmdate('Y-m-d H:i:s')]);
         $token = bin2hex(random_bytes(32));
-        $db->prepare('INSERT INTO password_reset_tokens VALUES (1, ?, ?)')->execute([hash('sha256', $token), gmdate('Y-m-d H:i:s', time() + 3600)]);
+        $db->prepare('INSERT INTO password_reset_tokens VALUES (1, ?, ?)')->execute([hash('sha256', $token), date('Y-m-d H:i:s', time() + 3600)]);
         $db->exec("INSERT INTO trusted_devices VALUES (1, 'device-hash', 'test browser', '2099-01-01 00:00:00')");
 
         (new PasswordResetService($db))->reset($token, 'new-secure-password-value');
