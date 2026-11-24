@@ -553,7 +553,7 @@ try {
         if (!$permissions->allows($current['role'], 'data.export')) Response::error('You do not have permission to perform this action.', 403);
         $body = $request->body();
         $format = (string) ($body['format'] ?? '');
-        if (!in_array($format, ['pdf', 'csv', 'excel', 'json'], true)) Response::error('Choose PDF, CSV, Excel or JSON as the download format.', 422);
+        if (!in_array($format, ['pdf', 'csv', 'excel', 'json', 'zip'], true)) Response::error('Choose PDF, CSV, Excel, JSON or ZIP as the download format.', 422);
         if (!isset($body['sections']) || !is_array($body['sections'])) Response::error('Choose one or more record groups to download.', 422);
         $rateLimits->consume('data.export', 5, 300, (string) $current['id']);
         $totp->verifySensitiveAction((int) $current['id'], (string) ($body['code'] ?? ''));

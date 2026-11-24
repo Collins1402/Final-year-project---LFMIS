@@ -21,14 +21,103 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
 const roleCopy = (english, swahili) => roleLanguage === 'sw' && ['worker', 'veterinarian'].includes(currentUser?.role) ? swahili : english
-const dataExportForm = (groups, id = 'data-export-form') => `<form id="${id}" class="compact-form data-export-form"><fieldset><legend>Choose records to include</legend><label class="export-section-option"><input type="checkbox" data-export-select-all> Select all available groups</label><div class="export-section-list">${groups.map((group) => `<label class="export-section-option"><input type="checkbox" name="sections" value="${escapeHtml(group.id)}"> ${escapeHtml(group.label)}</label>`).join('')}</div></fieldset><label>Download format<select name="format"><option value="pdf">PDF document</option><option value="csv">CSV spreadsheet</option><option value="excel">Excel workbook (.xls)</option><option value="json">JSON data</option></select></label><label>Current authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required></label><button>Download selected records</button></form>`
+const dataExportForm = (groups, id = 'data-export-form') => `<form id="${id}" class="compact-form data-export-form"><fieldset><legend>Choose records to include</legend><label class="export-section-option"><input type="checkbox" data-export-select-all> Select all available groups</label><div class="export-section-list">${groups.map((group) => `<label class="export-section-option"><input type="checkbox" name="sections" value="${escapeHtml(group.id)}"> ${escapeHtml(group.label)}</label>`).join('')}</div></fieldset><label>Download format<select name="format"><option value="pdf">PDF document</option><option value="csv">CSV spreadsheet</option><option value="excel">Excel workbook (.xls)</option><option value="json">JSON data</option><option value="zip">ZIP archive (separate CSV files)</option></select></label><label>Current authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required></label><button>Download selected records</button></form>`
+
+function sectionCsv(section, rows) {
+  const csvRows = [[section]]
+  if (!rows.length) csvRows.push(['No records'])
+  else {
+    const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))]
+    csvRows.push(headers, ...rows.map((row) => headers.map((header) => row[header] ?? '')))
+  }
+  const cell = (value) => {
+    let text = String(value ?? '')
+    if (/^[\s]*[=+@\-]/.test(text)) text = `'${text}`
+    return `"${text.replace(/"/g, '""')}"`
+  }
+  return '\uFEFF' + csvRows.map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n'
+}
+
+function createZip(files) {
+  const encoder = new TextEncoder()
+  const crcTable = new Uint32Array(256)
+  for (let index = 0; index < 256; index += 1) {
+    let value = index
+    for (let bit = 0; bit < 8; bit += 1) value = (value & 1) ? (0xEDB88320 ^ (value >>> 1)) : (value >>> 1)
+    crcTable[index] = value >>> 0
+  }
+  const crc32 = (bytes) => {
+    let value = 0xFFFFFFFF
+    bytes.forEach((byte) => { value = crcTable[(value ^ byte) & 0xFF] ^ (value >>> 8) })
+    return (value ^ 0xFFFFFFFF) >>> 0
+  }
+  const parts = []
+  const centralParts = []
+  let localOffset = 0
+  const now = new Date()
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2)
+  const dosDate = ((Math.max(1980, now.getFullYear()) - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()
+  files.forEach(({ name, content }) => {
+    const nameBytes = encoder.encode(name)
+    const dataBytes = encoder.encode(content)
+    const checksum = crc32(dataBytes)
+    const local = new Uint8Array(30 + nameBytes.length)
+    const localView = new DataView(local.buffer)
+    localView.setUint32(0, 0x04034B50, true)
+    localView.setUint16(4, 20, true)
+    localView.setUint16(6, 0x0800, true)
+    localView.setUint16(8, 0, true)
+    localView.setUint16(10, dosTime, true)
+    localView.setUint16(12, dosDate, true)
+    localView.setUint32(14, checksum, true)
+    localView.setUint32(18, dataBytes.length, true)
+    localView.setUint32(22, dataBytes.length, true)
+    localView.setUint16(26, nameBytes.length, true)
+    local.set(nameBytes, 30)
+    parts.push(local, dataBytes)
+
+    const central = new Uint8Array(46 + nameBytes.length)
+    const centralView = new DataView(central.buffer)
+    centralView.setUint32(0, 0x02014B50, true)
+    centralView.setUint16(4, 20, true)
+    centralView.setUint16(6, 20, true)
+    centralView.setUint16(8, 0x0800, true)
+    centralView.setUint16(10, 0, true)
+    centralView.setUint16(12, dosTime, true)
+    centralView.setUint16(14, dosDate, true)
+    centralView.setUint32(16, checksum, true)
+    centralView.setUint32(20, dataBytes.length, true)
+    centralView.setUint32(24, dataBytes.length, true)
+    centralView.setUint16(28, nameBytes.length, true)
+    centralView.setUint32(42, localOffset, true)
+    central.set(nameBytes, 46)
+    centralParts.push(central)
+    localOffset += local.length + dataBytes.length
+  })
+  const centralSize = centralParts.reduce((total, part) => total + part.length, 0)
+  const end = new Uint8Array(22)
+  const endView = new DataView(end.buffer)
+  endView.setUint32(0, 0x06054B50, true)
+  endView.setUint16(8, files.length, true)
+  endView.setUint16(10, files.length, true)
+  endView.setUint32(12, centralSize, true)
+  endView.setUint32(16, localOffset, true)
+  return new Blob([...parts, ...centralParts, end], { type: 'application/zip' })
+}
 
 function downloadDataExport(result) {
   const filename = `lfmis-${String(result.role || 'user')}-data-${nairobiDate()}`
   const sections = Object.entries(result.data).filter(([, rows]) => Array.isArray(rows))
   let blob
   let extension
-  if (result.format === 'json') {
+  if (result.format === 'zip') {
+    const files = sections.map(([section, rows]) => ({
+      name: `lfmis-export/${section.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`,
+      content: sectionCsv(section, rows),
+    }))
+    blob = createZip(files)
+    extension = 'zip'
+  } else if (result.format === 'json') {
     blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json;charset=utf-8' })
     extension = 'json'
   } else if (result.format === 'csv') {
