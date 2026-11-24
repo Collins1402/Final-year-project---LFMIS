@@ -169,8 +169,8 @@ final class CommerceService
 
     public function updateOrdersBulk(array $orderIds, string $status, int $userId, array $totalAmounts = []): array
     {
-        if (!in_array($status, ['quoted', 'fulfilled', 'cancelled'], true)) {
-            throw new \InvalidArgumentException('Bulk actions can only quote, fulfill or cancel orders.');
+        if (!in_array($status, ['quoted', 'accepted', 'fulfilled', 'cancelled'], true)) {
+            throw new \InvalidArgumentException('Bulk actions can only quote, accept, fulfill or cancel orders.');
         }
         foreach ($orderIds as $orderId) {
             if (filter_var($orderId, FILTER_VALIDATE_INT) === false) {
@@ -204,13 +204,14 @@ final class CommerceService
                 $currentStatus = (string) $order['status'];
                 $transitions = [
                     'pending' => ['quoted', 'cancelled'],
-                    'quoted' => ['cancelled'],
+                    'quoted' => ['accepted', 'cancelled'],
                     'accepted' => ['fulfilled', 'cancelled'],
                 ];
                 if (!in_array($status, $transitions[$currentStatus] ?? [], true)) {
                     throw new \DomainException('Order #' . $id . ' cannot move from ' . $currentStatus . ' to ' . $status . '. No orders were changed.');
                 }
 
+                if ($status === 'accepted') $this->reserveOrderItems($id);
                 if ($status === 'cancelled' && $currentStatus === 'accepted') $this->releaseOrderItems($id);
                 if ($status === 'fulfilled') $this->recordOrderSales($id, (int) $order['customer_id']);
                 $statement = $this->db->prepare(

@@ -129,27 +129,34 @@ function enhanceDataTable(table) {
     const quote = document.createElement('button')
     quote.type = 'button'
     quote.className = 'small-action'
+    const accept = document.createElement('button')
+    accept.type = 'button'
+    accept.className = 'small-action'
     const cancel = document.createElement('button')
     cancel.type = 'button'
     cancel.className = 'small-action danger-action'
     const feedback = document.createElement('span')
     feedback.className = 'table-bulk-feedback'
     feedback.setAttribute('aria-live', 'polite')
-    actions.append(quote, fulfill, cancel, feedback)
+    actions.append(quote, accept, fulfill, cancel, feedback)
     toolbar.append(actions)
 
     const visibleOrders = () => [...table.tBodies[0].rows].filter((row) => !row.hidden && row.dataset.orderId)
     const quoteIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'pending').map((row) => Number(row.dataset.orderId))
+    const acceptIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'quoted').map((row) => Number(row.dataset.orderId))
     const fulfillIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'accepted').map((row) => Number(row.dataset.orderId))
     const cancelIds = () => visibleOrders().filter((row) => ['pending', 'quoted', 'accepted'].includes(row.dataset.orderStatus)).map((row) => Number(row.dataset.orderId))
     updateBulkButtons = () => {
       const quoteCount = quoteIds().length
+      const acceptCount = acceptIds().length
       const fulfillCount = fulfillIds().length
       const cancelCount = cancelIds().length
       quote.textContent = `Quote visible (${quoteCount})`
+      accept.textContent = `Accept visible (${acceptCount})`
       fulfill.textContent = `Fulfill visible (${fulfillCount})`
       cancel.textContent = `Cancel visible (${cancelCount})`
       quote.disabled = quoteCount === 0
+      accept.disabled = acceptCount === 0
       fulfill.disabled = fulfillCount === 0
       cancel.disabled = cancelCount === 0
     }
@@ -158,9 +165,12 @@ function enhanceDataTable(table) {
       if (ids.length === 0) return
       const confirmText = status === 'fulfilled'
         ? `Fulfill ${ids.length} accepted order(s) matching the current filters? This records their sales.`
-        : `Cancel ${ids.length} open order(s) matching the current filters? Reserved stock will be released.`
+        : status === 'accepted'
+          ? `Accept ${ids.length} quoted order(s) matching the current filters? Stock will be reserved for each order.`
+          : `Cancel ${ids.length} open order(s) matching the current filters? Reserved stock will be released.`
       if (!window.confirm(confirmText)) return
       fulfill.disabled = true
+      accept.disabled = true
       cancel.disabled = true
       feedback.textContent = 'Updating orders…'
       try {
@@ -201,6 +211,7 @@ function enhanceDataTable(table) {
     }
     quote.addEventListener('click', quoteVisibleOrders)
     fulfill.addEventListener('click', () => submitBulkAction('fulfilled', fulfillIds()))
+    accept.addEventListener('click', () => submitBulkAction('accepted', acceptIds()))
     cancel.addEventListener('click', () => submitBulkAction('cancelled', cancelIds()))
   }
 
