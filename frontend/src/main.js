@@ -143,7 +143,7 @@ function enhanceDataTable(table) {
 
     const visibleOrders = () => [...table.tBodies[0].rows].filter((row) => !row.hidden && row.dataset.orderId)
     const quoteIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'pending').map((row) => Number(row.dataset.orderId))
-    const acceptIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'quoted').map((row) => Number(row.dataset.orderId))
+    const acceptIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'quoted' && row.dataset.orderCanAccept === 'true').map((row) => Number(row.dataset.orderId))
     const fulfillIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'accepted').map((row) => Number(row.dataset.orderId))
     const cancelIds = () => visibleOrders().filter((row) => ['pending', 'quoted', 'accepted'].includes(row.dataset.orderStatus)).map((row) => Number(row.dataset.orderId))
     updateBulkButtons = () => {
@@ -807,6 +807,12 @@ async function renderCommerceModule() {
   try {
     const [orders, sales, payments, expenses, products] = await Promise.all([api.orders(), api.sales(), api.payments(), api.expenses(), api.products()])
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Sales & orders</h1><p class="muted">Create orders, record sales and track payments.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create order</h2><form id="order-form" class="compact-form"><input name="customerName" placeholder="e.g. Mary Wanjiku" required><input name="customerPhone" placeholder="e.g. 0712 345 678"><select name="productId" required><option value="">Choose a listed product</option>${products.products.filter((item) => Number(item.available_quantity) > 0).map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity)} ${escapeHtml(item.unit)}</option>`).join('')}</select><input name="quantity" type="number" min=".01" step=".01" placeholder="e.g. 5 litres" required><input name="unitPrice" type="number" min="0" step=".01" placeholder="Price per unit, e.g. 75"><button>Create quote</button></form><h2>Orders</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Status</th><th>Total</th></tr></thead><tbody>${orders.orders.length ? orders.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.customer)}</td><td>${escapeHtml(item.status)}</td><td>${item.total_amount}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record sale</h2><form id="sale-form" class="compact-form"><input name="description"     placeholder="e.g. 10 litres sold at market"><input name="quantity" type="number" min=".01" step=".01"     placeholder="e.g. 10"><input name="unit"     placeholder="e.g. litres or trays"><input name="unitPrice" type="number" min="0" step=".01"     placeholder="KES per unit"><input name="soldAt" type="datetime-local" required><button>Save sale</button></form><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${payments.payments.length ? payments.payments.map((item) => `<tr><td>#${item.order_id}</td><td>${item.method}</td><td>${item.status}</td><td>${item.amount}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No payments yet.</td></tr>'}</tbody></table></div></section></section>`
+    if (orders.orders.some((order) => ['quoted', 'accepted'].includes(order.status) && Number(order.items_linked) !== 1)) {
+      const warning = document.createElement('p')
+      warning.className = 'message danger'
+      warning.textContent = 'Some orders cannot be accepted until every order item is linked to an active product listing.'
+      content.querySelector('.module-grid').before(warning)
+    }
     content.querySelector('#order-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createOrder(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
     content.querySelector('#sale-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createSale(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
     const commerceTools = document.createElement('section')
@@ -820,6 +826,7 @@ async function renderCommerceModule() {
       if (!row) return
       row.dataset.orderId = String(order.id)
       row.dataset.orderStatus = String(order.status)
+      row.dataset.orderCanAccept = String(Number(order.items_linked) === 1)
     })
     enableSortableTable(commerceTables[0], ['number', 'text', 'text', 'text', 'number'])
     enableSortableTable(commerceTables[1], ['number', 'text', 'text', 'number'])
@@ -832,15 +839,33 @@ async function renderCommerceModule() {
         if (!row) return
         const actionCell = row.insertCell()
         const actions = order.status === 'pending' ? [['Quote', 'quoted'], ['Cancel', 'cancelled']]
-          : order.status === 'quoted' ? [['Accept', 'accepted'], ['Cancel', 'cancelled']]
+          : order.status === 'quoted' ? [[Number(order.items_linked) === 1 ? 'Accept' : 'Link listing', Number(order.items_linked) === 1 ? 'accepted' : 'link'], ['Cancel', 'cancelled']]
             : order.status === 'accepted' ? [['Fulfill', 'fulfilled'], ['Cancel', 'cancelled']] : []
         actions.forEach(([label, status]) => {
+          if (status === 'link') {
+            const select = document.createElement('select')
+            select.className = 'order-product-link'
+            select.setAttribute('aria-label', `Choose product listing for order ${order.id}`)
+            select.innerHTML = '<option value="">Choose listing</option>' + products.products.map((product) => `<option value="${Number(product.id)}">${escapeHtml(product.name)} · ${escapeHtml(product.unit)}</option>`).join('')
+            const linkButton = document.createElement('button')
+            linkButton.type = 'button'
+            linkButton.className = 'small-action order-link-action'
+            linkButton.textContent = 'Link'
+            linkButton.dataset.orderId = String(order.id)
+            linkButton.disabled = products.products.length === 0
+            actionCell.append(select, linkButton)
+            return
+          }
           const button = document.createElement('button')
           button.type = 'button'
           button.className = 'small-action order-action'
           button.textContent = label
+          if (status === null) {
+            button.disabled = true
+            button.title = 'Link every order item to an active product listing before accepting.'
+          }
           button.dataset.orderId = String(order.id)
-          button.dataset.orderStatus = status
+          if (status !== null) button.dataset.orderStatus = status
           actionCell.append(button)
         })
       })
@@ -863,6 +888,17 @@ async function renderCommerceModule() {
       }
       try {
         await api.updateOrder(button.dataset.orderId, { status: button.dataset.orderStatus, ...(totalAmount === undefined ? {} : { totalAmount }) })
+        await renderCommerceModule()
+      } catch (error) { showCommerceError(error) }
+    }))
+    content.querySelectorAll('.order-link-action').forEach((button) => button.addEventListener('click', async () => {
+      const select = button.parentElement.querySelector('.order-product-link')
+      if (!select?.value) {
+        showCommerceError(new Error('Choose an active product listing to link to this order.'))
+        return
+      }
+      try {
+        await api.linkOrderProduct(button.dataset.orderId, { productId: Number(select.value) })
         await renderCommerceModule()
       } catch (error) { showCommerceError(error) }
     }))

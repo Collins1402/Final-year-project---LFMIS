@@ -703,6 +703,18 @@ try {
         }
         Response::json(['orders' => $updated]);
     }
+    if ($method === 'PATCH' && preg_match('#^/api/orders/(\d+)/product$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'orders.manage')) Response::error('You do not have permission to perform this action.', 403);
+        $body = $request->body();
+        $productId = filter_var($body['productId'] ?? null, FILTER_VALIDATE_INT);
+        if ($productId === false || $productId < 1) Response::error('Choose a valid active product listing.', 422);
+        $orderId = (int) $matches[1];
+        $linked = $commerce->linkOrderProduct($orderId, $productId);
+        $audit->record((int) $current['id'], 'order_item_linked_to_product', 'order', $orderId, ['productId' => $productId]);
+        Response::json(['link' => $linked]);
+    }
     if ($method === 'PATCH' && preg_match('#^/api/orders/(\d+)$#', $path, $matches)) {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);

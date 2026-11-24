@@ -72,6 +72,7 @@ export const api = {
   orders: () => request('/api/orders'),
   createOrder: (data) => post('/api/orders', data),
   updateOrder: (id, data) => request(`/api/orders/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  linkOrderProduct: (id, data) => request(`/api/orders/${id}/product`, { method: 'PATCH', body: JSON.stringify(data) }),
   updateOrdersBulk: (data) => request('/api/orders/bulk', { method: 'PATCH', body: JSON.stringify(data) }),
   sales: () => request('/api/sales'),
   createSale: (data) => post('/api/sales', data),

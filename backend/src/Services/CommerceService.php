@@ -85,7 +85,12 @@ final class CommerceService
 
     public function orders(?int $userId = null): array
     {
-        $query = 'SELECT orders.id, orders.status, orders.total_amount, orders.ordered_at, customers.name AS customer, customers.phone
+        $query = 'SELECT orders.id, orders.status, orders.total_amount, orders.ordered_at, customers.name AS customer, customers.phone,
+                         CASE WHEN EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id)
+                               AND NOT EXISTS (
+                                   SELECT 1 FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+                                   WHERE oi.order_id = orders.id AND (oi.product_id IS NULL OR p.id IS NULL OR p.is_active <> 1)
+                               ) THEN 1 ELSE 0 END AS items_linked
                   FROM orders JOIN customers ON customers.id = orders.customer_id';
         if ($userId !== null) {
             $query .= ' WHERE customers.user_id = ?';
@@ -94,6 +99,36 @@ final class CommerceService
         $statement = $this->db->prepare($query);
         $statement->execute($userId === null ? [] : [$userId]);
         return $statement->fetchAll();
+    }
+
+    public function linkOrderProduct(int $orderId, int $productId): array
+    {
+        $this->db->beginTransaction();
+        try {
+            $order = $this->db->prepare('SELECT status FROM orders WHERE id = ?');
+            $order->execute([$orderId]);
+            $status = $order->fetchColumn();
+            if ($status === false) throw new \DomainException('Order not found.');
+            if (!in_array($status, ['pending', 'quoted'], true)) throw new \DomainException('Only pending or quoted orders can be linked to a product listing.');
+
+            $items = $this->db->prepare('SELECT id, unit FROM order_items WHERE order_id = ?');
+            $items->execute([$orderId]);
+            $orderItems = $items->fetchAll(PDO::FETCH_ASSOC);
+            if (count($orderItems) !== 1) throw new \DomainException('This order must have exactly one item to link it from this screen.');
+
+            $product = $this->findProduct($productId, true);
+            if (!(int) $product['is_active']) throw new \DomainException('Choose an active product listing.');
+            if (strtolower(trim((string) $orderItems[0]['unit'])) !== strtolower(trim((string) $product['unit']))) {
+                throw new \DomainException('The product listing unit must match the order item unit.');
+            }
+            $update = $this->db->prepare('UPDATE order_items SET product_id = ?, item_name = ? WHERE id = ?');
+            $update->execute([$productId, $product['name'], $orderItems[0]['id']]);
+            $this->db->commit();
+            return ['orderId' => $orderId, 'productId' => $productId];
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
     }
 
     public function createOrder(array $input, int $userId): array
