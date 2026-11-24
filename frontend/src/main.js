@@ -21,6 +21,51 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
 const roleCopy = (english, swahili) => roleLanguage === 'sw' && ['worker', 'veterinarian'].includes(currentUser?.role) ? swahili : english
+function installFixedSidebar() {
+  const sidebar = app.querySelector('.shell > aside')
+  if (!sidebar || sidebar.dataset.fixedSidebar === 'true') return
+  sidebar.dataset.fixedSidebar = 'true'
+  const toggle = document.createElement('button')
+  toggle.type = 'button'
+  toggle.className = 'sidebar-toggle'
+  toggle.setAttribute('aria-expanded', 'false')
+  toggle.textContent = 'Menu'
+  sidebar.querySelector('.brand')?.after(toggle)
+  toggle.addEventListener('click', () => {
+    const open = sidebar.classList.toggle('sidebar-open')
+    toggle.setAttribute('aria-expanded', String(open))
+    toggle.textContent = open ? 'Close menu' : 'Menu'
+  })
+  sidebar.querySelectorAll('nav button, #logout, #security-back, #account-security, #phone-qr-access').forEach((button) => button.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 900px)').matches) sidebar.classList.remove('sidebar-open')
+  }))
+}
+
+function renderPhoneAccessModule() {
+  const content = app.querySelector('.content')
+  const currentHost = window.location.hostname
+  const isPrivateHost = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(currentHost)
+  content.innerHTML = `<header><div><p class="kicker">LOCAL NETWORK</p><h1>Phone access</h1><p class="muted">Create a QR code that opens LFMIS in a phone browser on the same Wi-Fi network.</p></div><span class="health-pill">Private Wi-Fi</span></header><section class="panel phone-access-panel"><h2>Connect a phone</h2><p class="muted">Enter this computer's private IPv4 address from <strong>ipconfig</strong>. Start the frontend with <code>npm --prefix frontend run dev:lan</code> and keep the PHP API and database running.</p><form id="phone-qr-form" class="compact-form"><label>Computer's private IPv4 address<input name="host" inputmode="decimal" placeholder="e.g. 192.168.1.20" value="${isPrivateHost ? escapeHtml(currentHost) : ''}" required></label><button>Generate phone QR code</button></form><div id="phone-qr-feedback" aria-live="polite"></div><canvas id="phone-access-qr" width="240" height="240" aria-label="QR code for opening LFMIS on a phone" hidden></canvas><p id="phone-access-url" class="muted" hidden></p><p class="muted">Both devices must be on the same trusted Wi-Fi. Keep this development app off the public internet.</p></section>`
+  content.querySelector('#phone-qr-form').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const host = event.currentTarget.elements.host.value.trim()
+    const octets = host.split('.').map(Number)
+    const validAddress = octets.length === 4 && octets.every((part, index) => /^\d{1,3}$/.test(host.split('.')[index]) && part >= 0 && part <= 255)
+    const privateAddress = validAddress && (octets[0] === 10 || (octets[0] === 192 && octets[1] === 168) || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31))
+    const feedback = content.querySelector('#phone-qr-feedback')
+    if (!privateAddress) { feedback.innerHTML = message('Enter a private IPv4 address, such as 192.168.1.20.', true); return }
+    const url = `http://${host}:5173/`
+    try {
+      await QRCode.toCanvas(content.querySelector('#phone-access-qr'), url, { width: 240, margin: 2 })
+      content.querySelector('#phone-access-qr').hidden = false
+      const link = content.querySelector('#phone-access-url')
+      link.textContent = url
+      link.hidden = false
+      feedback.innerHTML = message('Scan this code while connected to the same Wi-Fi.')
+    } catch (error) { feedback.innerHTML = message(error.message, true) }
+  })
+}
+
 function enableSortableTable(table, columnTypes = []) {
   const headers = table?.tHead?.rows[0]?.cells
   if (!headers || table.dataset.sortReady === 'true') return
@@ -390,6 +435,7 @@ async function renderAccountSecurity(forced = false) {
 
   const enabledPanel = status.enabled ? `<p>Two-step verification is on.</p><form id="totp-disable-form"><label>Current password<input name="password" type="password" required autocomplete="current-password"></label><label>Current 6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="danger-action">Disable</button></form><hr><h3>New recovery codes</h3><form id="recovery-form"><label>Password<input name="password" type="password" required autocomplete="current-password"></label><label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="secondary-action">Generate new recovery codes</button></form><p>Unused recovery codes: ${status.recoveryCodesRemaining}</p><h3>Remembered devices</h3><ul>${status.trustedDevices.map((device) => `<li>${escapeHtml(device.label)} · expires ${escapeHtml(device.expires_at)}</li>`).join('') || '<li>No remembered devices.</li>'}</ul><button id="revoke-devices" class="secondary-action">Sign out of all remembered devices</button>` : `<p>Use Google Authenticator, Microsoft Authenticator, or another TOTP app.</p><button id="start-totp" class="secondary-action">Turn on 2-step verification</button>`
   app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Account security</h2>${forced ? '' : '<button id="security-back" class="quiet">Back to workspace</button>'}<div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="security-logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">ACCOUNT SECURITY</p><h1>Two-step verification</h1><p class="muted">Use an authenticator app each time you sign in.</p></div><span class="health-pill">Two-factor ${status.enabled ? 'On' : 'Off'}</span></header><div id="security-notice" aria-live="polite">${forced ? message(status.enabled ? 'Two-step verification is on. Continue to your workspace below.' : 'Administrator accounts must turn on two-step verification before continuing.') : ''}</div><section class="module-grid"><section class="panel"><h2>Authenticator app</h2>${enabledPanel}<div id="totp-setup" hidden><p>Scan this QR code in your authenticator app, or enter the secret manually.</p><canvas id="totp-qr"></canvas><p><strong id="totp-secret"></strong></p><form id="totp-enable-form"><label>First 6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and turn on</button></form></div><div id="recovery-once" hidden><h3>Save these recovery codes</h3><p>Each code works once. They will not be shown again.</p><pre id="recovery-values"></pre><button id="copy-recovery" class="secondary-action">Copy</button><button id="saved-recovery">I saved them</button></div>${forced && status.enabled ? '<button id="continue-after-2fa">Continue to workspace</button>' : ''}</section></section></main></div>`
+  installFixedSidebar()
 
   app.querySelector('#security-back')?.addEventListener('click', renderApp)
   app.querySelector('#continue-after-2fa')?.addEventListener('click', () => { currentUser.mustEnable2fa = false; renderApp() })
@@ -448,6 +494,13 @@ async function renderApp() {
   accountSecurityButton.textContent = 'Account security'
   app.querySelector('aside .user-chip').before(accountSecurityButton)
   accountSecurityButton.addEventListener('click', renderAccountSecurity)
+  const phoneAccessButton = document.createElement('button')
+  phoneAccessButton.id = 'phone-qr-access'
+  phoneAccessButton.className = 'quiet'
+  phoneAccessButton.type = 'button'
+  phoneAccessButton.textContent = 'Phone QR access'
+  app.querySelector('aside .user-chip').before(phoneAccessButton)
+  phoneAccessButton.addEventListener('click', () => { app.querySelector('.shell > aside')?.classList.remove('sidebar-open'); renderPhoneAccessModule() })
   const stats = app.querySelector('.stats')
   stats.classList.add('overview-stats')
   const milkTotal = Number(overviewData.milkToday?.morning || 0) + Number(overviewData.milkToday?.evening || 0)
@@ -502,6 +555,7 @@ async function renderApp() {
     if (item.dataset.module === 'Overview') return renderApp()
     renderAdminModule(item.dataset.module)
   }))
+  installFixedSidebar()
   app.querySelector('#logout').addEventListener('click', async () => { await api.logout(); currentUser = null; renderAuth() })
   app.querySelector('#animal-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createAnimal(Object.fromEntries(new FormData(event.target))); await renderApp() } catch (error) { const form = event.target; let feedback = form.nextElementSibling; if (!feedback?.classList.contains('form-feedback')) { feedback = document.createElement('div'); feedback.className = 'form-feedback'; form.after(feedback) } feedback.innerHTML = message(error.message, true) } })
   app.querySelector('#health-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createHealthRecord(Object.fromEntries(new FormData(event.target))); await renderApp() } catch (error) { alert(error.message) } })
@@ -1262,6 +1316,7 @@ async function renderRoleWorkspace(initialModule) {
   accountSecurityButton.textContent = roleCopy('Account security', 'Usalama wa akaunti')
   app.querySelector('aside .user-chip').before(accountSecurityButton)
   accountSecurityButton.addEventListener('click', renderAccountSecurity)
+  installFixedSidebar()
   app.querySelector('#logout').addEventListener('click', async () => { await api.logout(); currentUser = null; renderLanding(app, () => renderAuth('login'), () => renderAuth('login')) })
   app.querySelectorAll('[data-role-module]').forEach((button) => button.addEventListener('click', () => renderRoleWorkspace(button.dataset.roleModule)))
   await renderRoleModule(activeModule)
