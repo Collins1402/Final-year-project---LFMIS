@@ -98,7 +98,18 @@ final class CommerceService
         $query .= ' ORDER BY orders.ordered_at DESC LIMIT 300';
         $statement = $this->db->prepare($query);
         $statement->execute($userId === null ? [] : [$userId]);
-        return $statement->fetchAll();
+        $orders = $statement->fetchAll(PDO::FETCH_ASSOC);
+        if ($orders === []) return [];
+        $placeholders = implode(',', array_fill(0, count($orders), '?'));
+        $itemsQuery = $this->db->prepare("SELECT order_id, item_name, quantity, unit, unit_price, product_id FROM order_items WHERE order_id IN ($placeholders) ORDER BY id");
+        $itemsQuery->execute(array_column($orders, 'id'));
+        $itemsByOrder = [];
+        foreach ($itemsQuery->fetchAll(PDO::FETCH_ASSOC) as $item) {
+            $itemsByOrder[(int) $item['order_id']][] = $item;
+        }
+        foreach ($orders as &$order) $order['items'] = $itemsByOrder[(int) $order['id']] ?? [];
+        unset($order);
+        return $orders;
     }
 
     public function linkOrderProduct(int $orderId, int $productId): array
