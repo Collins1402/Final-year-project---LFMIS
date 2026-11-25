@@ -1991,4 +1991,17 @@ async function start() {
   }
 }
 
+// Some browsers do not submit a form consistently when Enter is pressed from
+// a text field (for example, when the form has multiple controls/buttons).
+// Keep the usual form submit path so validation and existing submit handlers
+// still run, while leaving multiline fields and IME composition untouched.
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented) return
+  const field = event.target
+  if (!(field instanceof HTMLInputElement) || !field.form) return
+  if (['button', 'checkbox', 'color', 'file', 'image', 'radio', 'reset', 'submit'].includes(field.type)) return
+  event.preventDefault()
+  field.form.requestSubmit()
+})
+
 start()
