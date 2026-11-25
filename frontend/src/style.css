@@ -241,6 +241,14 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .production-module .table-wrap { max-width: 100%; }
 .production-module table { font-size: .78rem; }
 .production-module th, .production-module td { padding: .58rem .35rem; }
+.dashboard-shortcuts { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1rem; }
+.dashboard-shortcuts .panel { display: flex; flex-direction: column; gap: .4rem; padding: 1rem; }
+.dashboard-shortcuts .panel h2 { font-size: 1rem; }
+.dashboard-shortcuts .panel p { margin: 0; font-size: .83rem; }
+.dashboard-actions { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: auto; padding-top: .35rem; }
+.dashboard-actions button { padding: .45rem .6rem; font-size: .75rem; }
 .feedback-header-actions { display: flex; align-items: center; gap: .65rem; }
 .feedback-header-actions button:disabled { opacity: .55; cursor: default; }
 @media (max-width: 720px) { .animal-profile-filters { grid-template-columns: 1fr 1fr; }.animal-profile-filters input { grid-column: 1 / -1; }.animal-profile-filters .animal-record-count { justify-self: start; }.animal-profile-actions { justify-content: flex-start; }.production-module, .produce-record-filters { grid-template-columns: 1fr; }.feedback-header-actions { align-items: flex-end; flex-direction: column; } }
+@media (max-width: 1000px) { .dashboard-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 550px) { .dashboard-shortcuts { grid-template-columns: 1fr; } }
