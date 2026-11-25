@@ -235,6 +235,12 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .animal-profile-summary .stats { margin-top: .5rem; }
 .animal-profile-filters { display: grid; grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(145px, .7fr)) auto; align-items: center; gap: .65rem; margin-bottom: 1rem; }
 .animal-profile-filters .animal-record-count { justify-self: end; white-space: nowrap; }
+.animal-profile-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; }
+.production-module { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.produce-record-filters { display: grid; grid-template-columns: minmax(120px, 1.2fr) repeat(2, minmax(110px, 1fr)); gap: .5rem; margin-bottom: .75rem; }
+.production-module .table-wrap { max-width: 100%; }
+.production-module table { font-size: .78rem; }
+.production-module th, .production-module td { padding: .58rem .35rem; }
 .feedback-header-actions { display: flex; align-items: center; gap: .65rem; }
 .feedback-header-actions button:disabled { opacity: .55; cursor: default; }
-@media (max-width: 720px) { .animal-profile-filters { grid-template-columns: 1fr 1fr; }.animal-profile-filters input { grid-column: 1 / -1; }.animal-profile-filters .animal-record-count { justify-self: start; }.feedback-header-actions { align-items: flex-end; flex-direction: column; } }
+@media (max-width: 720px) { .animal-profile-filters { grid-template-columns: 1fr 1fr; }.animal-profile-filters input { grid-column: 1 / -1; }.animal-profile-filters .animal-record-count { justify-self: start; }.animal-profile-actions { justify-content: flex-start; }.production-module, .produce-record-filters { grid-template-columns: 1fr; }.feedback-header-actions { align-items: flex-end; flex-direction: column; } }
