@@ -918,25 +918,34 @@ async function renderAnimalProfile(target, animalId, canChangeStatus, onBack) {
 }
 
 function downloadAnimalProfile(profile) {
-  const sections = [
-    ['Animal details', [profile.animal]],
-    ['Health and care history', profile.healthRecords || []],
-    ['Production history', profile.productionRecords || []],
-    ['Activities', profile.activities || []],
-    ['Sale and order history', profile.orders || []],
+  const sheets = [
+    { name: 'Animal profile', columns: [['Tag number', 'tag_number', 95], ['Name', 'name', 120], ['Species', 'species', 80], ['Breed', 'breed', 115], ['Status', 'status', 80], ['Sex', 'sex', 65], ['Date of birth', 'date_of_birth', 90], ['Weight (kg)', 'weight_kg', 80], ['Notes', 'notes', 240]], rows: [profile.animal] },
+    { name: 'Health and care', columns: [['Date', 'record_date', 90], ['Record type', 'record_type', 100], ['Description', 'description', 260], ['Medication', 'medication', 130], ['Dosage', 'dosage', 85], ['Cost (KES)', 'cost', 90], ['Next due date', 'next_due_date', 100]], rows: profile.healthRecords || [] },
+    { name: 'Production', columns: [['Date', 'production_date', 90], ['Produce', 'produce_name', 100], ['Session', 'production_session', 85], ['Produced', 'quantity_produced', 90], ['Sold', 'quantity_sold', 75], ['Damaged', 'quantity_damaged', 85], ['Unit', 'unit', 75], ['Notes', 'notes', 220]], rows: profile.productionRecords || [] },
+    { name: 'Activities', columns: [['Date', 'activity_at', 115], ['Activity', 'activity_type', 100], ['Details', 'description', 280], ['Status', 'status', 90], ['Completed', 'completed_at', 115]], rows: profile.activities || [] },
+    { name: 'Sale history', columns: [['Order', 'id', 75], ['Customer', 'customer_name', 180], ['Status', 'status', 90], ['Total (KES)', 'total_amount', 100], ['Order date', 'ordered_at', 115], ['Fulfilled date', 'fulfilled_at', 115]], rows: profile.orders || [] },
   ]
-  const cell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
-  const lines = sections.flatMap(([title, records]) => {
-    const keys = records.length ? [...new Set(records.flatMap((record) => Object.keys(record)))] : ['Details']
-    return [[title], keys, ...(records.length ? records.map((record) => keys.map((key) => record[key] ?? '')) : [['No records']])].map((row) => row.map(cell).join(','))
-  })
-  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const xmlEscape = (value) => String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+  const cell = (value, style = 'text') => {
+    const numeric = typeof value === 'number' && Number.isFinite(value)
+    return `<Cell ss:StyleID="${style}"><Data ss:Type="${numeric ? 'Number' : 'String'}">${xmlEscape(value)}</Data></Cell>`
+  }
+  const worksheets = sheets.map(({ name, columns, rows }) => {
+    const header = `<Row ss:StyleID="header">${columns.map(([label]) => cell(label, 'header')).join('')}</Row>`
+    const data = rows.length
+      ? rows.map((record) => `<Row>${columns.map(([, key]) => cell(record[key])).join('')}</Row>`).join('')
+      : `<Row>${cell('No records', 'text')}</Row>`
+    const widths = columns.map(([, , width]) => `<Column ss:Width="${width}"/>`).join('')
+    return `<Worksheet ss:Name="${xmlEscape(name)}"><Table>${widths}${header}${data}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><FreezePanes/><FrozenNoSplit/><SplitHorizontal>1</SplitHorizontal><TopRowBottomPane>1</TopRowBottomPane></WorksheetOptions></Worksheet>`
+  }).join('')
+  const workbook = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Top" ss:WrapText="1"/><Font ss:FontName="Aptos" ss:Size="10"/></Style><Style ss:ID="text"><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style><Style ss:ID="header"><Alignment ss:Vertical="Center" ss:WrapText="1"/><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#19352D" ss:Pattern="Solid"/></Style></Styles>${worksheets}</Workbook>`
+  const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${String(profile.animal.tag_number || 'animal').replace(/[^a-z0-9_-]/gi, '-')}-profile.csv`
+  link.download = `${String(profile.animal.tag_number || 'animal').replace(/[^a-z0-9_-]/gi, '-')}-profile.xls`
   link.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 function activityHealthFields(animals) {

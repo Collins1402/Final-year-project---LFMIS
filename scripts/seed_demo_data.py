@@ -15,14 +15,11 @@ def demo_count(source_count: int) -> int:
 
 
 SPECIES = {
-    species: (demo_count(count), code, breeds)
-    for species, (count, code, breeds) in {
-        "cattle": (32, "CAT", ["Friesian", "Ayrshire", "Jersey"]),
-        "goat": (48, "GOA", ["Toggenburg", "Galla", "Saanen"]),
-        "sheep": (20, "SHE", ["Dorper", "Merino"]),
-        "rabbit": (100, "RAB", ["New Zealand White", "Californian"]),
-        "chicken": (150, "CHK", ["Kienyeji", "Kuroiler"]),
-    }.items()
+    "cattle": (40, "CAT", ["Friesian", "Ayrshire", "Jersey", "Sahiwal"]),
+    "goat": (12, "GOA", ["Toggenburg", "Galla", "Saanen"]),
+    "sheep": (12, "SHE", ["Dorper", "Merino"]),
+    "rabbit": (51, "RAB", ["New Zealand White", "Californian"]),
+    "chicken": (101, "CHK", ["Kienyeji", "Kuroiler"]),
 }
 SIMULATED = "SIMULATED DATA"
 
@@ -60,22 +57,12 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
     animal_ids: dict[str, list[int]] = {species: [] for species in SPECIES}
     sold_animal_ids: list[int] = []
     animal_index = 0
-    sold_count = 0
-    deceased_count = 0
     for species, (count, code, breeds) in SPECIES.items():
         for species_index in range(count):
             animal_id = 1000 + animal_index
             animal_index += 1
-            if species == "cattle" and species_index < 16:
-                status = "active"
-            elif sold_count < demo_count(45):
-                status = "sold"
-                sold_count += 1
-            elif deceased_count < demo_count(8):
-                status = "deceased"
-                deceased_count += 1
-            else:
-                status = "active"
+            status = ("active" if species_index < 24 else "sold" if species_index < 30 else
+                      "transferred" if species_index < 35 else "deceased") if species == "cattle" else "active"
             status_changed = (today - timedelta(days=rng.randint(1, days))).isoformat() if status != "active" else None
             sex = "female" if species_index % 3 else "male"
             if species == "cattle" and species_index < 24:

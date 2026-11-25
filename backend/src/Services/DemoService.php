@@ -19,16 +19,16 @@ final class DemoService
         $this->db->beginTransaction();
         try {
             $animals = [
-                ['DEMO-COW-001','cattle','Friesian','Daisy','female','2021-03-14',480],
-                ['DEMO-COW-002','cattle','Ayrshire','Bella','female','2020-08-02',455],
-                ['DEMO-COW-003','cattle','Jersey','Luna','female','2022-01-20',410],
-                ['DEMO-GOAT-001','goat','Toggenburg','Neema','female','2023-02-05',42],
-                ['DEMO-GOAT-002','goat','Galla','Zawadi','female','2023-06-18',38],
-                ['DEMO-RAB-001','rabbit','New Zealand White','Clover','female','2025-10-03',4.2],
-                ['DEMO-CHK-001','chicken','Kienyeji','Sunny','female','2025-09-10',2.1],
-                ['DEMO-CHK-002','chicken','Kienyeji','Pepper','female','2025-09-10',2.0],
+                ['DEMO-COW-001','cattle','Friesian','Daisy','female','2021-03-14',480,'sold'],
+                ['DEMO-COW-002','cattle','Ayrshire','Bella','female','2020-08-02',455,'sold'],
+                ['DEMO-COW-003','cattle','Jersey','Luna','female','2022-01-20',410,'sold'],
+                ['DEMO-GOAT-001','goat','Toggenburg','Neema','female','2023-02-05',42,'active'],
+                ['DEMO-GOAT-002','goat','Galla','Zawadi','female','2023-06-18',38,'active'],
+                ['DEMO-RAB-001','rabbit','New Zealand White','Clover','female','2025-10-03',4.2,'active'],
+                ['DEMO-CHK-001','chicken','Kienyeji','Sunny','female','2025-09-10',2.1,'active'],
+                ['DEMO-CHK-002','chicken','Kienyeji','Pepper','female','2025-09-10',2.0,'active'],
             ];
-            $animalStatement = $this->db->prepare('INSERT INTO animals (tag_number,species,breed,name,sex,date_of_birth,weight_kg,status,notes,created_by) VALUES (?,?,?,?,?,?,?,\'active\',?,?)');
+            $animalStatement = $this->db->prepare('INSERT INTO animals (tag_number,species,breed,name,sex,date_of_birth,weight_kg,status,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)');
             $animalIds = [];
             foreach ($animals as $animal) {
                 $animalStatement->execute([...$animal, 'TEST DATA - demo record', $userId]);

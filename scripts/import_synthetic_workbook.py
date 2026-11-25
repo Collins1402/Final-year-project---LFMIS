@@ -80,45 +80,78 @@ def unique_customer_map(customers: list[dict[str, object]]) -> dict[int, int]:
     return {int(row["id"]): 900000 + int(row["id"]) for row in customers}
 
 
+def farm_herd(source_animals: list[dict[str, object]], date_stamp: str) -> tuple[list[tuple[object, ...]], dict[int, int], dict[str, int]]:
+    """Build the requested structured herd while retaining a small set of template traits."""
+    template_by_species: dict[str, list[dict[str, object]]] = {}
+    for row in source_animals:
+        template_by_species.setdefault(str(row.get("species") or "").lower(), []).append(row)
+
+    # The app's eight starter DEMO records include three already-sold cattle,
+    # two active goats, two active chickens, and one active rabbit. One third
+    # of the chicken group is represented separately as rabbits.
+    plan = [("cattle", 37, [("active", 24), ("sold", 3), ("transferred", 5), ("deceased", 5)]),
+            ("goat", 10, [("active", 10)]),
+            ("sheep", 12, [("active", 12)]),
+            ("rabbit", 50, [("active", 50)]),
+            ("chicken", 99, [("active", 99)])]
+    generated: list[tuple[object, ...]] = []
+    output_ids: dict[str, list[int]] = {}
+    counts: dict[str, int] = {}
+    next_id = 800001
+    species_codes = {"cattle": "CAT", "goat": "GOA", "sheep": "SHE", "rabbit": "RAB", "chicken": "CHK"}
+
+    for species, total, status_groups in plan:
+        templates = template_by_species.get(species) or [{}]
+        output_ids[species] = []
+        index = 0
+        for status, amount in status_groups:
+            for _ in range(amount):
+                template = templates[index % len(templates)]
+                tag = f"SIM-{species_codes[species]}-{index + 1:03d}"
+                sex = "female" if species != "cattle" or index % 4 != 0 else "male"
+                changed_at = f"{date_stamp} 12:00:00" if status != "active" else None
+                generated.append((
+                    next_id, tag, species, template.get("breed") or "Mixed", f"Demo {species.title()} {index + 1:03d}", sex,
+                    date_value(template.get("date_of_birth")),
+                    float(template["weight_kg"]) if template.get("weight_kg") not in (None, "") else None,
+                    status, changed_at, "SYNTHETIC DEMONSTRATION", None,
+                ))
+                output_ids[species].append(next_id)
+                next_id += 1
+                index += 1
+        counts[species] = total
+
+    animal_id_map: dict[int, int] = {}
+    counters = {species: 0 for species in output_ids}
+    for row in source_animals:
+        species = str(row.get("species") or "").lower()
+        choices = output_ids.get(species)
+        if choices:
+            animal_id_map[int(row["id"])] = choices[counters[species] % len(choices)]
+            counters[species] += 1
+    return generated, animal_id_map, counts
+
+
 def build_sql(workbook: openpyxl.Workbook, demo_share: float = 0.30, max_animals: int | None = None) -> tuple[str, str, dict[str, int]]:
     synthetic_mark = "SYNTHETIC DEMONSTRATION"
     statements: list[str] = ["SET NAMES utf8mb4;", "SET FOREIGN_KEY_CHECKS = 0;"]
     counts: dict[str, int] = {}
 
     all_animals = rows_as_dicts(workbook, "animals")
-    animals = demo_rows(all_animals, demo_share)
-    if max_animals is not None:
-        animals = animals[:max_animals]
-    animal_rows = []
-    animal_id_map: dict[int, int] = {}
-    for offset, row in enumerate(animals, start=1):
-        if str(row.get("tag_number") or "").strip() == "":
-            continue
-        original_id = int(row["id"])
-        synthetic_id = 800000 + offset
-        animal_id_map[original_id] = synthetic_id
-        status = str(row.get("status") or "active").lower()
-        if status not in {"active", "sold", "deceased", "transferred"}:
-            status = "active"
-        animal_rows.append((
-            synthetic_id,
-            row["tag_number"],
-            str(row["species"]).lower(),
-            row.get("breed"),
-            row.get("name"),
-            str(row["sex"]).lower(),
-            date_value(row.get("date_of_birth")),
-            float(row["weight_kg"]) if row.get("weight_kg") not in (None, "") else None,
-            status,
-            datetime_value(row.get("status_changed_at")),
-            synthetic_mark,
-            None,
-        ))
+    if max_animals is not None and max_animals < 208:
+        raise ValueError("The structured herd contains 208 generated animal records.")
+    animal_rows, animal_id_map, herd_counts = farm_herd(all_animals, date.today().isoformat())
     add_insert(statements, "animals", [
         "id", "tag_number", "species", "breed", "name", "sex", "date_of_birth",
         "weight_kg", "status", "status_changed_at", "notes", "created_by",
     ], animal_rows)
     counts["animals"] = len(animal_rows)
+    counts["animals_active"] = sum(status == "active" for row in animal_rows for status in [row[8]])
+    counts["cattle_total_including_starter"] = 40
+    counts["goats"] = herd_counts["goat"]
+    counts["sheep"] = herd_counts["sheep"]
+    counts["chickens"] = herd_counts["chicken"]
+    counts["rabbits"] = herd_counts["rabbit"]
 
     customers = demo_rows(rows_as_dicts(workbook, "customers"), demo_share)
     customer_id_map = unique_customer_map(customers)
@@ -537,7 +570,7 @@ def main() -> None:
     parser.add_argument("workbook", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("seed_data"))
     parser.add_argument("--demo-share", type=float, default=0.30, help="Share of each workbook sheet to retain (default: 0.30).")
-    parser.add_argument("--max-animals", type=int, help="Optional additional cap on animal records.")
+    parser.add_argument("--max-animals", type=int, help="Compatibility check only; the structured herd always contains 208 generated records.")
     args = parser.parse_args()
     if not 0 < args.demo_share <= 1:
         parser.error("--demo-share must be greater than 0 and at most 1.")

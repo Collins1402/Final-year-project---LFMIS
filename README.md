@@ -278,7 +278,7 @@ python -m pip install -r scripts/requirements.txt
 python scripts/import_synthetic_workbook.py "C:\Users\colli\Downloads\LFMIS_Extensive_Synthetic_Dataset_12_Months.xlsx"
 ```
 
-By default the converter keeps a 30% sample from each workbook sheet (`--demo-share` changes the percentage). Related records are kept only when their animal, customer, product, inventory item or order is also in the sample. The other 70% is omitted so you can enter your own farm values in the app. It generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`; regenerate these files from the workbook before applying the reduced demo import, and apply only to a staging or demo database after migrations:
+By default the converter keeps 30% of each workbook sheet for customers, production, health, orders and other farm records (`--demo-share` changes that percentage). Animal rows use the requested structured herd instead: 40 cattle across active, sold, transferred and deceased statuses, 12 goats, 12 sheep, 51 rabbits, and 101 chickens, for 200 active animals alongside the eight starter records. The rabbit group is one third of the previous chicken group. Related records are remapped to the generated animals. The omitted workbook data remains available for manual entry. It generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`; regenerate these files from the workbook before applying the demo import, and apply only to a staging or demo database after migrations:
 
 ```powershell
 php backend/bin/import_synthetic.php
@@ -286,7 +286,7 @@ php backend/bin/import_synthetic.php
 
 Use `php backend/bin/import_synthetic.php --reset-only` to remove rows carrying the synthetic demo markers. The cleanup follows labels and relationships instead of deleting by numeric ID, so later manually entered rows are kept. The importer does not copy workbook password placeholders or synthetic user-account credentials.
 
-The converter remaps workbook IDs, creates separate synthetic order records instead of repeating order ID `1`, uses the workbook's synthetic animal and customer records only with `SIMULATED DEMONSTRATION` labels, excludes the placeholder account passwords, and omits synthetic forecast/audit records that must not be presented as real system evidence.
+The converter remaps workbook IDs, creates separate synthetic order records instead of repeating order ID `1`, labels generated animals and customer records `SIMULATED DEMONSTRATION`, excludes the placeholder account passwords, and omits synthetic forecast/audit records that must not be presented as real system evidence.
 
 ### Not yet integrated
 
