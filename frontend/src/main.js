@@ -11,11 +11,38 @@ let trendsRefreshTimer = null
 let roleLanguage = 'en'
 
 const adminNavigation = [
-  ['Operations', ['Overview', 'Livestock', 'Animal health', 'Activities', 'Production', 'Inventory']],
+  ['Operations', ['Overview', 'Livestock', 'Animal profiles', 'Animal health', 'Activities', 'Production', 'Inventory']],
   ['Commerce', ['Sales & orders', 'Feedback']],
   ['Insights', ['Reports', 'Farm trends', 'Assistant']],
   ['Administration', ['User accounts', 'Role permissions', 'Audit log', 'Your rights', 'Events']],
 ]
+
+function installTablePagination(root = app) {
+  root.querySelectorAll('.table-wrap tbody').forEach((tbody) => {
+    if (tbody.dataset.paged === 'true') return
+    const rows = [...tbody.querySelectorAll('tr')]
+    const pageSize = 10
+    if (rows.length <= pageSize || rows.some((row) => row.querySelector('.empty'))) return
+    tbody.dataset.paged = 'true'
+    let page = 1
+    const pages = Math.ceil(rows.length / pageSize)
+    const controls = document.createElement('div')
+    controls.className = 'table-pagination'
+    controls.innerHTML = '<button type="button" class="secondary-action" data-page-prev>Previous</button><span aria-live="polite"></span><button type="button" class="secondary-action" data-page-next>Next</button>'
+    tbody.closest('.table-wrap').after(controls)
+    const update = () => {
+      rows.forEach((row, index) => { row.hidden = index < (page - 1) * pageSize || index >= page * pageSize })
+      controls.querySelector('span').textContent = `Page ${page} of ${pages}`
+      controls.querySelector('[data-page-prev]').disabled = page === 1
+      controls.querySelector('[data-page-next]').disabled = page === pages
+    }
+    controls.querySelector('[data-page-prev]').addEventListener('click', () => { if (page > 1) { page--; update() } })
+    controls.querySelector('[data-page-next]').addEventListener('click', () => { if (page < pages) { page++; update() } })
+    update()
+  })
+}
+
+new MutationObserver(() => installTablePagination()).observe(app, { childList: true, subtree: true })
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
 const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -802,6 +829,7 @@ async function renderApp() {
 function renderAdminModule(module) {
   if (module === 'Events') return renderEventsModule()
   if (module === 'Activities') return renderActivitiesModule()
+  if (module === 'Animal profiles') return renderAnimalProfilesModule()
   if (module === 'Production') return renderProductionModule()
   if (module === 'Inventory') return renderInventoryModule()
   if (module === 'Sales & orders') return renderCommerceModule()
@@ -833,6 +861,36 @@ function renderAdminModule(module) {
   const [title, description] = details
   app.querySelector('.content').innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>${escapeHtml(title)}</h1><p class="muted">${escapeHtml(description)}</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel module-intro"><p class="kicker">WORKSPACE</p><h2>${escapeHtml(title)}</h2><p class="muted">This module is now part of the admin workspace. Its records and actions will appear here as the backend slice is connected.</p><button class="primary-action" data-module="Overview">Back to overview</button></section><section class="panel"><p class="kicker">NEXT ACTION</p><h2>Keep records complete</h2><p class="muted">Use the overview for the currently connected livestock and animal-health records.</p></section></section>`
   app.querySelector('[data-module="Overview"]').addEventListener('click', renderApp)
+}
+
+async function renderAnimalProfilesModule(animalId = null) {
+  const content = app.querySelector('.content')
+  try {
+    const [animalData, permissionData] = await Promise.all([api.animals(), api.permissions()])
+    const grants = permissionData.permissions || permissionData.matrix?.[permissionData.role] || {}
+    const canChangeStatus = Boolean(grants['animals.status']?.allowed)
+    if (animalId !== null) {
+      await renderAnimalProfile(content, animalId, canChangeStatus, () => renderAnimalProfilesModule())
+      return
+    }
+    const animals = animalData.animals || []
+    content.innerHTML = `<header><div><p class="kicker">ANIMAL RECORDS</p><h1>Animal profiles</h1><p class="muted">Open an individual record to see its identity, status, care, production and sale history.</p></div><span class="health-pill">${animals.length} animals</span></header><section class="panel"><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Name</th><th>Species</th><th>Breed</th><th>Status</th><th></th></tr></thead><tbody>${animals.map((animal) => `<tr><td>${escapeHtml(animal.tag_number)}</td><td>${escapeHtml(animal.name || '—')}</td><td>${escapeHtml(animal.species)}</td><td>${escapeHtml(animal.breed || '—')}</td><td><span class="status">${escapeHtml(animal.status)}</span></td><td><button class="small-action" data-open-animal="${Number(animal.id)}">Open profile</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No animals registered.</td></tr>'}</tbody></table></div></section>`
+    content.querySelectorAll('[data-open-animal]').forEach((button) => button.addEventListener('click', () => renderAnimalProfilesModule(Number(button.dataset.openAnimal))))
+  } catch (error) { content.innerHTML = message(error.message, true) }
+}
+
+async function renderAnimalProfile(target, animalId, canChangeStatus, onBack) {
+  const profile = await api.animalProfile(animalId)
+  const animal = profile.animal
+  const table = (title, columns, rows, empty) => `<section class="panel"><h2>${title}</h2><div class="table-wrap"><table><thead><tr>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${columns.length}" class="empty">${empty}</td></tr>`}</tbody></table></div></section>`
+  target.innerHTML = `<header><div><p class="kicker">INDIVIDUAL ANIMAL RECORD</p><h1>${escapeHtml(animal.name || animal.tag_number)}</h1><p class="muted">${escapeHtml(animal.tag_number)} · ${escapeHtml(animal.species)} · ${escapeHtml(animal.breed || 'Breed not recorded')}</p></div><button type="button" class="secondary-action" id="animal-profile-back">Back to animal profiles</button></header><section class="panel animal-profile-summary"><div class="stats"><div><small>Status</small><strong>${escapeHtml(animal.status)}</strong>${animal.status_changed_at ? `<small>Updated ${escapeHtml(animal.status_changed_at)}</small>` : ''}</div><div><small>Sex</small><strong>${escapeHtml(animal.sex)}</strong></div><div><small>Date of birth</small><strong>${escapeHtml(animal.date_of_birth || 'Not recorded')}</strong></div><div><small>Weight</small><strong>${animal.weight_kg ? `${Number(animal.weight_kg).toLocaleString()} kg` : 'Not recorded'}</strong></div></div><p>${escapeHtml(animal.notes || 'No additional notes.')}</p>${canChangeStatus ? `<form id="animal-profile-status" class="compact-form"><label>Animal status<select name="status"><option value="active" ${animal.status === 'active' ? 'selected' : ''}>Active on farm</option><option value="sold" ${animal.status === 'sold' ? 'selected' : ''}>Sold</option><option value="deceased" ${animal.status === 'deceased' ? 'selected' : ''}>Deceased</option><option value="transferred" ${animal.status === 'transferred' ? 'selected' : ''}>Transferred</option></select></label><button>Update status</button></form><div id="animal-profile-feedback" aria-live="polite"></div>` : ''}</section>${table('Health and care history',['Date','Type','Description','Medication'],profile.healthRecords.map((item)=>`<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.medication || '—')}</td></tr>`).join(''),'No health records for this animal.')}${table('Individual production history',['Date','Produce','Session','Quantity'],profile.productionRecords.map((item)=>`<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '—')}</td><td>${Number(item.quantity_produced).toLocaleString()} ${escapeHtml(item.unit)}</td></tr>`).join(''),'No individual production records. Flock-level eggs are not assigned to individual animals.')}${table('Activities',['Date','Activity','Details','Status'],profile.activities.map((item)=>`<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td></tr>`).join(''),'No activities linked to this animal.')}${table('Sale and order history',['Order','Customer','Status','Order date','Fulfilled'],profile.orders.map((item)=>`<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.customer_name || '—')}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.fulfilled_at || '—')}</td></tr>`).join(''),'No sale or order history for this animal.')}`
+  target.querySelector('#animal-profile-back').addEventListener('click', onBack)
+  target.querySelector('#animal-profile-status')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const feedback = target.querySelector('#animal-profile-feedback')
+    try { await api.updateAnimalStatus(animal.id, new FormData(event.target).get('status')); await renderAnimalProfile(target, animal.id, canChangeStatus, onBack) }
+    catch (error) { feedback.innerHTML = message(error.message, true) }
+  })
 }
 
 function activityHealthFields(animals) {
@@ -1129,7 +1187,7 @@ async function renderCommerceModule() {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
-function renderForecastChart(observations, predictions) {
+function renderForecastChart(observations, predictions, unit = 'litres') {
   const actual = observations.slice(-28)
   const values = [...actual, ...predictions]
   if (values.length === 0) return '<p class="empty">No production history is available.</p>'
@@ -1151,20 +1209,23 @@ function renderForecastChart(observations, predictions) {
   const forecastPath = actual.length ? path([actual[actual.length - 1], ...predictions], actual.length - 1) : path(predictions)
   const midY = y((minimum + maximum) / 2)
 
-  return `<svg class="forecast-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Milk production history and seven-day forecast in litres">
+  return `<svg class="forecast-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(unit)} production history and seven-day forecast">
     <line x1="${left}" y1="${midY}" x2="${width - right}" y2="${midY}" class="forecast-gridline"></line>
     <path d="${actualPath}" class="forecast-actual-line"></path>
     <path d="${forecastPath}" class="forecast-prediction-line"></path>
     <circle cx="${x(values.length - 1)}" cy="${y(values[values.length - 1].litres)}" r="4" class="forecast-endpoint"></circle>
     <text x="${left}" y="${height - 8}">${escapeHtml(actual[0]?.date || values[0].date)}</text>
     <text x="${width - right}" y="${height - 8}" text-anchor="end">${escapeHtml(values[values.length - 1].date)}</text>
-    <text x="4" y="${Math.max(top + 8, midY - 5)}">${Number((minimum + maximum) / 2).toFixed(0)} L</text>
+    <text x="4" y="${Math.max(top + 8, midY - 5)}">${Number((minimum + maximum) / 2).toFixed(0)} ${escapeHtml(unit)}</text>
   </svg><div class="forecast-legend"><span><i class="forecast-legend-actual"></i>Recorded</span><span><i class="forecast-legend-prediction"></i>Forecast</span></div>`
 }
 
-function renderForecastPanel(data, error) {
+function renderForecastPanel(data, error, selectedProduct = 'milk', productOptions = []) {
+  const selectedInfo = productOptions.find((item) => item.name.toLowerCase() === selectedProduct)
+  const label = selectedInfo?.name || (selectedProduct ? selectedProduct[0].toUpperCase() + selectedProduct.slice(1) : 'Milk')
+  const selector = `<label>Product forecast<select id="forecast-product">${productOptions.map((item) => `<option value="${escapeHtml(item.name.toLowerCase())}" ${item.name.toLowerCase() === selectedProduct ? 'selected' : ''}>${escapeHtml(item.name)} (${escapeHtml(item.unit)})</option>`).join('') || '<option value="milk">Milk</option>'}</select></label>`
   if (error) {
-    return `<section class="forecast-panel"><header><div><p class="kicker">DECISION SUPPORT</p><h2>Milk forecast</h2></div></header><p class="message danger">${escapeHtml(error.message)}</p><p class="muted">Forecasting requires at least 21 consecutive recorded milk-production days and the local Python service.</p></section>`
+    return `<section class="forecast-panel"><header><div><p class="kicker">DECISION SUPPORT</p><h2>${label} forecast</h2></div>${selector}</header><p class="message danger">${escapeHtml(error.message)}</p><p class="muted">Forecasting requires at least 21 consecutive recorded production days and the local Python service.</p></section>`
   }
 
   const result = data.forecast
@@ -1172,8 +1233,9 @@ function renderForecastPanel(data, error) {
   const predictions = result.forecast || []
   const actual = data.observations || []
   const checks = data.insights?.checks || []
-  const formatLitres = (value) => `${Number(value).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`
-  const formatMae = (value) => `${Number(value).toFixed(2)} L`
+  const unit = data.unit || selectedInfo?.unit || 'units'
+  const formatQuantity = (value) => `${Number(value).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${unit}`
+  const formatMae = (value) => `${Number(value).toFixed(2)} ${unit}`
   const improvement = Number(backtest.improvementPct)
   const verdict = improvement > 0
     ? `The model reduced one-day-ahead backtest MAE by ${improvement.toFixed(1)}% against the ${escapeHtml(backtest.baselineName)} baseline. This does not guarantee seven-day forecast accuracy.`
@@ -1184,12 +1246,12 @@ function renderForecastPanel(data, error) {
     return `<li class="insight-item insight-${priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><small>${escapeHtml(item.action)}</small></li>`
   }).join('')
 
-  return `<section class="forecast-panel"><header><div><p class="kicker">DECISION SUPPORT</p><h2>Milk forecast</h2><p class="muted">Seven-day estimate from the latest ${result.trainingDays} consecutive recorded days.</p></div></header>
+  return `<section class="forecast-panel"><header><div><p class="kicker">DECISION SUPPORT</p><h2>${label} forecast</h2><p class="muted">Seven-day estimate from the latest ${result.trainingDays} consecutive recorded days.</p></div>${selector}</header>
     ${data.includesSimulatedData ? '<p class="message forecast-warning"><strong>Simulated data:</strong> this history includes labelled demo records. Do not report it as farm results.</p>' : ''}
-    <div class="stats forecast-stats"><div><small>Training history</small><strong>${result.trainingDays} days</strong></div><div><small>Next seven days</small><strong>${formatLitres(predictions.reduce((sum, item) => sum + Number(item.litres), 0))}</strong></div><div><small>Backtest MAE</small><strong>${formatMae(backtest.maeLitres)}</strong><small>Baseline: ${formatMae(backtest.baselineMaeLitres)}</small></div></div>
+    <div class="stats forecast-stats"><div><small>Training history</small><strong>${result.trainingDays} days</strong></div><div><small>Next seven days</small><strong>${formatQuantity(predictions.reduce((sum, item) => sum + Number(item.litres), 0))}</strong></div><div><small>Backtest MAE</small><strong>${formatMae(backtest.maeLitres)}</strong><small>Baseline: ${formatMae(backtest.baselineMaeLitres)}</small></div></div>
     <p class="forecast-verdict">${verdict}</p>
-    <figure class="forecast-figure"><figcaption>Recorded daily milk and seven-day estimate</figcaption>${renderForecastChart(actual, predictions)}</figure>
-    <div class="forecast-columns"><section><h3>Seven-day forecast</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Expected milk</th></tr></thead><tbody>${predictions.map((item) => `<tr><td>${escapeHtml(item.date)}</td><td>${formatLitres(item.litres)}</td></tr>`).join('')}</tbody></table></div></section><section><h3>Checks for the farmer</h3><ul class="insight-list">${checkItems || '<li class="empty">No immediate checks detected.</li>'}</ul></section></div>
+    <figure class="forecast-figure"><figcaption>Recorded daily ${label.toLowerCase()} and seven-day estimate</figcaption>${renderForecastChart(actual, predictions, unit)}</figure>
+    <div class="forecast-columns"><section><h3>Seven-day forecast</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Expected ${label.toLowerCase()}</th></tr></thead><tbody>${predictions.map((item) => `<tr><td>${escapeHtml(item.date)}</td><td>${formatQuantity(item.litres)}</td></tr>`).join('')}</tbody></table></div></section><section><h3>Checks for the farmer</h3><ul class="insight-list">${checkItems || '<li class="empty">No product-specific checks are available for this forecast.</li>'}</ul></section></div>
     <h3>Model and baseline comparison</h3><div class="table-wrap"><table><thead><tr><th>Model</th><th>Features</th><th>MAE</th><th>RMSE</th><th>Improvement</th></tr></thead><tbody>${evaluationRows}</tbody></table></div>
     <p class="muted forecast-limitation">${escapeHtml(result.limitations)} Backtest results are one-day-ahead; the forecast horizon is seven days.</p>
   </section>`
@@ -1306,14 +1368,20 @@ async function renderReportsModule() {
   const content = app.querySelector('.content')
   try {
     const finance = await api.financeReport()
+    let forecastProducts = [{ name: 'Milk', unit: 'litres' }, { name: 'Eggs', unit: 'trays' }]
+    try {
+      const available = await api.forecastProducts()
+      if (available.products?.length) forecastProducts = available.products
+    } catch {}
+    const initialProduct = forecastProducts.find((item) => item.name.toLowerCase() === 'milk')?.name.toLowerCase() || forecastProducts[0]?.name.toLowerCase() || 'milk'
     let forecastData = null
     let forecastError = null
-    try { forecastData = await api.forecastReport() } catch (error) { forecastError = error }
+    try { forecastData = await api.forecastReport(initialProduct) } catch (error) { forecastError = error }
     let operations = null
     let operationsError = null
     try { operations = await api.operationalReports() } catch (error) { operationsError = error }
     const money = (value) => Math.round(Number(value)).toLocaleString()
-    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Reports</h1><p class="muted">Monthly financial performance and milk-production decision support.</p></div><span class="health-pill">Current month</span></header><section class="stats"><div><small>Sales</small><strong>KES ${money(finance.salesThisMonth)}</strong></div><div><small>Confirmed payments</small><strong>KES ${money(finance.confirmedPaymentsThisMonth)}</strong></div><div><small>Expenses</small><strong>KES ${money(finance.expensesThisMonth)}</strong></div><div><small>Estimated net</small><strong>KES ${money(finance.estimatedNet)}</strong></div></section><section class="panel"><h2>Finance summary</h2><p class="muted">These totals are calculated from the records entered in Sales, Payments and Expenses.</p></section>${renderForecastPanel(forecastData, forecastError)}`
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Reports</h1><p class="muted">Monthly financial performance and production forecasts from recorded products.</p></div><span class="health-pill">Current month</span></header><section class="stats"><div><small>Sales</small><strong>KES ${money(finance.salesThisMonth)}</strong></div><div><small>Confirmed payments</small><strong>KES ${money(finance.confirmedPaymentsThisMonth)}</strong></div><div><small>Expenses</small><strong>KES ${money(finance.expensesThisMonth)}</strong></div><div><small>Estimated net</small><strong>KES ${money(finance.estimatedNet)}</strong></div></section><section class="panel"><h2>Finance summary</h2><p class="muted">These totals are calculated from the records entered in Sales, Payments and Expenses.</p></section>${renderForecastPanel(forecastData, forecastError, initialProduct, forecastProducts)}`
     const annualReport = document.createElement('section')
     annualReport.className = 'panel annual-report'
     if (operationsError) {
@@ -1324,6 +1392,20 @@ async function renderReportsModule() {
       annualReport.innerHTML = `<h2>12-month operations</h2><p class="muted">Monthly production, recorded sales, expenses and estimated net.</p><div class="annual-health-summary"><div><small>Health records this month</small><strong>${Number(operations.health.healthRecordsThisMonth)}</strong></div><div><small>Open follow-ups due</small><strong>${Number(operations.health.followUpsDue)}</strong></div><div><small>Overdue follow-ups</small><strong>${Number(operations.health.overdueFollowUps)}</strong></div></div><div class="table-wrap"><table><thead><tr><th>Month</th><th>Milk (L)</th><th>Eggs (trays)</th><th>Sales</th><th>Expenses</th><th>Estimated net</th></tr></thead><tbody>${operations.months.map((month) => `<tr><td>${escapeHtml(month.month)}</td><td>${Number(month.production[milkKey] || 0).toLocaleString()}</td><td>${Number(month.production[eggsKey] || 0).toLocaleString()}</td><td>KES ${money(month.sales)}</td><td>KES ${money(month.expenses)}</td><td>KES ${money(month.net)}</td></tr>`).join('')}</tbody></table></div>`
     }
     content.querySelector('.forecast-panel').before(annualReport)
+    const handleForecastProduct = async (event) => {
+      const product = event.target.value
+      const panel = content.querySelector('.forecast-panel')
+      if (!panel) return
+      panel.innerHTML = '<p class="muted">Calculating forecast from recorded production...</p>'
+      try {
+        const result = await api.forecastReport(product)
+        if (panel.isConnected) panel.outerHTML = renderForecastPanel(result, null, product, forecastProducts)
+      } catch (error) {
+        if (panel.isConnected) panel.outerHTML = renderForecastPanel(null, error, product, forecastProducts)
+      }
+      content.querySelector('#forecast-product')?.addEventListener('change', handleForecastProduct)
+    }
+    content.querySelector('#forecast-product')?.addEventListener('change', handleForecastProduct)
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
@@ -1676,7 +1758,11 @@ async function renderRoleModule(module) {
     if (module === 'Livestock' || module === 'Due follow-ups' || module === 'Health records') {
       const [animals, health] = await Promise.all([api.animals(), api.healthRecords()])
       if (module === 'Livestock') {
-        content.innerHTML = `<section class="panel"><h2>Animal register</h2><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Name</th><th>Species</th><th>Status</th></tr></thead><tbody>${animals.animals.map((item) => `<tr><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.name || '—')}</td><td>${escapeHtml(item.species)}</td><td>${escapeHtml(item.status)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No animals registered.</td></tr>'}</tbody></table></div></section>`
+        content.innerHTML = `<section class="panel"><h2>Animal profiles</h2><p class="muted">Select an animal to open its individual record and history.</p><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Name</th><th>Species</th><th>Status</th><th></th></tr></thead><tbody>${animals.animals.map((item) => `<tr><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.name || '—')}</td><td>${escapeHtml(item.species)}</td><td>${escapeHtml(item.status)}</td><td><button type="button" class="small-action" data-role-open-animal="${Number(item.id)}">Open profile</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">No animals registered.</td></tr>'}</tbody></table></div></section>`
+        content.querySelectorAll('[data-role-open-animal]').forEach((button) => button.addEventListener('click', async () => {
+          try { await renderAnimalProfile(content, Number(button.dataset.roleOpenAnimal), Boolean(currentPermissions['animals.status']?.allowed), () => renderRoleModule('Livestock')) }
+          catch (error) { content.innerHTML = message(error.message, true) }
+        }))
         return
       }
       const dueRows = health.dueSoon.map((item) => `<tr><td>${escapeHtml(item.next_due_date)}</td><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td></tr>`).join('')

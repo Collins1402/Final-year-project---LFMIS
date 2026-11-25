@@ -32,6 +32,10 @@ final class Mailer
                 throw new RuntimeException('LFMIS_MAIL_FROM is missing or invalid.');
             }
 
+            $html = self::emailHtml($text, $html);
+            $logoPath = dirname(__DIR__, 2) . '/public/flouri-farm-logo.png';
+            $logo = is_readable($logoPath) ? file_get_contents($logoPath) : false;
+
             $headers = [
                 'From' => $from,
                 'MIME-Version' => '1.0',
@@ -43,11 +47,18 @@ final class Mailer
                 $message = self::wrapBase64($text);
             } else {
                 $boundary = '=_LFMIS_' . bin2hex(random_bytes(12));
-                $headers['Content-Type'] = 'multipart/alternative; boundary="' . $boundary . '"';
-                $message = '--' . $boundary . "\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+                $relatedBoundary = '=_LFMIS_RELATED_' . bin2hex(random_bytes(12));
+                $headers['Content-Type'] = 'multipart/related; boundary="' . $relatedBoundary . '"';
+                $message = '--' . $relatedBoundary . "\r\nContent-Type: multipart/alternative; boundary=\"" . $boundary . "\"\r\n\r\n"
+                    . '--' . $boundary . "\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
                     . self::wrapBase64($text) . "\r\n--" . $boundary
                     . "\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
                     . self::wrapBase64($html) . "\r\n--" . $boundary . "--\r\n";
+                if (is_string($logo)) {
+                    $message .= '--' . $relatedBoundary . "\r\nContent-Type: image/png; name=\"flouri-farm-logo.png\"\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <flouri-farm-logo>\r\nContent-Disposition: inline; filename=\"flouri-farm-logo.png\"\r\n\r\n"
+                        . self::wrapBase64($logo) . "\r\n";
+                }
+                $message .= '--' . $relatedBoundary . "--\r\n";
             }
             $headers['To'] = $to;
             $wireMessage = implode("\r\n", array_map(
@@ -98,6 +109,7 @@ final class Mailer
                         $mailer->isHTML(true);
                         $mailer->Body = $html;
                         $mailer->AltBody = $text;
+                        if (is_string($logo)) $mailer->addStringEmbeddedImage($logo, 'flouri-farm-logo', 'flouri-farm-logo.png', PHPMailer::ENCODING_BASE64, 'image/png');
                     }
                     $sent = $mailer->send();
                 }
@@ -115,6 +127,15 @@ final class Mailer
     private static function wrapBase64(string $body): string
     {
         return rtrim(chunk_split(base64_encode($body), 76, "\r\n"), "\r\n");
+    }
+
+    private static function emailHtml(string $text, ?string $html): string
+    {
+        $content = $html ?? '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>';
+        $logoPath = dirname(__DIR__, 2) . '/public/flouri-farm-logo.png';
+        $logo = is_readable($logoPath) ? '<img src="cid:flouri-farm-logo" alt="Flouri Farm" width="220" style="display:block;width:220px;height:auto;border:0;margin:0 0 20px">' : '<strong style="font-size:20px;color:#173f35">Flouri Farm</strong>';
+        return '<!doctype html><html><body style="margin:0;padding:24px;background:#f6f5ef;font-family:Arial,sans-serif;color:#19352d"><div style="max-width:600px;margin:auto;padding:28px;background:#fffdf7;border-radius:10px">'
+            . $logo . $content . '<p style="margin-top:28px;color:#668078;font-size:12px">Flouri Farm · Livestock Farm Management</p></div></body></html>';
     }
 
     private static function formatHeaders(array $headers): string

@@ -229,3 +229,7 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .export-section-option input { width: auto; margin: 0; }
 @media (max-width: 900px) { .synthetic-grid, .trends-farm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.trend-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 550px) { .trend-tabs { display: grid; grid-template-columns: repeat(3, 1fr); }.trend-article, .weather-grid, .trend-history-charts { display: grid; grid-template-columns: 1fr; }.synthetic-grid, .trends-farm-stats, .trend-status-grid { grid-template-columns: 1fr; } }
+.table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: .8rem; padding: .75rem 0; color: #527368; font-size: .85rem; }
+.table-pagination button:disabled { opacity: .5; cursor: default; }
+.table-pagination button { padding: .45rem .8rem; }
+.animal-profile-summary .stats { margin-top: .5rem; }

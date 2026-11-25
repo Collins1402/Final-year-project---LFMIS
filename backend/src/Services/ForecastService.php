@@ -22,6 +22,17 @@ final class ForecastService
         return $this->trainingDataFor('milk');
     }
 
+    public function products(): array
+    {
+        $rows = $this->db->query('SELECT produce_name, unit, MAX(production_date) AS latest_date FROM farm_produce WHERE production_date < CURRENT_DATE GROUP BY LOWER(produce_name), LOWER(unit), produce_name, unit ORDER BY produce_name, latest_date DESC')->fetchAll(PDO::FETCH_ASSOC);
+        $products = [];
+        foreach ($rows as $row) {
+            $key = strtolower(trim((string) $row['produce_name']));
+            if ($key !== '' && !isset($products[$key])) $products[$key] = ['name' => (string) $row['produce_name'], 'unit' => strtolower((string) $row['unit'])];
+        }
+        return array_values($products);
+    }
+
     public function scenario(int $additionalCows, int $additionalHens): array
     {
         if ($additionalCows < 0 || $additionalCows > 250 || $additionalHens < 0 || $additionalHens > 250) {
@@ -91,13 +102,8 @@ final class ForecastService
 
     private function trainingDataFor(string $produceName): array
     {
-        $unitsByProduct = [
-            'milk' => ['litre', 'litres', 'l'],
-            'eggs' => ['tray', 'trays', 'egg', 'eggs'],
-        ];
-        if (!isset($unitsByProduct[$produceName])) {
-            throw new \InvalidArgumentException('Unsupported produce type.');
-        }
+        $produceName = strtolower(trim($produceName));
+        if ($produceName === '' || strlen($produceName) > 120) throw new \InvalidArgumentException('Choose a valid production product.');
         $unitQuery = $this->db->prepare('SELECT unit FROM farm_produce WHERE LOWER(produce_name) = ? ORDER BY production_date DESC LIMIT 1');
         $unitQuery->execute([$produceName]);
         $unit = strtolower((string) $unitQuery->fetchColumn());
@@ -155,9 +161,11 @@ final class ForecastService
         return ['observations' => $observations, 'includesSimulatedData' => $includesSimulatedData, 'unit' => $unit];
     }
 
-    public function report(int $userId): array
+    public function report(int $userId, string $product = 'milk'): array
     {
-        $trainingData = $this->trainingData();
+        $product = strtolower(trim($product));
+        if ($product === '' || strlen($product) > 120) throw new \InvalidArgumentException('Choose a valid production product.');
+        $trainingData = $this->trainingDataFor($product);
         $observations = $trainingData['observations'];
         if (count($observations) < 21) {
             throw new \InvalidArgumentException(sprintf(
@@ -168,13 +176,15 @@ final class ForecastService
         }
 
         $forecast = $this->post('/forecast', ['observations' => $observations, 'horizon' => 7]);
-        $insights = $this->post('/insights', ['observations' => $observations, 'signals' => $this->signals()]);
-        $this->storeBacktest($forecast, $userId, $trainingData['includesSimulatedData']);
+        $insights = $product === 'milk' ? $this->post('/insights', ['observations' => $observations, 'signals' => $this->signals()]) : ['checks' => [], 'summary' => 'Forecast based on the recorded daily product totals.'];
+        if ($product === 'milk') $this->storeBacktest($forecast, $userId, $trainingData['includesSimulatedData']);
 
         return [
             'observations' => $observations,
             'forecast' => $forecast,
             'insights' => $insights,
+            'product' => $product,
+            'unit' => $trainingData['unit'],
             'includesSimulatedData' => $trainingData['includesSimulatedData'],
         ];
     }

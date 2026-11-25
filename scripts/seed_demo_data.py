@@ -8,11 +8,11 @@ from pathlib import Path
 
 
 SPECIES = {
-    "cattle": (32, "CAT", ["Friesian", "Ayrshire", "Jersey"]),
-    "goat": (48, "GOA", ["Toggenburg", "Galla", "Saanen"]),
-    "sheep": (20, "SHE", ["Dorper", "Merino"]),
-    "rabbit": (100, "RAB", ["New Zealand White", "Californian"]),
-    "chicken": (150, "CHK", ["Kienyeji", "Kuroiler"]),
+    "cattle": (6, "CAT", ["Friesian", "Ayrshire", "Jersey"]),
+    "goat": (6, "GOA", ["Toggenburg", "Galla", "Saanen"]),
+    "sheep": (4, "SHE", ["Dorper", "Merino"]),
+    "rabbit": (4, "RAB", ["New Zealand White", "Californian"]),
+    "chicken": (6, "CHK", ["Kienyeji", "Kuroiler"]),
 }
 SIMULATED = "SIMULATED DATA"
 
@@ -58,10 +58,10 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
             animal_index += 1
             if species == "cattle" and species_index < 16:
                 status = "active"
-            elif sold_count < 45:
+            elif sold_count < 5:
                 status = "sold"
                 sold_count += 1
-            elif deceased_count < 8:
+            elif deceased_count < 3:
                 status = "deceased"
                 deceased_count += 1
             else:
@@ -105,7 +105,7 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
     health_rows = []
     health_types = ["vaccination", "treatment", "deworming", "checkup", "illness", "other"]
     all_animal_ids = [animal_id for species_animals in animal_ids.values() for animal_id in species_animals]
-    for _ in range(2300):
+    for _ in range(120):
         record_day = first_day + timedelta(days=rng.randrange(days))
         due_date = record_day + timedelta(days=rng.randint(30, 180)) if rng.random() < 0.32 else None
         health_rows.append((rng.choice(all_animal_ids), rng.choice(health_types),
@@ -115,7 +115,7 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
     counts["health_records"] = len(health_rows)
 
     activity_rows = []
-    for index in range(374):
+    for index in range(60):
         activity_day = first_day + timedelta(days=rng.randrange(days))
         status = "planned" if index % 7 == 0 else "completed"
         at = datetime.combine(activity_day, time(hour=rng.randrange(5, 18), minute=0))
@@ -151,7 +151,7 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
         balance = 0.0
         changes = [("in", round(rng.uniform(120, 220), 2))]
         balance += changes[0][1]
-        for _ in range(119):
+        for _ in range(34):
             if balance < 20 or rng.random() < 0.43:
                 change = round(rng.uniform(4, 24), 2)
                 changes.append(("in", change))
@@ -173,7 +173,7 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
     counts["inventory_transactions"] = len(transaction_rows)
 
     customers = []
-    for index in range(35):
+    for index in range(10):
         customers.append((1000 + index, None, f"Demo Customer {index + 1:02d}", f"07{rng.randrange(100000000):08d}", f"customer{index + 1:02d}@sim.flouri.invalid"))
     add_insert(statements, "customers", ["id", "user_id", "name", "phone", "email"], customers)
     counts["customers"] = len(customers)
@@ -183,11 +183,11 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
     order_animals = []
     sales = []
     payments = []
-    for index in range(569):
+    for index in range(40):
         order_id = 1000 + index
-        customer_id = 1000 + rng.randrange(35)
+        customer_id = 1000 + rng.randrange(10)
         order_day = first_day + timedelta(days=rng.randrange(days))
-        if index < 45:
+        if index < len(sold_animal_ids):
             item_name, quantity, unit, unit_price = "Livestock", 1.0, "head", round(rng.uniform(9000, 75000), 2)
             order_animals.append((order_id, sold_animal_ids[index]))
         else:
@@ -195,10 +195,10 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
             quantity = round(rng.uniform(1, 20), 2)
             unit_price = round(rng.uniform(180, 900), 2)
         total = round(quantity * unit_price, 2)
-        if index < 561:
+        if index < 32:
             status = "fulfilled"
         else:
-            status = ["pending", "pending", "pending", "quoted", "quoted", "quoted", "accepted", "accepted"][index - 561]
+            status = ["pending", "pending", "pending", "quoted", "quoted", "quoted", "accepted", "accepted"][index - 32]
         ordered_at = f"{order_day.isoformat()} 10:00:00"
         accepted_at = ordered_at if status in ("accepted", "fulfilled") else None
         fulfilled_at = ordered_at if status == "fulfilled" else None
@@ -207,7 +207,7 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
         if status == "fulfilled":
             sales.append((order_id, customer_id, f"{item_name} order #{order_id} [{SIMULATED.lower()}]", quantity, unit, unit_price, ordered_at, None))
             payments.append((order_id, customer_id, total, rng.choice(["cash", "mpesa", "bank"]), "confirmed", None, ordered_at, None))
-        elif status == "accepted" and index == 567:
+        elif status == "accepted" and index == 38:
             payments.append((order_id, customer_id, round(total / 2, 2), "mpesa", "pending", None, None, None))
     add_insert(statements, "orders", ["id", "customer_id", "status", "total_amount", "notes", "handled_by", "ordered_at", "accepted_at", "fulfilled_at"], orders)
     add_insert(statements, "order_items", ["order_id", "product_id", "item_name", "quantity", "unit", "unit_price"], order_items)
@@ -221,7 +221,7 @@ def generated_rows(days: int, seed: int) -> tuple[list[str], dict[str, int]]:
     counts["payments"] = len(payments)
 
     expenses = []
-    for index in range(230):
+    for index in range(60):
         expense_day = first_day + timedelta(days=rng.randrange(days))
         expenses.append((rng.choice(["feed", "veterinary", "labour", "equipment", "utilities", "transport", "maintenance", "other"]),
                          f"Farm operating cost {index + 1} [{SIMULATED.lower()}]", round(rng.uniform(300, 18000), 2), expense_day.isoformat(), None))
@@ -251,7 +251,7 @@ DELETE FROM animals WHERE tag_number LIKE 'SIM-%';
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate clearly labelled LFMIS demo data as SQL.")
-    parser.add_argument("--days", type=int, default=730, help="Consecutive history days ending yesterday (default: 730).")
+    parser.add_argument("--days", type=int, default=60, help="Consecutive history days ending yesterday (default: 60).")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for repeatable output (default: 42).")
     parser.add_argument("--output-dir", type=Path, default=Path("seed_data"), help="Directory for generated SQL files.")
     args = parser.parse_args()
@@ -265,7 +265,7 @@ def main() -> None:
     seed_path.write_text("\n\n".join(statements) + "\n", encoding="utf-8")
     reset_path.write_text(reset_sql(), encoding="utf-8")
     print(f"Wrote {seed_path} and {reset_path}")
-    print(f"History: {args.days} days ending yesterday; milk and all other generated records are labelled SIMULATED DATA.")
+    print(f"History: {args.days} days ending yesterday; generated milk and other records are labelled SIMULATED DATA. Use --days to expand the history when evaluating forecasts.")
     for name, count in counts.items():
         print(f"{name}: {count}")
 

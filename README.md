@@ -278,7 +278,7 @@ python -m pip install -r scripts/requirements.txt
 python scripts/import_synthetic_workbook.py "C:\Users\colli\Downloads\LFMIS_Extensive_Synthetic_Dataset_12_Months.xlsx"
 ```
 
-By default this generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`. Apply it only to a staging or demo database after migrations:
+By default the converter keeps at most 30 animals, 150 matching health records, 100 activities and orders, 1,200 matching production rows, and bounded sample rows for the other tables. Use `--max-animals` to choose a different herd size. It generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`; regenerate these files from the workbook before applying a new smaller demo import, and apply only to a staging or demo database after migrations:
 
 ```powershell
 php backend/bin/import_synthetic.php

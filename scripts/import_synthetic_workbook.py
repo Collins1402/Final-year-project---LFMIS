@@ -72,12 +72,12 @@ def unique_customer_map(customers: list[dict[str, object]]) -> dict[int, int]:
     return {int(row["id"]): 900000 + int(row["id"]) for row in customers}
 
 
-def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
+def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, str, dict[str, int]]:
     synthetic_mark = "SYNTHETIC DEMONSTRATION"
     statements: list[str] = ["SET NAMES utf8mb4;", "SET FOREIGN_KEY_CHECKS = 0;"]
     counts: dict[str, int] = {}
 
-    animals = rows_as_dicts(workbook, "animals")
+    animals = rows_as_dicts(workbook, "animals")[:max_animals]
     animal_rows = []
     animal_id_map: dict[int, int] = {}
     for offset, row in enumerate(animals, start=1):
@@ -109,7 +109,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     ], animal_rows)
     counts["animals"] = len(animal_rows)
 
-    customers = rows_as_dicts(workbook, "customers")
+    customers = rows_as_dicts(workbook, "customers")[:20]
     customer_id_map = unique_customer_map(customers)
     customer_rows = [
         (customer_id_map[int(row["id"])], None, row["name"], str(row["phone"]) if row.get("phone") not in (None, "") else None,
@@ -120,7 +120,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["customers"] = len(customer_rows)
 
     health_rows = []
-    for row in rows_as_dicts(workbook, "health_records"):
+    for row in [row for row in rows_as_dicts(workbook, "health_records") if int(row["animal_id"]) in animal_id_map][-150:]:
         record_type = str(row["record_type"]).lower()
         if record_type not in {"vaccination", "treatment", "deworming", "checkup", "illness", "issue"}:
             record_type = "checkup"
@@ -147,7 +147,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["health_records"] = len(health_rows)
 
     activity_rows = []
-    for row in rows_as_dicts(workbook, "farm_activities"):
+    for row in [row for row in rows_as_dicts(workbook, "farm_activities") if row.get("animal_id") in (None, "") or int(row["animal_id"]) in animal_id_map][-100:]:
         activity_type = str(row["activity_type"]).lower()
         if activity_type not in {"feeding", "milking", "cleaning", "breeding", "health", "maintenance", "other"}:
             activity_type = "other"
@@ -173,7 +173,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["farm_activities"] = len(activity_rows)
 
     maintenance_rows = []
-    for row in rows_as_dicts(workbook, "maintenance_records"):
+    for row in rows_as_dicts(workbook, "maintenance_records")[-20:]:
         asset_type = str(row["asset_type"]).lower()
         if asset_type not in {"equipment", "housing", "water", "vehicle", "other"}:
             asset_type = "other"
@@ -195,7 +195,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["maintenance_records"] = len(maintenance_rows)
 
     produce_rows = []
-    for row in rows_as_dicts(workbook, "farm_produce"):
+    for row in [row for row in rows_as_dicts(workbook, "farm_produce") if row.get("animal_id") in (None, "") or int(row["animal_id"]) in animal_id_map][-1200:]:
         quantity = float(row["quantity_produced"])
         sold = float(row.get("quantity_sold") or 0)
         damaged = float(row.get("quantity_damaged") or 0)
@@ -223,7 +223,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
 
     inventory_id_map: dict[int, int] = {}
     inventory_rows = []
-    for offset, row in enumerate(rows_as_dicts(workbook, "inventory_items"), start=1):
+    for offset, row in enumerate(rows_as_dicts(workbook, "inventory_items")[:20], start=1):
         original_id = int(row["id"])
         mapped_id = 300000 + offset
         inventory_id_map[original_id] = mapped_id
@@ -246,7 +246,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["inventory_items"] = len(inventory_rows)
 
     transaction_rows = []
-    for offset, row in enumerate(rows_as_dicts(workbook, "inventory_transactions"), start=1):
+    for offset, row in enumerate([row for row in rows_as_dicts(workbook, "inventory_transactions") if int(row["item_id"]) in inventory_id_map][-200:], start=1):
         transaction_type = str(row["transaction_type"]).lower()
         if transaction_type not in {"in", "out", "adjustment"}:
             transaction_type = "adjustment"
@@ -266,7 +266,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["inventory_transactions"] = len(transaction_rows)
 
     product_rows = []
-    for row in rows_as_dicts(workbook, "products"):
+    for row in rows_as_dicts(workbook, "products")[:30]:
         name = str(row["name"])
         product_type = str(row["product_type"]).lower()
         if product_type not in {"livestock", "produce", "other"}:
@@ -299,14 +299,15 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     ], product_rows)
     counts["products"] = len(product_rows)
 
-    workbook_orders = rows_as_dicts(workbook, "orders")
-    workbook_items = rows_as_dicts(workbook, "order_items")
-    workbook_animals = rows_as_dicts(workbook, "order_animals")
+    workbook_orders = [row for row in rows_as_dicts(workbook, "orders") if int(row["customer_id"]) in customer_id_map][:100]
+    workbook_items = rows_as_dicts(workbook, "order_items")[:100]
+    workbook_animals = [row for row in rows_as_dicts(workbook, "order_animals") if int(row["animal_id"]) in animal_id_map]
     order_rows = []
     order_item_rows = []
     order_animal_rows = []
     sale_rows = []
     payment_rows = []
+    order_id_map = {int(row["id"]): 100000 + index for index, row in enumerate(workbook_orders, start=1)}
 
     for index, row in enumerate(workbook_orders, start=1):
         mapped_order_id = 100000 + index
@@ -333,9 +334,10 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
         ))
 
     for index, row in enumerate(workbook_items, start=1):
-        if index > len(workbook_orders):
-            break
-        mapped_order_id = 100000 + index
+        original_order_id = int(row.get("order_id") or (workbook_orders[index - 1]["id"] if index <= len(workbook_orders) else -1))
+        mapped_order_id = order_id_map.get(original_order_id)
+        if mapped_order_id is None:
+            continue
         item_name = f"SYN-{row['item_name']}"
         order_item_rows.append((
             100000 + index,
@@ -347,24 +349,22 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
             float(row["unit_price"]),
         ))
 
-    unique_order_animals = []
-    seen = set()
+    linked_animals = set()
     for row in workbook_animals:
         animal_id = int(row["animal_id"])
-        if animal_id not in seen:
-            seen.add(animal_id)
-            unique_order_animals.append(animal_id)
-    for index, animal_id in enumerate(unique_order_animals, start=1):
-        if index <= len(workbook_orders):
-            order_animal_rows.append((100000 + index, animal_id_map.get(animal_id, 800000 + animal_id)))
+        original_order_id = int(row.get("order_id") or -1)
+        mapped_order_id = order_id_map.get(original_order_id)
+        if mapped_order_id is not None and animal_id not in linked_animals:
+            order_animal_rows.append((mapped_order_id, animal_id_map[animal_id]))
+            linked_animals.add(animal_id)
 
-    workbook_sales = rows_as_dicts(workbook, "sales")
-    workbook_payments = rows_as_dicts(workbook, "payments")
+    workbook_sales = rows_as_dicts(workbook, "sales")[:100]
+    workbook_payments = rows_as_dicts(workbook, "payments")[:100]
     for index, row in enumerate(workbook_sales, start=1):
-        order_index = index
-        if order_index > len(workbook_orders):
+        original_order_id = int(row.get("order_id") or (workbook_orders[index - 1]["id"] if index <= len(workbook_orders) else -1))
+        mapped_order_id = order_id_map.get(original_order_id)
+        if mapped_order_id is None:
             continue
-        mapped_order_id = 100000 + order_index
         customer_id = customer_id_map.get(int(row["customer_id"]))
         sale_rows.append((
             200000 + index,
@@ -378,10 +378,10 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
             None,
         ))
     for index, row in enumerate(workbook_payments, start=1):
-        order_index = index
-        if order_index > len(workbook_orders):
+        original_order_id = int(row.get("order_id") or (workbook_orders[index - 1]["id"] if index <= len(workbook_orders) else -1))
+        mapped_order_id = order_id_map.get(original_order_id)
+        if mapped_order_id is None:
             continue
-        mapped_order_id = 100000 + order_index
         customer_id = customer_id_map.get(int(row["customer_id"]))
         status = str(row["status"]).lower()
         if status not in {"pending", "confirmed", "failed", "refunded"}:
@@ -425,7 +425,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["payments"] = len(payment_rows)
 
     expense_rows = []
-    for offset, row in enumerate(rows_as_dicts(workbook, "expenses"), start=1):
+    for offset, row in enumerate(rows_as_dicts(workbook, "expenses")[-100:], start=1):
         category = str(row["category"]).lower()
         if category not in {"feed", "veterinary", "labour", "equipment", "transport", "utilities", "maintenance", "other"}:
             category = "other"
@@ -443,7 +443,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["expenses"] = len(expense_rows)
 
     weather_rows = []
-    for row in rows_as_dicts(workbook, "weather_observations"):
+    for row in rows_as_dicts(workbook, "weather_observations")[-180:]:
         weather_rows.append((
             date_value(row["observation_date"]),
             float(row["rain_mm"]) if row.get("rain_mm") not in (None, "") else None,
@@ -456,7 +456,7 @@ def build_sql(workbook: openpyxl.Workbook) -> tuple[str, str, dict[str, int]]:
     counts["weather_observations"] = len(weather_rows)
 
     feedback_rows = []
-    for offset, row in enumerate(rows_as_dicts(workbook, "feedback"), start=1):
+    for offset, row in enumerate(rows_as_dicts(workbook, "feedback")[-40:], start=1):
         category = str(row["category"]).lower()
         if category not in {"feedback", "complaint", "suggestion"}:
             category = "feedback"
@@ -508,7 +508,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Convert the LFMIS synthetic Excel workbook into safe staging SQL.")
     parser.add_argument("workbook", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("seed_data"))
+    parser.add_argument("--max-animals", type=int, default=30, help="Maximum animals to import (default: 30).")
     args = parser.parse_args()
+    if args.max_animals < 1:
+        parser.error("--max-animals must be at least 1.")
     workbook = openpyxl.load_workbook(args.workbook, read_only=True, data_only=True)
     required = {"roles", "users", "animals", "health_records", "farm_activities", "maintenance_records",
                 "farm_produce", "inventory_items", "inventory_transactions", "customers", "products",
@@ -517,7 +520,7 @@ def main() -> None:
     missing = sorted(required - set(workbook.sheetnames))
     if missing:
         raise SystemExit("Workbook is missing required sheets: " + ", ".join(missing))
-    sql, reset, counts = build_sql(workbook)
+    sql, reset, counts = build_sql(workbook, args.max_animals)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     import_path = args.output_dir / "synthetic-workbook.sql"
     reset_path = args.output_dir / "reset-synthetic-workbook.sql"

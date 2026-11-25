@@ -15,7 +15,7 @@ final class AnimalService
     public function list(): array
     {
         return $this->db->query(
-            'SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, notes, created_at
+            'SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, status_changed_at, notes, created_at
              FROM animals ORDER BY status = "active" DESC, tag_number'
         )->fetchAll();
     }
@@ -62,23 +62,37 @@ final class AnimalService
         if (!in_array($status, ['active', 'sold', 'deceased', 'transferred'], true)) {
             throw new \InvalidArgumentException('Unsupported animal status.');
         }
+        $exists = $this->db->prepare('SELECT 1 FROM animals WHERE id = ?');
+        $exists->execute([$id]);
+        if (!$exists->fetchColumn()) throw new \RuntimeException('Animal not found.');
         $statement = $this->db->prepare('UPDATE animals SET status = ?, status_changed_at = NOW() WHERE id = ?');
         $statement->execute([$status, $id]);
-        if ($statement->rowCount() === 0) {
-            throw new \RuntimeException('Animal not found.');
-        }
         return $this->find($id);
     }
 
     public function find(int $id): array
     {
-        $statement = $this->db->prepare('SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, notes, created_at FROM animals WHERE id = ?');
+        $statement = $this->db->prepare('SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, status_changed_at, notes, created_at FROM animals WHERE id = ?');
         $statement->execute([$id]);
         $animal = $statement->fetch();
         if (!$animal) {
             throw new \RuntimeException('Animal not found.');
         }
         return $animal;
+    }
+
+    public function profile(int $id): array
+    {
+        $animal = $this->find($id);
+        $health = $this->db->prepare('SELECT id, record_type, description, medication, dosage, cost, record_date, next_due_date FROM health_records WHERE animal_id = ? ORDER BY record_date DESC, id DESC LIMIT 100');
+        $health->execute([$id]);
+        $production = $this->db->prepare('SELECT id, produce_name, production_date, production_session, quantity_produced, quantity_sold, quantity_damaged, unit FROM farm_produce WHERE animal_id = ? ORDER BY production_date DESC, id DESC LIMIT 100');
+        $production->execute([$id]);
+        $activities = $this->db->prepare('SELECT id, activity_type, description, activity_at, status, completed_at FROM farm_activities WHERE animal_id = ? ORDER BY activity_at DESC, id DESC LIMIT 100');
+        $activities->execute([$id]);
+        $orders = $this->db->prepare('SELECT o.id, o.status, o.total_amount, o.ordered_at, o.fulfilled_at, c.name AS customer_name FROM order_animals oa JOIN orders o ON o.id = oa.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE oa.animal_id = ? ORDER BY o.ordered_at DESC, o.id DESC');
+        $orders->execute([$id]);
+        return ['animal' => $animal, 'healthRecords' => $health->fetchAll(), 'productionRecords' => $production->fetchAll(), 'activities' => $activities->fetchAll(), 'orders' => $orders->fetchAll()];
     }
 
     private function textOrNull(mixed $value): ?string
