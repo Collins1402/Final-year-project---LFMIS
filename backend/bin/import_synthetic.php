@@ -4,7 +4,7 @@ declare(strict_types=1);
 // Usage:
 // php backend/bin/import_synthetic.php
 // php backend/bin/import_synthetic.php --reset-only
-// Loads only generated synthetic staging SQL; real account passwords are never changed.
+// Loads only generated synthetic staging SQL; cleanup follows synthetic labels and relationships.
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../src/Core/Env.php';

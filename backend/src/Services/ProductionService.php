@@ -57,8 +57,10 @@ final class ProductionService
         $date = $this->date($input['productionDate'] ?? $editing['production_date'] ?? '');
         $session = trim((string) ($input['session'] ?? $editing['production_session'] ?? ''));
         $quantity = filter_var($input['quantityProduced'] ?? $editing['quantity_produced'] ?? null, FILTER_VALIDATE_FLOAT);
-        $sold = filter_var($input['quantitySold'] ?? $editing['quantity_sold'] ?? 0, FILTER_VALIDATE_FLOAT);
-        $damaged = filter_var($input['quantityDamaged'] ?? $editing['quantity_damaged'] ?? 0, FILTER_VALIDATE_FLOAT);
+        $soldInput = $input['quantitySold'] ?? $editing['quantity_sold'] ?? 0;
+        $damagedInput = $input['quantityDamaged'] ?? $editing['quantity_damaged'] ?? 0;
+        $sold = $soldInput === '' || $soldInput === null ? 0.0 : filter_var($soldInput, FILTER_VALIDATE_FLOAT);
+        $damaged = $damagedInput === '' || $damagedInput === null ? 0.0 : filter_var($damagedInput, FILTER_VALIDATE_FLOAT);
         $unit = trim((string) ($input['unit'] ?? $editing['unit'] ?? ''));
         $animalId = ($input['animalId'] ?? $editing['animal_id'] ?? null);
         $animalId = $animalId === null || $animalId === '' ? null : filter_var($animalId, FILTER_VALIDATE_INT);

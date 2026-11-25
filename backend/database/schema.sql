@@ -350,7 +350,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE TABLE IF NOT EXISTS feedback (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NULL,
-  category ENUM('feedback', 'complaint', 'suggestion') NOT NULL,
+  category ENUM('feedback', 'complaint', 'suggestion', 'compliment') NOT NULL,
   message TEXT NOT NULL,
   status ENUM('open', 'resolved') NOT NULL DEFAULT 'open',
   resolved_by BIGINT UNSIGNED NULL,
@@ -364,7 +364,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 CREATE TABLE IF NOT EXISTS notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
-  type ENUM('health_due', 'low_stock', 'order_pending', 'payment_pending', 'production_drop', 'maintenance_due', 'system') NOT NULL,
+  type ENUM('health_due', 'low_stock', 'order_pending', 'payment_pending', 'production_drop', 'maintenance_due', 'feedback', 'system') NOT NULL,
   entity_type VARCHAR(40) NULL,
   entity_id BIGINT UNSIGNED NULL,
   title VARCHAR(150) NOT NULL,

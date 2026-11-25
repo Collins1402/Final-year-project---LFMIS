@@ -107,7 +107,7 @@ final class ForecastService
         $unitQuery = $this->db->prepare('SELECT unit FROM farm_produce WHERE LOWER(produce_name) = ? ORDER BY production_date DESC LIMIT 1');
         $unitQuery->execute([$produceName]);
         $unit = strtolower((string) $unitQuery->fetchColumn());
-        if (!in_array($unit, $unitsByProduct[$produceName], true)) {
+        if ($unit === '') {
             return ['observations' => [], 'includesSimulatedData' => false, 'unit' => null];
         }
         $statement = $this->db->prepare(

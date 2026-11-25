@@ -278,13 +278,13 @@ python -m pip install -r scripts/requirements.txt
 python scripts/import_synthetic_workbook.py "C:\Users\colli\Downloads\LFMIS_Extensive_Synthetic_Dataset_12_Months.xlsx"
 ```
 
-By default the converter keeps at most 30 animals, 150 matching health records, 100 activities and orders, 1,200 matching production rows, and bounded sample rows for the other tables. Use `--max-animals` to choose a different herd size. It generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`; regenerate these files from the workbook before applying a new smaller demo import, and apply only to a staging or demo database after migrations:
+By default the converter keeps a 30% sample from each workbook sheet (`--demo-share` changes the percentage). Related records are kept only when their animal, customer, product, inventory item or order is also in the sample. The other 70% is omitted so you can enter your own farm values in the app. It generates `seed_data/synthetic-workbook.sql` and `seed_data/reset-synthetic-workbook.sql`; regenerate these files from the workbook before applying the reduced demo import, and apply only to a staging or demo database after migrations:
 
 ```powershell
 php backend/bin/import_synthetic.php
 ```
 
-Use `php backend/bin/import_synthetic.php --reset-only` to remove only the synthetic-ID/tag range without changing real accounts or records. The importer does not copy workbook password placeholders or synthetic user-account credentials.
+Use `php backend/bin/import_synthetic.php --reset-only` to remove rows carrying the synthetic demo markers. The cleanup follows labels and relationships instead of deleting by numeric ID, so later manually entered rows are kept. The importer does not copy workbook password placeholders or synthetic user-account credentials.
 
 The converter remaps workbook IDs, creates separate synthetic order records instead of repeating order ID `1`, uses the workbook's synthetic animal and customer records only with `SIMULATED DEMONSTRATION` labels, excludes the placeholder account passwords, and omits synthetic forecast/audit records that must not be presented as real system evidence.
 

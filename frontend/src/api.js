@@ -97,6 +97,7 @@ export const api = {
   feedback: () => request('/api/feedback'),
   createFeedback: (data) => post('/api/feedback', data),
   resolveFeedback: (id) => request(`/api/feedback/${id}/resolve`, { method: 'PATCH', body: '{}' }),
+  resolveAllFeedback: () => request('/api/feedback/resolve-all', { method: 'PATCH', body: '{}' }),
   users: () => request('/api/users'),
   createUser: (data) => post('/api/users', data),
   deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),

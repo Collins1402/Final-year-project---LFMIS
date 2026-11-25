@@ -850,8 +850,19 @@ try {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
         if ($method === 'GET' && $permissions->allows($current['role'], 'feedback.view')) Response::json(['feedback' => $feedback->list($current['role'] === 'admin' ? null : (int) $current['id'])]);
-        if ($method === 'POST' && $permissions->allows($current['role'], 'feedback.create')) Response::json(['feedback' => $feedback->create($request->body(), $current['id'])], 201);
+        if ($method === 'POST' && $permissions->allows($current['role'], 'feedback.create')) {
+            $body = $request->body();
+            $created = $feedback->create($body, $current['id']);
+            $notifications->addFeedbackNotification($created['id'], (string) ($body['category'] ?? 'feedback'), (string) $current['fullName'], (string) ($body['message'] ?? ''));
+            Response::json(['feedback' => $created], 201);
+        }
         Response::error('You do not have permission to perform this action.', 403);
+    }
+    if ($method === 'PATCH' && $path === '/api/feedback/resolve-all') {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'feedback.resolve')) Response::error('You do not have permission to perform this action.', 403);
+        Response::json(['resolved' => $feedback->resolveAll($current['id'])]);
     }
     if ($method === 'PATCH' && preg_match('#^/api/feedback/(\d+)/resolve$#', $path, $matches)) {
         $current = $auth->currentUser();

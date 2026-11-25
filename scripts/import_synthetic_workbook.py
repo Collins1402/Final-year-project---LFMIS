@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from datetime import date, datetime
 from pathlib import Path
 from typing import Iterable, Iterator
@@ -29,6 +30,13 @@ def sheet_rows(workbook: openpyxl.Workbook, name: str) -> tuple[list[str], Itera
 def rows_as_dicts(workbook: openpyxl.Workbook, name: str) -> list[dict[str, object]]:
     headers, values = sheet_rows(workbook, name)
     return [dict(zip(headers, row)) for row in values if any(value is not None for value in row)]
+
+
+def demo_rows(rows: list[dict[str, object]], share: float, newest: bool = False, source_count: int | None = None) -> list[dict[str, object]]:
+    count = math.ceil((len(rows) if source_count is None else source_count) * share)
+    if count <= 0:
+        return []
+    return rows[-count:] if newest else rows[:count]
 
 
 def date_value(value: object) -> str | None:
@@ -72,12 +80,15 @@ def unique_customer_map(customers: list[dict[str, object]]) -> dict[int, int]:
     return {int(row["id"]): 900000 + int(row["id"]) for row in customers}
 
 
-def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, str, dict[str, int]]:
+def build_sql(workbook: openpyxl.Workbook, demo_share: float = 0.30, max_animals: int | None = None) -> tuple[str, str, dict[str, int]]:
     synthetic_mark = "SYNTHETIC DEMONSTRATION"
     statements: list[str] = ["SET NAMES utf8mb4;", "SET FOREIGN_KEY_CHECKS = 0;"]
     counts: dict[str, int] = {}
 
-    animals = rows_as_dicts(workbook, "animals")[:max_animals]
+    all_animals = rows_as_dicts(workbook, "animals")
+    animals = demo_rows(all_animals, demo_share)
+    if max_animals is not None:
+        animals = animals[:max_animals]
     animal_rows = []
     animal_id_map: dict[int, int] = {}
     for offset, row in enumerate(animals, start=1):
@@ -109,18 +120,20 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     ], animal_rows)
     counts["animals"] = len(animal_rows)
 
-    customers = rows_as_dicts(workbook, "customers")[:20]
+    customers = demo_rows(rows_as_dicts(workbook, "customers"), demo_share)
     customer_id_map = unique_customer_map(customers)
     customer_rows = [
-        (customer_id_map[int(row["id"])], None, row["name"], str(row["phone"]) if row.get("phone") not in (None, "") else None,
+        (customer_id_map[int(row["id"])], None, f"SYN-{row['name']} [{synthetic_mark}]", str(row["phone"]) if row.get("phone") not in (None, "") else None,
          str(row["email"]).replace("'", "''"))
         for row in customers
     ]
     add_insert(statements, "customers", ["id", "user_id", "name", "phone", "email"], customer_rows)
     counts["customers"] = len(customer_rows)
 
+    all_health = rows_as_dicts(workbook, "health_records")
+    eligible_health = [row for row in all_health if int(row["animal_id"]) in animal_id_map]
     health_rows = []
-    for row in [row for row in rows_as_dicts(workbook, "health_records") if int(row["animal_id"]) in animal_id_map][-150:]:
+    for row in demo_rows(eligible_health, demo_share, newest=True, source_count=len(all_health)):
         record_type = str(row["record_type"]).lower()
         if record_type not in {"vaccination", "treatment", "deworming", "checkup", "illness", "issue"}:
             record_type = "checkup"
@@ -146,8 +159,10 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     ], health_rows)
     counts["health_records"] = len(health_rows)
 
+    all_activities = rows_as_dicts(workbook, "farm_activities")
+    eligible_activities = [row for row in all_activities if row.get("animal_id") in (None, "") or int(row["animal_id"]) in animal_id_map]
     activity_rows = []
-    for row in [row for row in rows_as_dicts(workbook, "farm_activities") if row.get("animal_id") in (None, "") or int(row["animal_id"]) in animal_id_map][-100:]:
+    for row in demo_rows(eligible_activities, demo_share, newest=True, source_count=len(all_activities)):
         activity_type = str(row["activity_type"]).lower()
         if activity_type not in {"feeding", "milking", "cleaning", "breeding", "health", "maintenance", "other"}:
             activity_type = "other"
@@ -173,7 +188,7 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     counts["farm_activities"] = len(activity_rows)
 
     maintenance_rows = []
-    for row in rows_as_dicts(workbook, "maintenance_records")[-20:]:
+    for row in demo_rows(rows_as_dicts(workbook, "maintenance_records"), demo_share, newest=True):
         asset_type = str(row["asset_type"]).lower()
         if asset_type not in {"equipment", "housing", "water", "vehicle", "other"}:
             asset_type = "other"
@@ -194,8 +209,10 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     ], maintenance_rows)
     counts["maintenance_records"] = len(maintenance_rows)
 
+    all_produce = rows_as_dicts(workbook, "farm_produce")
+    eligible_produce = [row for row in all_produce if row.get("animal_id") in (None, "") or int(row["animal_id"]) in animal_id_map]
     produce_rows = []
-    for row in [row for row in rows_as_dicts(workbook, "farm_produce") if row.get("animal_id") in (None, "") or int(row["animal_id"]) in animal_id_map][-1200:]:
+    for row in demo_rows(eligible_produce, demo_share, newest=True, source_count=len(all_produce)):
         quantity = float(row["quantity_produced"])
         sold = float(row.get("quantity_sold") or 0)
         damaged = float(row.get("quantity_damaged") or 0)
@@ -223,7 +240,8 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
 
     inventory_id_map: dict[int, int] = {}
     inventory_rows = []
-    for offset, row in enumerate(rows_as_dicts(workbook, "inventory_items")[:20], start=1):
+    all_inventory = rows_as_dicts(workbook, "inventory_items")
+    for offset, row in enumerate(demo_rows(all_inventory, demo_share), start=1):
         original_id = int(row["id"])
         mapped_id = 300000 + offset
         inventory_id_map[original_id] = mapped_id
@@ -245,8 +263,10 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     ], inventory_rows)
     counts["inventory_items"] = len(inventory_rows)
 
+    all_transactions = rows_as_dicts(workbook, "inventory_transactions")
+    eligible_transactions = [row for row in all_transactions if int(row["item_id"]) in inventory_id_map]
     transaction_rows = []
-    for offset, row in enumerate([row for row in rows_as_dicts(workbook, "inventory_transactions") if int(row["item_id"]) in inventory_id_map][-200:], start=1):
+    for offset, row in enumerate(demo_rows(eligible_transactions, demo_share, newest=True, source_count=len(all_transactions)), start=1):
         transaction_type = str(row["transaction_type"]).lower()
         if transaction_type not in {"in", "out", "adjustment"}:
             transaction_type = "adjustment"
@@ -266,7 +286,7 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     counts["inventory_transactions"] = len(transaction_rows)
 
     product_rows = []
-    for row in rows_as_dicts(workbook, "products")[:30]:
+    for row in demo_rows(rows_as_dicts(workbook, "products"), demo_share):
         name = str(row["name"])
         product_type = str(row["product_type"]).lower()
         if product_type not in {"livestock", "produce", "other"}:
@@ -299,15 +319,21 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     ], product_rows)
     counts["products"] = len(product_rows)
 
-    workbook_orders = [row for row in rows_as_dicts(workbook, "orders") if int(row["customer_id"]) in customer_id_map][:100]
-    workbook_items = rows_as_dicts(workbook, "order_items")[:100]
-    workbook_animals = [row for row in rows_as_dicts(workbook, "order_animals") if int(row["animal_id"]) in animal_id_map]
+    all_orders = rows_as_dicts(workbook, "orders")
+    eligible_orders = [row for row in all_orders if int(row["customer_id"]) in customer_id_map]
+    workbook_orders = demo_rows(eligible_orders, demo_share, newest=True, source_count=len(all_orders))
+    all_items = rows_as_dicts(workbook, "order_items")
+    workbook_items = all_items
+    all_order_animals = rows_as_dicts(workbook, "order_animals")
+    workbook_animals = [row for row in all_order_animals if int(row["animal_id"]) in animal_id_map]
     order_rows = []
     order_item_rows = []
     order_animal_rows = []
     sale_rows = []
     payment_rows = []
     order_id_map = {int(row["id"]): 100000 + index for index, row in enumerate(workbook_orders, start=1)}
+    workbook_items = demo_rows([row for row in all_items if int(row.get("order_id") or -1) in order_id_map], demo_share, newest=True, source_count=len(all_items))
+    workbook_animals = demo_rows([row for row in workbook_animals if int(row.get("order_id") or -1) in order_id_map], demo_share, newest=True, source_count=len(all_order_animals))
 
     for index, row in enumerate(workbook_orders, start=1):
         mapped_order_id = 100000 + index
@@ -358,8 +384,10 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
             order_animal_rows.append((mapped_order_id, animal_id_map[animal_id]))
             linked_animals.add(animal_id)
 
-    workbook_sales = rows_as_dicts(workbook, "sales")[:100]
-    workbook_payments = rows_as_dicts(workbook, "payments")[:100]
+    all_sales = rows_as_dicts(workbook, "sales")
+    workbook_sales = demo_rows([row for row in all_sales if int(row.get("order_id") or -1) in order_id_map], demo_share, newest=True, source_count=len(all_sales))
+    all_payments = rows_as_dicts(workbook, "payments")
+    workbook_payments = demo_rows([row for row in all_payments if int(row.get("order_id") or -1) in order_id_map], demo_share, newest=True, source_count=len(all_payments))
     for index, row in enumerate(workbook_sales, start=1):
         original_order_id = int(row.get("order_id") or (workbook_orders[index - 1]["id"] if index <= len(workbook_orders) else -1))
         mapped_order_id = order_id_map.get(original_order_id)
@@ -425,7 +453,7 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     counts["payments"] = len(payment_rows)
 
     expense_rows = []
-    for offset, row in enumerate(rows_as_dicts(workbook, "expenses")[-100:], start=1):
+    for offset, row in enumerate(demo_rows(rows_as_dicts(workbook, "expenses"), demo_share, newest=True), start=1):
         category = str(row["category"]).lower()
         if category not in {"feed", "veterinary", "labour", "equipment", "transport", "utilities", "maintenance", "other"}:
             category = "other"
@@ -443,7 +471,7 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     counts["expenses"] = len(expense_rows)
 
     weather_rows = []
-    for row in rows_as_dicts(workbook, "weather_observations")[-180:]:
+    for row in demo_rows(rows_as_dicts(workbook, "weather_observations"), demo_share, newest=True):
         weather_rows.append((
             date_value(row["observation_date"]),
             float(row["rain_mm"]) if row.get("rain_mm") not in (None, "") else None,
@@ -456,9 +484,9 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
     counts["weather_observations"] = len(weather_rows)
 
     feedback_rows = []
-    for offset, row in enumerate(rows_as_dicts(workbook, "feedback")[-40:], start=1):
+    for offset, row in enumerate(demo_rows(rows_as_dicts(workbook, "feedback"), demo_share, newest=True), start=1):
         category = str(row["category"]).lower()
-        if category not in {"feedback", "complaint", "suggestion"}:
+        if category not in {"feedback", "complaint", "suggestion", "compliment"}:
             category = "feedback"
         status = str(row["status"]).lower()
         if status not in {"open", "resolved"}:
@@ -482,23 +510,23 @@ def build_sql(workbook: openpyxl.Workbook, max_animals: int = 30) -> tuple[str, 
 
     reset = [
         "SET FOREIGN_KEY_CHECKS = 0;",
-        "DELETE FROM payments WHERE id >= 250000 AND id < 251000;",
-        "DELETE FROM sales WHERE id >= 200000 AND id < 201000;",
-        "DELETE FROM order_animals WHERE order_id >= 100000;",
-        "DELETE FROM order_items WHERE id >= 100000;",
-        "DELETE FROM orders WHERE id >= 100000;",
-        "DELETE FROM feedback WHERE id >= 350000;",
-        "DELETE FROM expenses WHERE id >= 300000;",
-        "DELETE FROM inventory_transactions WHERE id >= 400000;",
-        "DELETE FROM inventory_items WHERE id >= 300000;",
-        "DELETE FROM products WHERE id >= 200000;",
+        "DELETE FROM payments WHERE result_desc LIKE '%[SYNTHETIC DEMONSTRATION]%' OR order_id IN (SELECT id FROM orders WHERE notes LIKE 'SYNTHETIC DEMONSTRATION ORDER%');",
+        "DELETE FROM sales WHERE description LIKE '%[SYNTHETIC DEMONSTRATION]%' OR order_id IN (SELECT id FROM orders WHERE notes LIKE 'SYNTHETIC DEMONSTRATION ORDER%');",
+        "DELETE FROM order_animals WHERE order_id IN (SELECT id FROM orders WHERE notes LIKE 'SYNTHETIC DEMONSTRATION ORDER%');",
+        "DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE notes LIKE 'SYNTHETIC DEMONSTRATION ORDER%') OR item_name LIKE 'SYN-%';",
+        "DELETE FROM orders WHERE notes LIKE 'SYNTHETIC DEMONSTRATION ORDER%';",
+        "DELETE FROM feedback WHERE message LIKE '%[SYNTHETIC DEMONSTRATION]%';",
+        "DELETE FROM expenses WHERE description LIKE '%[SYNTHETIC DEMONSTRATION]%';",
+        "DELETE FROM inventory_transactions WHERE reason LIKE '%[SYNTHETIC DEMONSTRATION]%';",
+        "DELETE FROM inventory_items WHERE name LIKE 'SYN-%';",
+        "DELETE FROM products WHERE name LIKE 'SYN-%';",
         "DELETE FROM weather_observations WHERE source = 'synthetic_demo';",
-        "DELETE FROM maintenance_records WHERE id >= 600000;",
-        "DELETE FROM farm_produce WHERE id >= 500000;",
-        "DELETE FROM farm_activities WHERE id >= 800000;",
-        "DELETE FROM health_records WHERE id >= 700000;",
-        "DELETE FROM customers WHERE id >= 900000;",
-        "DELETE FROM animals WHERE id >= 800000;",
+        "DELETE FROM maintenance_records WHERE notes = 'SYNTHETIC DEMONSTRATION';",
+        "DELETE FROM farm_produce WHERE notes = 'SYNTHETIC DEMONSTRATION';",
+        "DELETE FROM farm_activities WHERE description LIKE '%[SYNTHETIC DEMONSTRATION]%';",
+        "DELETE FROM health_records WHERE description LIKE '%[SYNTHETIC DEMONSTRATION]%';",
+        "DELETE FROM customers WHERE name LIKE '%[SYNTHETIC DEMONSTRATION]%' OR email LIKE '%@sim.flouri.invalid';",
+        "DELETE FROM animals WHERE notes = 'SYNTHETIC DEMONSTRATION' OR tag_number LIKE 'SIM-%';",
         "SET FOREIGN_KEY_CHECKS = 1;",
     ]
     return "\n\n".join(statements) + "\n", "\n".join(reset) + "\n", counts
@@ -508,9 +536,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Convert the LFMIS synthetic Excel workbook into safe staging SQL.")
     parser.add_argument("workbook", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("seed_data"))
-    parser.add_argument("--max-animals", type=int, default=30, help="Maximum animals to import (default: 30).")
+    parser.add_argument("--demo-share", type=float, default=0.30, help="Share of each workbook sheet to retain (default: 0.30).")
+    parser.add_argument("--max-animals", type=int, help="Optional additional cap on animal records.")
     args = parser.parse_args()
-    if args.max_animals < 1:
+    if not 0 < args.demo_share <= 1:
+        parser.error("--demo-share must be greater than 0 and at most 1.")
+    if args.max_animals is not None and args.max_animals < 1:
         parser.error("--max-animals must be at least 1.")
     workbook = openpyxl.load_workbook(args.workbook, read_only=True, data_only=True)
     required = {"roles", "users", "animals", "health_records", "farm_activities", "maintenance_records",
@@ -520,7 +551,7 @@ def main() -> None:
     missing = sorted(required - set(workbook.sheetnames))
     if missing:
         raise SystemExit("Workbook is missing required sheets: " + ", ".join(missing))
-    sql, reset, counts = build_sql(workbook, args.max_animals)
+    sql, reset, counts = build_sql(workbook, args.demo_share, args.max_animals)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     import_path = args.output_dir / "synthetic-workbook.sql"
     reset_path = args.output_dir / "reset-synthetic-workbook.sql"

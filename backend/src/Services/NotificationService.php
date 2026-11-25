@@ -23,6 +23,30 @@ final class NotificationService
         $this->db->prepare("INSERT IGNORE INTO notifications (user_id, type, title, message, dedupe_key) SELECT ?, 'order_pending', 'Orders need review', CONCAT(COUNT(*), ' order(s) are awaiting action.'), CONCAT('orders:', CURRENT_DATE()) FROM orders WHERE status IN ('pending','quoted') HAVING COUNT(*) > 0")->execute([$userId]);
     }
 
+    public function addFeedbackNotification(int $feedbackId, string $category, string $senderName, string $message): void
+    {
+        $admins = $this->db->query(
+            "SELECT users.id FROM users JOIN roles ON roles.id = users.role_id
+             WHERE users.is_active = 1 AND roles.name = 'admin'"
+        )->fetchAll(PDO::FETCH_COLUMN);
+        $ignore = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+        $statement = $this->db->prepare(
+            "$ignore INTO notifications (user_id, type, entity_type, entity_id, title, message, dedupe_key)
+             VALUES (?, 'feedback', 'feedback', ?, ?, ?, ?)"
+        );
+        $title = ucfirst($category) . ' received';
+        $preview = function_exists('mb_substr') ? mb_substr(trim($message), 0, 260) : substr(trim($message), 0, 260);
+        foreach ($admins as $adminId) {
+            $statement->execute([
+                $adminId,
+                $feedbackId,
+                $title,
+                $senderName . ': ' . $preview,
+                'feedback:' . $feedbackId,
+            ]);
+        }
+    }
+
     public function markRead(int $id, int $userId): void
     {
         $statement = $this->db->prepare('UPDATE notifications SET is_read=1, read_at=NOW() WHERE id=? AND user_id=?'); $statement->execute([$id, $userId]);

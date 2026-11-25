@@ -233,3 +233,8 @@ fieldset[data-health-concern-fields] textarea { width: 100%; }
 .table-pagination button:disabled { opacity: .5; cursor: default; }
 .table-pagination button { padding: .45rem .8rem; }
 .animal-profile-summary .stats { margin-top: .5rem; }
+.animal-profile-filters { display: grid; grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(145px, .7fr)) auto; align-items: center; gap: .65rem; margin-bottom: 1rem; }
+.animal-profile-filters .animal-record-count { justify-self: end; white-space: nowrap; }
+.feedback-header-actions { display: flex; align-items: center; gap: .65rem; }
+.feedback-header-actions button:disabled { opacity: .55; cursor: default; }
+@media (max-width: 720px) { .animal-profile-filters { grid-template-columns: 1fr 1fr; }.animal-profile-filters input { grid-column: 1 / -1; }.animal-profile-filters .animal-record-count { justify-self: start; }.feedback-header-actions { align-items: flex-end; flex-direction: column; } }
