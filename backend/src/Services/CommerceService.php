@@ -308,15 +308,21 @@ final class CommerceService
         $orderId = filter_var($input['orderId'] ?? null, FILTER_VALIDATE_INT); $method = (string) ($input['method'] ?? ''); $reference = trim((string) ($input['transactionReference'] ?? '')) ?: null;
         if (!$orderId || !in_array($method, ['cash', 'mpesa', 'bank', 'other', 'pay_on_premise', 'cheque'], true)) throw new \InvalidArgumentException('Choose an order and payment method.');
         $order = $this->db->prepare('SELECT customer_id, total_amount FROM orders WHERE id = ?'); $order->execute([$orderId]); $row = $order->fetch(); if (!$row || (float) $row['total_amount'] <= 0) throw new \InvalidArgumentException('The order must have a positive total.');
-        if (in_array($method, ['pay_on_premise', 'cheque'], true)) {
-            $pending = $this->db->prepare("SELECT id FROM payments WHERE order_id = ? AND method = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
-            $pending->execute([$orderId, $method]);
+        $pendingMethods = match ($method) {
+            'cash' => ['pay_on_premise', 'cash'],
+            'pay_on_premise', 'cheque' => [$method],
+            default => [],
+        };
+        if ($pendingMethods !== []) {
+            $methodPlaceholders = implode(', ', array_fill(0, count($pendingMethods), '?'));
+            $pending = $this->db->prepare("SELECT id FROM payments WHERE order_id = ? AND method IN ($methodPlaceholders) AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
+            $pending->execute([$orderId, ...$pendingMethods]);
             $paymentId = $pending->fetchColumn();
             if ($paymentId) {
                 $this->db->beginTransaction();
                 try {
-                    $this->db->prepare("UPDATE payments SET status = 'confirmed', transaction_reference = ?, result_desc = 'Payment received and confirmed by farm staff.', paid_at = CURRENT_TIMESTAMP, recorded_by = ? WHERE id = ?")
-                        ->execute([$reference, $userId, (int) $paymentId]);
+                    $this->db->prepare("UPDATE payments SET method = ?, status = 'confirmed', transaction_reference = ?, result_desc = 'Payment received and confirmed by farm staff.', paid_at = CURRENT_TIMESTAMP, recorded_by = ? WHERE id = ?")
+                        ->execute([$method, $reference, $userId, (int) $paymentId]);
                     $this->db->prepare("UPDATE orders SET status = 'paid' WHERE id = ? AND status NOT IN ('paid', 'fulfilled', 'cancelled')")->execute([$orderId]);
                     $this->recordOrderSales($orderId, (int) $row['customer_id']);
                     $this->db->commit();
