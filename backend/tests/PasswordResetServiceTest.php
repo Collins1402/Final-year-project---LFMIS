@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected passwordresetservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class PasswordResetServiceTest extends TestCase
 {
+    /**
+ * Runs the test password reset keeps two factor enabled and revokes remembered devices behavior under test.
+ * @return void Result of this operation.
+ */
     public function testPasswordResetKeepsTwoFactorEnabledAndRevokesRememberedDevices(): void
     {
         $db = new PDO('sqlite::memory:');

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected customerdataisolation behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -10,6 +15,10 @@ use PHPUnit\Framework\TestCase;
 
 final class CustomerDataIsolationTest extends TestCase
 {
+    /**
+ * Runs the test orders can be scoped to the signed in customer behavior under test.
+ * @return void Result of this operation.
+ */
     public function testOrdersCanBeScopedToTheSignedInCustomer(): void
     {
         $db = new PDO('sqlite::memory:');
@@ -24,6 +33,10 @@ final class CustomerDataIsolationTest extends TestCase
         $this->assertSame('Customer One', $orders[0]['customer']);
     }
 
+    /**
+ * Runs the test feedback can be scoped to the signed in customer behavior under test.
+ * @return void Result of this operation.
+ */
     public function testFeedbackCanBeScopedToTheSignedInCustomer(): void
     {
         $db = new PDO('sqlite::memory:');

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected mpesaservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class MpesaServiceTest extends TestCase
 {
+    /**
+ * Handles the set up operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function setUp(): void
     {
         putenv('LFMIS_MPESA_ENV=sandbox');
@@ -20,6 +29,10 @@ final class MpesaServiceTest extends TestCase
         putenv('LFMIS_MPESA_CALLBACK_SECRET=0123456789abcdef0123456789abcdef');
     }
 
+    /**
+ * Handles the tear down operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function tearDown(): void
     {
         foreach ([
@@ -35,6 +48,10 @@ final class MpesaServiceTest extends TestCase
         }
     }
 
+    /**
+ * Runs the test initiate normalizes phone and sends stk push behavior under test.
+ * @return void Result of this operation.
+ */
     public function testInitiateNormalizesPhoneAndSendsStkPush(): void
     {
         $db = $this->database();
@@ -58,6 +75,10 @@ final class MpesaServiceTest extends TestCase
         $this->assertSame('254712345678', $payment['phone']);
     }
 
+    /**
+ * Runs the test callback confirms payment records sale and notifies staff only once behavior under test.
+ * @return void Result of this operation.
+ */
     public function testCallbackConfirmsPaymentRecordsSaleAndNotifiesStaffOnlyOnce(): void
     {
         $db = $this->database();
@@ -76,6 +97,10 @@ final class MpesaServiceTest extends TestCase
         $this->assertSame('payment_confirmed', $db->query('SELECT action FROM audit_logs')->fetchColumn());
     }
 
+    /**
+ * Runs the test failed callback allows buyer to retry behavior under test.
+ * @return void Result of this operation.
+ */
     public function testFailedCallbackAllowsBuyerToRetry(): void
     {
         $db = $this->database();
@@ -88,6 +113,10 @@ final class MpesaServiceTest extends TestCase
         $this->assertSame(0, (int) $db->query('SELECT COUNT(*) FROM sales')->fetchColumn());
     }
 
+    /**
+ * Runs the test callback rejects wrong secret behavior under test.
+ * @return void Result of this operation.
+ */
     public function testCallbackRejectsWrongSecret(): void
     {
         $this->expectException(\DomainException::class);
@@ -95,6 +124,10 @@ final class MpesaServiceTest extends TestCase
         (new MpesaService($this->database()))->handleCallback('wrong-secret', $this->callbackPayload(0));
     }
 
+    /**
+ * Runs the test buyer cannot pay another customers order behavior under test.
+ * @return void Result of this operation.
+ */
     public function testBuyerCannotPayAnotherCustomersOrder(): void
     {
         $service = new MpesaService($this->database(), static fn(): array => ['status' => 200, 'body' => '{}']);
@@ -103,6 +136,10 @@ final class MpesaServiceTest extends TestCase
         $service->initiate(1, ['id' => 12, 'role' => 'customer'], '0712345678');
     }
 
+    /**
+ * Runs the test initiate rejects invalid phone behavior under test.
+ * @return void Result of this operation.
+ */
     public function testInitiateRejectsInvalidPhone(): void
     {
         $service = new MpesaService($this->database(), static fn(): array => ['status' => 200, 'body' => '{}']);
@@ -111,6 +148,10 @@ final class MpesaServiceTest extends TestCase
         $service->initiate(1, ['id' => 11, 'role' => 'customer'], '07123');
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');
@@ -135,11 +176,23 @@ final class MpesaServiceTest extends TestCase
         return $db;
     }
 
+    /**
+ * Handles the add pending payment operation for the API router.
+ * @param mixed $db Value supplied to this operation.
+ * @return void Result of this operation.
+ */
     private function addPendingPayment(PDO $db): void
     {
         $db->exec("INSERT INTO payments (order_id, customer_id, amount, method, status, checkout_request_id) VALUES (1, 1, 300, 'mpesa', 'pending', 'ws_CO_123')");
     }
 
+    /**
+ * Handles the callback payload operation for the API router.
+ * @param mixed $resultCode Value supplied to this operation.
+ * @param mixed $receipt Value supplied to this operation.
+ * @param mixed $description Value supplied to this operation.
+ * @return array Result of this operation.
+ */
     private function callbackPayload(int $resultCode, ?string $receipt = 'ABC123', string $description = 'The service request is processed successfully.'): array
     {
         $items = [];

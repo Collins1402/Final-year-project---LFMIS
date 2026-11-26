@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected productionservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class ProductionServiceTest extends TestCase
 {
+    /**
+ * Runs the test records generic produce and units sold behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRecordsGenericProduceAndUnitsSold(): void
     {
         $service = $this->service();
@@ -32,6 +41,10 @@ final class ProductionServiceTest extends TestCase
         $this->assertSame('trays', $record['unit']);
     }
 
+    /**
+ * Runs the test rejects sold and damaged quantities above production behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRejectsSoldAndDamagedQuantitiesAboveProduction(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -46,6 +59,10 @@ final class ProductionServiceTest extends TestCase
         ], 7);
     }
 
+    /**
+ * Runs the test rejects duplicate milk and returns existing record for editing behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRejectsDuplicateMilkAndReturnsExistingRecordForEditing(): void
     {
         $service = $this->service();
@@ -63,6 +80,10 @@ final class ProductionServiceTest extends TestCase
         $this->assertEquals(13, $service->records()[0]['quantity_produced']);
     }
 
+    /**
+ * Runs the test rejects duplicate eggs for same date and session behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRejectsDuplicateEggsForSameDateAndSession(): void
     {
         $service = $this->service();
@@ -72,6 +93,10 @@ final class ProductionServiceTest extends TestCase
         $service->record($input, 7);
     }
 
+    /**
+ * Runs the test warns and does not save implausible milk amount behavior under test.
+ * @return void Result of this operation.
+ */
     public function testWarnsAndDoesNotSaveImplausibleMilkAmount(): void
     {
         $db = $this->database();
@@ -85,6 +110,10 @@ final class ProductionServiceTest extends TestCase
         $this->assertCount(0, $service->records());
     }
 
+    /**
+ * Runs the test summary groups recent daily and month to date production behavior under test.
+ * @return void Result of this operation.
+ */
     public function testSummaryGroupsRecentDailyAndMonthToDateProduction(): void
     {
         $db = $this->database();
@@ -102,11 +131,19 @@ final class ProductionServiceTest extends TestCase
         $this->assertSame(5.0, $summary['monthlyTotals']['Eggs (trays)']['produced']);
     }
 
+    /**
+ * Handles the service operation for the API router.
+ * @return ProductionService Result of this operation.
+ */
     private function service(): ProductionService
     {
         return new ProductionService($this->database());
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

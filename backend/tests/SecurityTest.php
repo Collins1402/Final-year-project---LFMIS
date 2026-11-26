@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected security behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -12,6 +17,10 @@ use PHPUnit\Framework\TestCase;
 
 final class SecurityTest extends TestCase
 {
+    /**
+ * Runs the test worker cannot access admin backup permission behavior under test.
+ * @return void Result of this operation.
+ */
     public function testWorkerCannotAccessAdminBackupPermission(): void
     {
         $db = new PDO('sqlite::memory:');
@@ -25,6 +34,10 @@ final class SecurityTest extends TestCase
         $this->assertFalse((new PermissionService($db))->allows('worker', 'backup.create'));
     }
 
+    /**
+ * Runs the test customer cannot read another customers orders behavior under test.
+ * @return void Result of this operation.
+ */
     public function testCustomerCannotReadAnotherCustomersOrders(): void
     {
         $db = new PDO('sqlite::memory:');
@@ -39,6 +52,10 @@ final class SecurityTest extends TestCase
         $this->assertSame('Customer One', $orders[0]['customer']);
     }
 
+    /**
+ * Runs the test sql injection login input returns normal credential error behavior under test.
+ * @return void Result of this operation.
+ */
     public function testSqlInjectionLoginInputReturnsNormalCredentialError(): void
     {
         $db = $this->authDatabase();
@@ -51,6 +68,10 @@ final class SecurityTest extends TestCase
         }
     }
 
+    /**
+ * Runs the test sql injection search filter remains aparameterized search behavior under test.
+ * @return void Result of this operation.
+ */
     public function testSqlInjectionSearchFilterRemainsAParameterizedSearch(): void
     {
         $db = new PDO('sqlite::memory:');
@@ -64,6 +85,10 @@ final class SecurityTest extends TestCase
         $this->assertSame(1, (int) $db->query('SELECT COUNT(*) FROM audit_logs')->fetchColumn());
     }
 
+    /**
+ * Runs the test locked and expired accounts cannot sign in behavior under test.
+ * @return void Result of this operation.
+ */
     public function testLockedAndExpiredAccountsCannotSignIn(): void
     {
         $db = $this->authDatabase(true);
@@ -85,6 +110,11 @@ final class SecurityTest extends TestCase
         }
     }
 
+    /**
+ * Handles the auth database operation for the API router.
+ * @param mixed $withUser Value supplied to this operation.
+ * @return PDO Result of this operation.
+ */
     private function authDatabase(bool $withUser = false): PDO
     {
         $db = new PDO('sqlite::memory:');

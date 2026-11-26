@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected refreshtrendsjob behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -14,6 +19,10 @@ use PHPUnit\Framework\TestCase;
 
 final class RefreshTrendsJobTest extends TestCase
 {
+    /**
+ * Runs the test reporting period aligns with east africa time boundaries behavior under test.
+ * @return void Result of this operation.
+ */
     public function testReportingPeriodAlignsWithEastAfricaTimeBoundaries(): void
     {
         $tz = new DateTimeZone('Africa/Nairobi');
@@ -47,6 +56,10 @@ final class RefreshTrendsJobTest extends TestCase
         $this->assertSame('2026-11-20 00:00:00', $p4['periodEnd']);
     }
 
+    /**
+ * Runs the test runs refresh and prevents duplicate processing behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRunsRefreshAndPreventsDuplicateProcessing(): void
     {
         $db = $this->database();
@@ -78,6 +91,10 @@ final class RefreshTrendsJobTest extends TestCase
         $this->assertSame('success', $forcedRun['status']);
     }
 
+    /**
+ * Runs the test detects and logs missed periods behavior under test.
+ * @return void Result of this operation.
+ */
     public function testDetectsAndLogsMissedPeriods(): void
     {
         $db = $this->database();
@@ -96,6 +113,10 @@ final class RefreshTrendsJobTest extends TestCase
         $this->assertGreaterThan(0, (int) $missedLogs);
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

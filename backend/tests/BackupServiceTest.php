@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected backupservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -10,6 +15,10 @@ final class BackupServiceTest extends TestCase
 {
     private string $root;
 
+    /**
+ * Handles the set up operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'lfmis-backup-test-' . bin2hex(random_bytes(6));
@@ -22,6 +31,10 @@ final class BackupServiceTest extends TestCase
         putenv('LFMIS_DB_PASSWORD_EMPTY=0');
     }
 
+    /**
+ * Handles the tear down operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function tearDown(): void
     {
         foreach (['LFMIS_DB_HOST', 'LFMIS_DB_PORT', 'LFMIS_DB_NAME', 'LFMIS_DB_USER', 'LFMIS_DB_PASSWORD', 'LFMIS_DB_PASSWORD_EMPTY'] as $key) {
@@ -39,6 +52,10 @@ final class BackupServiceTest extends TestCase
         rmdir($this->root);
     }
 
+    /**
+ * Runs the test creates dated backup without returning its absolute path behavior under test.
+ * @return void Result of this operation.
+ */
     public function testCreatesDatedBackupWithoutReturningItsAbsolutePath(): void
     {
         $command = [];
@@ -57,6 +74,10 @@ final class BackupServiceTest extends TestCase
         $this->assertFileExists($this->root . DIRECTORY_SEPARATOR . 'backups' . DIRECTORY_SEPARATOR . $backup['filename']);
     }
 
+    /**
+ * Runs the test removes partial backup after dump failure behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRemovesPartialBackupAfterDumpFailure(): void
     {
         $service = new BackupService($this->root, static function (array $args, string $path): int {
@@ -73,6 +94,10 @@ final class BackupServiceTest extends TestCase
         $this->assertSame([], glob($this->root . DIRECTORY_SEPARATOR . 'backups' . DIRECTORY_SEPARATOR . '*') ?: []);
     }
 
+    /**
+ * Runs the test rejects unsafe database name before starting dump behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRejectsUnsafeDatabaseNameBeforeStartingDump(): void
     {
         putenv('LFMIS_DB_NAME=bad;drop');

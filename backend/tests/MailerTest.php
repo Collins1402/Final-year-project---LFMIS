@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected mailer behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -8,12 +13,20 @@ use PHPUnit\Framework\TestCase;
 
 final class MailerTest extends TestCase
 {
+    /**
+ * Handles the tear down operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function tearDown(): void
     {
         Mailer::useTransport(null);
         putenv('LFMIS_MAIL_FROM');
     }
 
+    /**
+ * Runs the test builds utf8 multipart message with encoded subject and base64 bodies behavior under test.
+ * @return void Result of this operation.
+ */
     public function testBuildsUtf8MultipartMessageWithEncodedSubjectAndBase64Bodies(): void
     {
         putenv('LFMIS_MAIL_FROM=lfmis@example.test');
@@ -33,6 +46,10 @@ final class MailerTest extends TestCase
         self::assertStringContainsString(base64_encode('<p>Résumé HTML</p>'), $captured['message']);
     }
 
+    /**
+ * Runs the test rejects header injection without calling transport behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRejectsHeaderInjectionWithoutCallingTransport(): void
     {
         putenv('LFMIS_MAIL_FROM=lfmis@example.test');

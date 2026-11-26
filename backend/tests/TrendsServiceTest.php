@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected trendsservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class TrendsServiceTest extends TestCase
 {
+    /**
+ * Runs the test fetches and caches kenya east africa and global articles behavior under test.
+ * @return void Result of this operation.
+ */
     public function testFetchesAndCachesKenyaEastAfricaAndGlobalArticles(): void
     {
         $db = $this->database();
@@ -37,6 +46,10 @@ final class TrendsServiceTest extends TestCase
         $this->assertSame(3, $requests); // Second call served from cache, no new requests
     }
 
+    /**
+ * Runs the test deduplicates articles by canonical url behavior under test.
+ * @return void Result of this operation.
+ */
     public function testDeduplicatesArticlesByCanonicalUrl(): void
     {
         $db = $this->database();
@@ -64,6 +77,10 @@ final class TrendsServiceTest extends TestCase
         $this->assertSame('livestock', $result['articles'][0]['category']);
     }
 
+    /**
+ * Runs the test handles invalid or missing article dates gracefully behavior under test.
+ * @return void Result of this operation.
+ */
     public function testHandlesInvalidOrMissingArticleDatesGracefully(): void
     {
         $db = $this->database();
@@ -90,6 +107,10 @@ final class TrendsServiceTest extends TestCase
         $this->assertSame('poultry', $result['articles'][1]['category']);
     }
 
+    /**
+ * Runs the test partial geographic feed failure keeps working feeds fresh behavior under test.
+ * @return void Result of this operation.
+ */
     public function testPartialGeographicFeedFailureKeepsWorkingFeedsFresh(): void
     {
         $db = $this->database();
@@ -114,6 +135,10 @@ final class TrendsServiceTest extends TestCase
         $this->assertTrue($current['east_africa']['unavailable']);
     }
 
+    /**
+ * Runs the test external failure returns cached articles with stale flag behavior under test.
+ * @return void Result of this operation.
+ */
     public function testExternalFailureReturnsCachedArticlesWithStaleFlag(): void
     {
         $db = $this->database();
@@ -140,6 +165,10 @@ final class TrendsServiceTest extends TestCase
         $this->assertSame('Maize silage preparation', $staleResult['articles'][0]['title']);
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

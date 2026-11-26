@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected inventoryservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class InventoryServiceTest extends TestCase
 {
+    /**
+ * Runs the test transaction updates balance and stores history behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTransactionUpdatesBalanceAndStoresHistory(): void
     {
         $db = $this->database();
@@ -22,6 +31,10 @@ final class InventoryServiceTest extends TestCase
         $this->assertSame('Feed use', $history[0]['reason']);
     }
 
+    /**
+ * Runs the test transaction cannot make stock negative behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTransactionCannotMakeStockNegative(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -30,6 +43,10 @@ final class InventoryServiceTest extends TestCase
         (new InventoryService($this->database()))->transact(1, ['transactionType' => 'out', 'quantityChange' => '-11'], 8);
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

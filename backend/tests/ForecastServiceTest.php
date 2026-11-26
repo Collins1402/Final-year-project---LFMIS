@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected forecastservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -10,6 +15,10 @@ use PHPUnit\Framework\TestCase;
 
 final class ForecastServiceTest extends TestCase
 {
+    /**
+ * Runs the test training data uses latest gap free run and excludes today behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTrainingDataUsesLatestGapFreeRunAndExcludesToday(): void
     {
         $db = $this->database();
@@ -26,6 +35,10 @@ final class ForecastServiceTest extends TestCase
         $this->assertTrue($data['includesSimulatedData']);
     }
 
+    /**
+ * Runs the test training data flags test data demo records as simulated behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTrainingDataFlagsTestDataDemoRecordsAsSimulated(): void
     {
         $db = $this->database();
@@ -38,6 +51,10 @@ final class ForecastServiceTest extends TestCase
         $this->assertTrue($data['includesSimulatedData']);
     }
 
+    /**
+ * Runs the test report rejects history shorter than twenty one days behavior under test.
+ * @return void Result of this operation.
+ */
     public function testReportRejectsHistoryShorterThanTwentyOneDays(): void
     {
         $db = $this->database();
@@ -57,6 +74,10 @@ final class ForecastServiceTest extends TestCase
         $this->assertSame(0, $requestCount);
     }
 
+    /**
+ * Runs the test report surfaces unavailable ml service for the api to handle behavior under test.
+ * @return void Result of this operation.
+ */
     public function testReportSurfacesUnavailableMlServiceForTheApiToHandle(): void
     {
         $db = $this->database();
@@ -69,6 +90,10 @@ final class ForecastServiceTest extends TestCase
         $service->report(1);
     }
 
+    /**
+ * Runs the test report stores an identical daily backtest only once behavior under test.
+ * @return void Result of this operation.
+ */
     public function testReportStoresAnIdenticalDailyBacktestOnlyOnce(): void
     {
         $db = $this->database();
@@ -96,6 +121,10 @@ final class ForecastServiceTest extends TestCase
         $this->assertSame(1, (int) $stored['uses_weather']);
     }
 
+    /**
+ * Runs the test scenario projects milk and eggs from additional animals behavior under test.
+ * @return void Result of this operation.
+ */
     public function testScenarioProjectsMilkAndEggsFromAdditionalAnimals(): void
     {
         $db = $this->database();
@@ -124,6 +153,10 @@ final class ForecastServiceTest extends TestCase
         $this->assertSame(140.0, $result['feedUse'][0]['estimatedUseWithAddedAnimals']);
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');
@@ -138,6 +171,14 @@ final class ForecastServiceTest extends TestCase
         return $db;
     }
 
+    /**
+ * Handles the add production days operation for the API router.
+ * @param mixed $db Value supplied to this operation.
+ * @param mixed $firstDaysAgo Value supplied to this operation.
+ * @param mixed $lastDaysAgo Value supplied to this operation.
+ * @param mixed $simulated Value supplied to this operation.
+ * @return void Result of this operation.
+ */
     private function addProductionDays(PDO $db, int $firstDaysAgo, int $lastDaysAgo, bool $simulated = false): void
     {
         $insert = $db->prepare('INSERT INTO farm_produce VALUES (?, ?, ?, ?, ?)');

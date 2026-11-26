@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected auditservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class AuditServiceTest extends TestCase
 {
+    /**
+ * Runs the test records and filters audit events behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRecordsAndFiltersAuditEvents(): void
     {
         $db = $this->database();
@@ -26,6 +35,10 @@ final class AuditServiceTest extends TestCase
         $this->assertSame('203.0.113.8', $records[0]['ip_address']);
     }
 
+    /**
+ * Runs the test rejects invalid audit filters behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRejectsInvalidAuditFilters(): void
     {
         $service = new AuditService($this->database());
@@ -34,6 +47,10 @@ final class AuditServiceTest extends TestCase
         $service->list(['userId' => '1 OR 1=1']);
     }
 
+    /**
+ * Runs the test record rejects invalid event names behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRecordRejectsInvalidEventNames(): void
     {
         $service = new AuditService($this->database());
@@ -42,6 +59,10 @@ final class AuditServiceTest extends TestCase
         $service->record(7, str_repeat('x', 41), 'user');
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected synthetictrendsservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class SyntheticTrendsServiceTest extends TestCase
 {
+    /**
+ * Runs the test generates synthetic indicators for three scopes behavior under test.
+ * @return void Result of this operation.
+ */
     public function testGeneratesSyntheticIndicatorsForThreeScopes(): void
     {
         $db = $this->database();
@@ -38,6 +47,10 @@ final class SyntheticTrendsServiceTest extends TestCase
         $this->assertSame(SyntheticTrendsService::DISCLAIMER, $milkPrice['disclaimer']);
     }
 
+    /**
+ * Runs the test reproducible generation with seed behavior under test.
+ * @return void Result of this operation.
+ */
     public function testReproducibleGenerationWithSeed(): void
     {
         $db1 = $this->database();
@@ -54,6 +67,10 @@ final class SyntheticTrendsServiceTest extends TestCase
         $this->assertSame($val1, $val2);
     }
 
+    /**
+ * Runs the test active simulated events are labelled and affect indicators behavior under test.
+ * @return void Result of this operation.
+ */
     public function testActiveSimulatedEventsAreLabelledAndAffectIndicators(): void
     {
         $db = $this->database();
@@ -69,6 +86,10 @@ final class SyntheticTrendsServiceTest extends TestCase
         }
     }
 
+    /**
+ * Runs the test percentage change calculation behavior under test.
+ * @return void Result of this operation.
+ */
     public function testPercentageChangeCalculation(): void
     {
         $db = $this->database();
@@ -86,6 +107,10 @@ final class SyntheticTrendsServiceTest extends TestCase
         $this->assertSame($expectedChange, $metric['changePercent']);
     }
 
+    /**
+ * Runs the test history metrics returns time series behavior under test.
+ * @return void Result of this operation.
+ */
     public function testHistoryMetricsReturnsTimeSeries(): void
     {
         $db = $this->database();
@@ -102,6 +127,10 @@ final class SyntheticTrendsServiceTest extends TestCase
         $this->assertSame(SyntheticTrendsService::DISCLAIMER, $history[0]['disclaimer']);
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

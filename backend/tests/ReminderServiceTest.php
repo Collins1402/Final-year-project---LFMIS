@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected reminderservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -10,6 +15,10 @@ use PHPUnit\Framework\TestCase;
 
 final class ReminderServiceTest extends TestCase
 {
+    /**
+ * Runs the test selects due records and sends each reminder once behavior under test.
+ * @return void Result of this operation.
+ */
     public function testSelectsDueRecordsAndSendsEachReminderOnce(): void
     {
         $db = $this->database();
@@ -33,6 +42,10 @@ final class ReminderServiceTest extends TestCase
         $this->assertSame(4, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
     }
 
+    /**
+ * Runs the test failed email is retried and attempt count increases behavior under test.
+ * @return void Result of this operation.
+ */
     public function testFailedEmailIsRetriedAndAttemptCountIncreases(): void
     {
         $db = $this->database();
@@ -56,6 +69,10 @@ final class ReminderServiceTest extends TestCase
         $this->assertSame(2, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');
@@ -71,6 +88,13 @@ final class ReminderServiceTest extends TestCase
         return $db;
     }
 
+    /**
+ * Handles the add health record operation for the API router.
+ * @param mixed $db Value supplied to this operation.
+ * @param mixed $id Value supplied to this operation.
+ * @param mixed $dueDate Value supplied to this operation.
+ * @return void Result of this operation.
+ */
     private function addHealthRecord(PDO $db, int $id, string $dueDate): void
     {
         $db->prepare("INSERT INTO health_records (id, animal_id, record_type, description, next_due_date) VALUES (?, 1, 'vaccination', 'Routine vaccine', ?)")->execute([$id, $dueDate]);

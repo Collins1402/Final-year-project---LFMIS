@@ -82,8 +82,10 @@ final class CommerceService
         $productId = filter_var($input['productId'] ?? null, FILTER_VALIDATE_INT);
         $quantity = filter_var($input['quantity'] ?? null, FILTER_VALIDATE_FLOAT);
         if (!$productId || $quantity === false || $quantity <= 0 || !is_finite((float) $quantity)) throw new \InvalidArgumentException('Choose a product and enter a positive quantity.');
+        // Keep the order and its item together so a partial order cannot be left behind.
         $this->db->beginTransaction();
         try {
+            // Lock the listing while checking stock so concurrent buyers cannot oversell it.
             $product = $this->findProduct((int) $productId, true);
             if (!(int) $product['is_active']) throw new \DomainException('This listing is no longer available.');
             if (($user['role'] ?? '') === 'buyer' && $product['product_type'] !== 'livestock') throw new \DomainException('Livestock buyer accounts can request livestock listings only.');
@@ -105,6 +107,7 @@ final class CommerceService
             $orderId = (int) $this->db->lastInsertId();
             $item = $this->db->prepare('INSERT INTO order_items (order_id, product_id, item_name, quantity, unit, unit_price) VALUES (?, ?, ?, ?, ?, ?)');
             $item->execute([$orderId, $product['id'], $product['name'], $quantity, $product['unit'], $product['unit_price']]);
+            // Commit only after both order records have been saved successfully.
             $this->db->commit();
             return ['id' => $orderId, 'status' => 'pending', 'totalAmount' => $total];
         } catch (\Throwable $error) {

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected authservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -10,11 +15,19 @@ use PDO;
 
 final class AuthServiceTest extends TestCase
 {
+    /**
+ * Runs the test password policy requires twelve characters behavior under test.
+ * @return void Result of this operation.
+ */
     public function testPasswordPolicyRequiresTwelveCharacters(): void
     {
         $this->assertGreaterThanOrEqual(12, strlen('a-secure-password'));
     }
 
+    /**
+ * Runs the test customer and buyer registration creates linked customer records behavior under test.
+ * @return void Result of this operation.
+ */
     public function testCustomerAndBuyerRegistrationCreatesLinkedCustomerRecords(): void
     {
         $db = new PDO('sqlite::memory:');
@@ -31,6 +44,10 @@ final class AuthServiceTest extends TestCase
         $this->assertSame('0711000000', $db->query('SELECT phone FROM customers WHERE user_id = 1')->fetchColumn());
     }
 
+    /**
+ * Runs the test self registration cannot grant staff roles behavior under test.
+ * @return void Result of this operation.
+ */
     public function testSelfRegistrationCannotGrantStaffRoles(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -45,6 +62,10 @@ final class AuthServiceTest extends TestCase
         (new AuthService($db))->register(['fullName' => 'Worker One', 'username' => 'worker_one', 'email' => 'worker@example.test', 'password' => 'long-enough-password', 'role' => 'worker']);
     }
 
+    /**
+ * Runs the test login with two factor does not create an authenticated session behavior under test.
+ * @return void Result of this operation.
+ */
     public function testLoginWithTwoFactorDoesNotCreateAnAuthenticatedSession(): void
     {
         $db = new PDO('sqlite::memory:');

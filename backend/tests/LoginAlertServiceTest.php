@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected loginalertservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -8,6 +13,10 @@ use PHPUnit\Framework\TestCase;
 
 final class LoginAlertServiceTest extends TestCase
 {
+    /**
+ * Runs the test successful login sends security details without credentials behavior under test.
+ * @return void Result of this operation.
+ */
     public function testSuccessfulLoginSendsSecurityDetailsWithoutCredentials(): void
     {
         $message = '';
@@ -28,6 +37,10 @@ final class LoginAlertServiceTest extends TestCase
         $this->assertStringNotContainsString('sample-secret', $message);
     }
 
+    /**
+ * Runs the test mail failure does not throw behavior under test.
+ * @return void Result of this operation.
+ */
     public function testMailFailureDoesNotThrow(): void
     {
         $service = new LoginAlertService(static function (): bool {

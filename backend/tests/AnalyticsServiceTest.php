@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected analyticsservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -14,6 +19,10 @@ final class AnalyticsServiceTest extends TestCase
     private PDO $db;
     private AnalyticsService $analytics;
 
+    /**
+ * Handles the set up operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function setUp(): void
     {
         $this->db = new PDO('sqlite::memory:');
@@ -24,6 +33,10 @@ final class AnalyticsServiceTest extends TestCase
         $this->analytics = new AnalyticsService($this->db);
     }
 
+    /**
+ * Runs the test milk series calculates totals change and seven period average behavior under test.
+ * @return void Result of this operation.
+ */
     public function testMilkSeriesCalculatesTotalsChangeAndSevenPeriodAverage(): void
     {
         $today = new \DateTimeImmutable('today');
@@ -43,6 +56,10 @@ final class AnalyticsServiceTest extends TestCase
         self::assertNotSame(999.0, $chart['stats']['total']);
     }
 
+    /**
+ * Runs the test empty metric has honest no data result behavior under test.
+ * @return void Result of this operation.
+ */
     public function testEmptyMetricHasHonestNoDataResult(): void
     {
         $chart = $this->analytics->series('eggs', '30d');
@@ -52,6 +69,10 @@ final class AnalyticsServiceTest extends TestCase
         self::assertStringContainsString('No recorded data', $chart['message']);
     }
 
+    /**
+ * Runs the test unknown metric and period are rejected behavior under test.
+ * @return void Result of this operation.
+ */
     public function testUnknownMetricAndPeriodAreRejected(): void
     {
         try { $this->analytics->series('not_a_metric', '30d'); self::fail('Unknown metric accepted.'); }
@@ -60,6 +81,10 @@ final class AnalyticsServiceTest extends TestCase
         $this->analytics->series('milk', 'all-time');
     }
 
+    /**
+ * Runs the test role scopes block customer and worker finance charts behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRoleScopesBlockCustomerAndWorkerFinanceCharts(): void
     {
         try { $this->analytics->series('milk', '30d', null, null, 'customer'); self::fail('Customer received farm analytics.'); }
@@ -68,6 +93,10 @@ final class AnalyticsServiceTest extends TestCase
         $this->analytics->series('sales', '30d', null, null, 'worker');
     }
 
+    /**
+ * Runs the test model supplied numbers cannot alter server computed chart data behavior under test.
+ * @return void Result of this operation.
+ */
     public function testModelSuppliedNumbersCannotAlterServerComputedChartData(): void
     {
         $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
@@ -79,6 +108,10 @@ final class AnalyticsServiceTest extends TestCase
         self::assertSame('bar', $result['charts'][0]['type']);
     }
 
+    /**
+ * Runs the test assistant does not return charts to customer or finance to worker behavior under test.
+ * @return void Result of this operation.
+ */
     public function testAssistantDoesNotReturnChartsToCustomerOrFinanceToWorker(): void
     {
         $assistant = new AssistantService($this->db, $this->analytics);

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected trendsapi behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -13,6 +18,10 @@ use PHPUnit\Framework\TestCase;
 
 final class TrendsApiTest extends TestCase
 {
+    /**
+ * Runs the test trends aggregate payload has all required sections behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTrendsAggregatePayloadHasAllRequiredSections(): void
     {
         $db = $this->database();
@@ -58,6 +67,10 @@ final class TrendsApiTest extends TestCase
         $this->assertSame('Africa/Nairobi', $payload['status']['timezone']);
     }
 
+    /**
+ * Runs the test trends manage permission allowed only for authorized roles behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTrendsManagePermissionAllowedOnlyForAuthorizedRoles(): void
     {
         $db = $this->database();
@@ -69,6 +82,10 @@ final class TrendsApiTest extends TestCase
         $this->assertFalse($perms->allows('worker', 'trends.manage'));
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

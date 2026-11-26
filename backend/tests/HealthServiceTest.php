@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected healthservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class HealthServiceTest extends TestCase
 {
+    /**
+ * Runs the test due soon includes overdue open follow ups and excludes closed or inactive ones behavior under test.
+ * @return void Result of this operation.
+ */
     public function testDueSoonIncludesOverdueOpenFollowUpsAndExcludesClosedOrInactiveOnes(): void
     {
         $db = new PDO('sqlite::memory:');

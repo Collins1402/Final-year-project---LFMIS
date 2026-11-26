@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected activityservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class ActivityServiceTest extends TestCase
 {
+    /**
+ * Runs the test health concern creates issue and notifies admin and veterinarian behavior under test.
+ * @return void Result of this operation.
+ */
     public function testHealthConcernCreatesIssueAndNotifiesAdminAndVeterinarian(): void
     {
         $db = $this->database();
@@ -28,6 +37,10 @@ final class ActivityServiceTest extends TestCase
         $this->assertSame([7, 9], array_map('intval', $db->query('SELECT user_id FROM notifications ORDER BY user_id')->fetchAll(PDO::FETCH_COLUMN)));
     }
 
+    /**
+ * Runs the test health concern requires animal and symptoms behavior under test.
+ * @return void Result of this operation.
+ */
     public function testHealthConcernRequiresAnimalAndSymptoms(): void
     {
         $db = $this->database();
@@ -43,6 +56,10 @@ final class ActivityServiceTest extends TestCase
         $this->assertSame(0, (int) $db->query('SELECT COUNT(*) FROM health_records')->fetchColumn());
     }
 
+    /**
+ * Runs the test ordinary activity does not create health record or expose concern notifications behavior under test.
+ * @return void Result of this operation.
+ */
     public function testOrdinaryActivityDoesNotCreateHealthRecordOrExposeConcernNotifications(): void
     {
         $db = $this->database();
@@ -53,6 +70,11 @@ final class ActivityServiceTest extends TestCase
         $this->assertSame(0, (int) $db->query('SELECT COUNT(*) FROM notifications')->fetchColumn());
     }
 
+    /**
+ * Handles the input operation for the API router.
+ * @param mixed $overrides Value supplied to this operation.
+ * @return array Result of this operation.
+ */
     private function input(array $overrides = []): array
     {
         return array_replace([
@@ -65,6 +87,10 @@ final class ActivityServiceTest extends TestCase
         ], $overrides);
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

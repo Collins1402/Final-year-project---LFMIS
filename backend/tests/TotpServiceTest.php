@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected totpservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -15,6 +20,10 @@ final class TotpServiceTest extends TestCase
     private PDO $db;
     private TotpService $service;
 
+    /**
+ * Handles the set up operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function setUp(): void
     {
         putenv('LFMIS_2FA_KEY=' . base64_encode(random_bytes(32)));
@@ -35,6 +44,10 @@ final class TotpServiceTest extends TestCase
         $this->service = new TotpService($this->db);
     }
 
+    /**
+ * Runs the test login with totp does not create session until valid code behavior under test.
+ * @return void Result of this operation.
+ */
     public function testLoginWithTotpDoesNotCreateSessionUntilValidCode(): void
     {
         $setup = $this->service->beginSetup(1);
@@ -48,6 +61,10 @@ final class TotpServiceTest extends TestCase
         self::assertArrayNotHasKey('user_id', $_SESSION);
     }
 
+    /**
+ * Runs the test five wrong codes lock the pending attempt behavior under test.
+ * @return void Result of this operation.
+ */
     public function testFiveWrongCodesLockThePendingAttempt(): void
     {
         $setup = $this->service->beginSetup(1);
@@ -61,6 +78,10 @@ final class TotpServiceTest extends TestCase
         $this->service->verifyPending('000000', false);
     }
 
+    /**
+ * Runs the test recovery code can only be used once and status contains no secrets behavior under test.
+ * @return void Result of this operation.
+ */
     public function testRecoveryCodeCanOnlyBeUsedOnceAndStatusContainsNoSecrets(): void
     {
         $setup = $this->service->beginSetup(1);
@@ -76,6 +97,10 @@ final class TotpServiceTest extends TestCase
         self::assertStringNotContainsString('token_hash', $json);
     }
 
+    /**
+ * Runs the test trusted device is scoped to user and revocation removes it behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTrustedDeviceIsScopedToUserAndRevocationRemovesIt(): void
     {
         $token = bin2hex(random_bytes(32));
@@ -87,6 +112,10 @@ final class TotpServiceTest extends TestCase
         self::assertFalse($this->service->hasTrustedDevice(1, $token));
     }
 
+    /**
+ * Runs the test trusted cookie skips challenge only for the matching user behavior under test.
+ * @return void Result of this operation.
+ */
     public function testTrustedCookieSkipsChallengeOnlyForTheMatchingUser(): void
     {
         $secret = Totp::generateSecret();
@@ -105,5 +134,9 @@ final class TotpServiceTest extends TestCase
         self::assertArrayNotHasKey('user_id', $_SESSION);
     }
 
+    /**
+ * Handles the tear down operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function tearDown(): void { Mailer::useTransport(null); }
 }

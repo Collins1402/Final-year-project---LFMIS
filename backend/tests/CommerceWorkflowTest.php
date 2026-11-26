@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected commerceworkflow behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class CommerceWorkflowTest extends TestCase
 {
+    /**
+ * Runs the test acceptance reserves produce and fulfillment records sale once behavior under test.
+ * @return void Result of this operation.
+ */
     public function testAcceptanceReservesProduceAndFulfillmentRecordsSaleOnce(): void
     {
         $db = $this->database();
@@ -27,6 +36,10 @@ final class CommerceWorkflowTest extends TestCase
         $this->assertSame('fulfilled', $db->query('SELECT status FROM orders WHERE id = 1')->fetchColumn());
     }
 
+    /**
+ * Runs the test acceptance allocates specific livestock behavior under test.
+ * @return void Result of this operation.
+ */
     public function testAcceptanceAllocatesSpecificLivestock(): void
     {
         $db = $this->database();
@@ -43,6 +56,10 @@ final class CommerceWorkflowTest extends TestCase
         $this->assertSame(1, (int) $db->query("SELECT COUNT(*) FROM animals WHERE species = 'goat' AND status = 'active'")->fetchColumn());
     }
 
+    /**
+ * Runs the test customer can request listed product behavior under test.
+ * @return void Result of this operation.
+ */
     public function testCustomerCanRequestListedProduct(): void
     {
         $db = $this->database();
@@ -61,6 +78,10 @@ final class CommerceWorkflowTest extends TestCase
         $this->assertSame(11, (int) $db->query('SELECT user_id FROM customers')->fetchColumn());
     }
 
+    /**
+ * Runs the test admin quote is linked to catalog stock behavior under test.
+ * @return void Result of this operation.
+ */
     public function testAdminQuoteIsLinkedToCatalogStock(): void
     {
         $db = $this->database();
@@ -78,6 +99,10 @@ final class CommerceWorkflowTest extends TestCase
         $this->assertSame(1, (int) $db->query('SELECT product_id FROM order_items')->fetchColumn());
     }
 
+    /**
+ * Runs the test livestock availability uses active animal records behavior under test.
+ * @return void Result of this operation.
+ */
     public function testLivestockAvailabilityUsesActiveAnimalRecords(): void
     {
         $db = $this->database();
@@ -90,6 +115,10 @@ final class CommerceWorkflowTest extends TestCase
         $this->assertSame(2.0, (float) $products[0]['available_quantity']);
     }
 
+    /**
+ * Runs the test customer cannot request livestock listing behavior under test.
+ * @return void Result of this operation.
+ */
     public function testCustomerCannotRequestLivestockListing(): void
     {
         $db = $this->database();
@@ -103,6 +132,10 @@ final class CommerceWorkflowTest extends TestCase
         ]);
     }
 
+    /**
+ * Runs the test insufficient stock rolls back acceptance behavior under test.
+ * @return void Result of this operation.
+ */
     public function testInsufficientStockRollsBackAcceptance(): void
     {
         $db = $this->database();
@@ -121,6 +154,10 @@ final class CommerceWorkflowTest extends TestCase
         $this->assertSame(2.0, (float) $db->query('SELECT available_quantity FROM products WHERE id = 1')->fetchColumn());
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

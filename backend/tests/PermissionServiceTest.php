@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected permissionservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -9,6 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class PermissionServiceTest extends TestCase
 {
+    /**
+ * Runs the test admin can revoke and restore role permission behavior under test.
+ * @return void Result of this operation.
+ */
     public function testAdminCanRevokeAndRestoreRolePermission(): void
     {
         $db = $this->database();
@@ -22,6 +31,10 @@ final class PermissionServiceTest extends TestCase
         $this->assertFalse($service->allows('worker', 'production.record'));
     }
 
+    /**
+ * Runs the test administrator permissions cannot be changed behavior under test.
+ * @return void Result of this operation.
+ */
     public function testAdministratorPermissionsCannotBeChanged(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -30,6 +43,10 @@ final class PermissionServiceTest extends TestCase
         (new PermissionService($this->database()))->updateRole('admin', []);
     }
 
+    /**
+ * Runs the test database backup permission is granted only to administrator behavior under test.
+ * @return void Result of this operation.
+ */
     public function testDatabaseBackupPermissionIsGrantedOnlyToAdministrator(): void
     {
         $db = $this->database();
@@ -41,6 +58,10 @@ final class PermissionServiceTest extends TestCase
         $this->assertFalse($service->allows('worker', 'backup.create'));
     }
 
+    /**
+ * Handles the database operation for the API router.
+ * @return PDO Result of this operation.
+ */
     private function database(): PDO
     {
         $db = new PDO('sqlite::memory:');

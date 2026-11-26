@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: proves the expected twofactorservice behavior through automated tests.
+ * PHPUnit loads this file to check the corresponding service or API behavior.
+ * It depends on the test database setup and fixtures declared in the test suite.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Tests;
@@ -12,6 +17,10 @@ final class TwoFactorServiceTest extends TestCase
 {
     private PDO $db;
 
+    /**
+ * Handles the set up operation for the API router.
+ * @return void Result of this operation.
+ */
     protected function setUp(): void
     {
         putenv('LFMIS_2FA_OTP_KEY=' . str_repeat('a', 64));
@@ -55,6 +64,10 @@ final class TwoFactorServiceTest extends TestCase
         $insert->execute(['farmer@example.test', 'Farm Owner', password_hash('correct-horse-battery', PASSWORD_DEFAULT)]);
     }
 
+    /**
+ * Runs the test email enrollment and login code are single use behavior under test.
+ * @return void Result of this operation.
+ */
     public function testEmailEnrollmentAndLoginCodeAreSingleUse(): void
     {
         $codes = [];
@@ -76,6 +89,10 @@ final class TwoFactorServiceTest extends TestCase
         $this->assertArrayNotHasKey('pending_2fa', $_SESSION);
     }
 
+    /**
+ * Runs the test sms enrollment is rejected behavior under test.
+ * @return void Result of this operation.
+ */
     public function testSmsEnrollmentIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -84,6 +101,10 @@ final class TwoFactorServiceTest extends TestCase
         (new TwoFactorService($this->db))->startEnrollment(1, 'sms');
     }
 
+    /**
+ * Runs the test five incorrect codes lock the challenge behavior under test.
+ * @return void Result of this operation.
+ */
     public function testFiveIncorrectCodesLockTheChallenge(): void
     {
         $code = '';
@@ -113,6 +134,10 @@ final class TwoFactorServiceTest extends TestCase
         $this->assertSame([], $service->status(1)['methods']);
     }
 
+    /**
+ * Runs the test fourth code request in an hour is rate limited behavior under test.
+ * @return void Result of this operation.
+ */
     public function testFourthCodeRequestInAnHourIsRateLimited(): void
     {
         $service = new TwoFactorService($this->db, static function (): bool {
@@ -126,6 +151,10 @@ final class TwoFactorServiceTest extends TestCase
         $service->startEnrollment(1, 'email');
     }
 
+    /**
+ * Runs the test expired code cannot enable amethod behavior under test.
+ * @return void Result of this operation.
+ */
     public function testExpiredCodeCannotEnableAMethod(): void
     {
         $service = new TwoFactorService($this->db, static function (): bool {
@@ -138,6 +167,10 @@ final class TwoFactorServiceTest extends TestCase
         $service->completeEnrollment(1, 'email', '123456');
     }
 
+    /**
+ * Runs the test legacy sms only login is rejected behavior under test.
+ * @return void Result of this operation.
+ */
     public function testLegacySmsOnlyLoginIsRejected(): void
     {
         $this->expectException(\RuntimeException::class);
