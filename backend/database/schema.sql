@@ -1,3 +1,6 @@
+-- File purpose: defines the LFMIS relational tables and indexes used to store farm operations and commerce.
+-- The application database setup loads this schema before API services query these records.
+-- It depends on MySQL-compatible SQL and the table relationships declared below.
 -- Flouri Farm LFMIS: complete schema (MySQL 8.4, utf8mb4).
 -- Load once into an empty database. Later changes go in database/migrations/.
 
@@ -5,11 +8,13 @@ SET NAMES utf8mb4;
 
 -- ---------------------------------------------------------------- Access
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version VARCHAR(120) PRIMARY KEY,
   applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS roles (
   id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(30) NOT NULL,
@@ -17,6 +22,7 @@ CREATE TABLE IF NOT EXISTS roles (
   CONSTRAINT uq_roles_name UNIQUE (name)
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   role_id TINYINT UNSIGNED NOT NULL,
@@ -39,6 +45,7 @@ CREATE TABLE IF NOT EXISTS users (
   CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
   user_id BIGINT UNSIGNED PRIMARY KEY,
   token_hash CHAR(64) NOT NULL,
@@ -48,6 +55,7 @@ CREATE TABLE IF NOT EXISTS email_verification_tokens (
   CONSTRAINT fk_email_verification_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   user_id BIGINT UNSIGNED PRIMARY KEY,
   token_hash CHAR(64) NOT NULL,
@@ -57,6 +65,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS admin_transfer_invites (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   invited_by BIGINT UNSIGNED NOT NULL,
@@ -76,6 +85,7 @@ CREATE TABLE IF NOT EXISTS admin_transfer_invites (
 
 -- ---------------------------------------------------------------- Livestock
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS animals (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   tag_number VARCHAR(40) NOT NULL,
@@ -98,6 +108,7 @@ CREATE TABLE IF NOT EXISTS animals (
   CONSTRAINT fk_animals_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS health_records (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   animal_id BIGINT UNSIGNED NOT NULL,
@@ -121,6 +132,7 @@ CREATE TABLE IF NOT EXISTS health_records (
   CONSTRAINT fk_health_recorded_by FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS farm_activities (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   activity_type ENUM('feeding', 'milking', 'cleaning', 'breeding', 'health', 'maintenance', 'other') NOT NULL,
@@ -141,6 +153,7 @@ CREATE TABLE IF NOT EXISTS farm_activities (
   CONSTRAINT fk_activities_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS maintenance_records (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   asset_name VARCHAR(120) NOT NULL,
@@ -161,6 +174,7 @@ CREATE TABLE IF NOT EXISTS maintenance_records (
 
 -- ---------------------------------------------------------------- Produce
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS farm_produce (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   produce_name VARCHAR(120) NOT NULL,
@@ -182,6 +196,7 @@ CREATE TABLE IF NOT EXISTS farm_produce (
 
 -- ---------------------------------------------------------------- Stock
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS inventory_items (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
@@ -198,6 +213,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   INDEX idx_inventory_active_category (is_active, category)
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS inventory_transactions (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   item_id BIGINT UNSIGNED NOT NULL,
@@ -217,6 +233,7 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
 
 -- ---------------------------------------------------------------- Commerce
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS customers (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NULL,
@@ -229,6 +246,7 @@ CREATE TABLE IF NOT EXISTS customers (
   CONSTRAINT fk_customers_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS products (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(140) NOT NULL,
@@ -247,6 +265,7 @@ CREATE TABLE IF NOT EXISTS products (
   INDEX idx_products_species (species)
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS orders (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   customer_id BIGINT UNSIGNED NOT NULL,
@@ -265,6 +284,7 @@ CREATE TABLE IF NOT EXISTS orders (
   CONSTRAINT fk_orders_handled_by FOREIGN KEY (handled_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS order_items (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id BIGINT UNSIGNED NOT NULL,
@@ -278,6 +298,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS order_animals (
   order_id BIGINT UNSIGNED NOT NULL,
   animal_id BIGINT UNSIGNED NOT NULL,
@@ -287,6 +308,7 @@ CREATE TABLE IF NOT EXISTS order_animals (
   CONSTRAINT fk_order_animals_animal FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS sales (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id BIGINT UNSIGNED NULL,
@@ -306,6 +328,7 @@ CREATE TABLE IF NOT EXISTS sales (
   CONSTRAINT fk_sales_recorded_by FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS payments (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id BIGINT UNSIGNED NOT NULL,
@@ -332,6 +355,7 @@ CREATE TABLE IF NOT EXISTS payments (
   CONSTRAINT fk_payments_recorded_by FOREIGN KEY (recorded_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS expenses (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   category ENUM('feed', 'veterinary', 'labour', 'equipment', 'utilities', 'transport', 'maintenance', 'other') NOT NULL,
@@ -347,6 +371,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 
 -- ---------------------------------------------------------------- Service
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS feedback (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NULL,
@@ -361,6 +386,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   CONSTRAINT fk_feedback_resolved_by FOREIGN KEY (resolved_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
@@ -379,6 +405,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NULL,
@@ -394,6 +421,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS api_rate_limits (
   bucket_key CHAR(64) NOT NULL,
   window_start BIGINT UNSIGNED NOT NULL,
@@ -404,6 +432,7 @@ CREATE TABLE IF NOT EXISTS api_rate_limits (
 
 -- ---------------------------------------------------------------- ML support
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS weather_observations (
   observation_date DATE PRIMARY KEY,
   rain_mm DECIMAL(6,2) NULL,
@@ -413,6 +442,7 @@ CREATE TABLE IF NOT EXISTS weather_observations (
   CONSTRAINT chk_weather_rain CHECK (rain_mm IS NULL OR rain_mm >= 0)
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS forecast_runs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   method VARCHAR(120) NOT NULL,
@@ -438,11 +468,13 @@ INSERT IGNORE INTO roles (name, description) VALUES
   ('customer', 'Buys farm produce and tracks orders and payments'),
   ('buyer', 'Purchases livestock and tracks livestock orders');
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS permissions (
   code VARCHAR(60) PRIMARY KEY,
   label VARCHAR(120) NOT NULL
 ) ENGINE=InnoDB;
 
+-- Stores the IF records that the application uses for this part of farm operations.
 CREATE TABLE IF NOT EXISTS role_permissions (
   role_id TINYINT UNSIGNED NOT NULL,
   permission_code VARCHAR(60) NOT NULL,

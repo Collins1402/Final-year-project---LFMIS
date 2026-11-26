@@ -1,5 +1,9 @@
+-- File purpose: applies the 016_farm_trends_intelligence database change while upgrading an existing LFMIS installation.
+-- The database migration runner applies this file after the preceding migration.
+-- It depends on the earlier schema and preserves existing records while adding this capability.
 -- 016_farm_trends_intelligence.sql: Farm Trends & Agricultural Intelligence tables
 
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS trend_snapshot_history (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   trend_type ENUM('live', 'simulated', 'actual_farm') NOT NULL,
@@ -14,6 +18,7 @@ CREATE TABLE IF NOT EXISTS trend_snapshot_history (
   CONSTRAINT uq_trend_history_type_scope_period UNIQUE (trend_type, geographic_scope, period_start)
 ) ENGINE=InnoDB;
 
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS trend_articles (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   snapshot_id BIGINT UNSIGNED NULL,
@@ -32,6 +37,7 @@ CREATE TABLE IF NOT EXISTS trend_articles (
   CONSTRAINT uq_articles_url_scope UNIQUE (url(190), geographic_scope)
 ) ENGINE=InnoDB;
 
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS synthetic_trend_metrics (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   snapshot_id BIGINT UNSIGNED NULL,
@@ -48,6 +54,7 @@ CREATE TABLE IF NOT EXISTS synthetic_trend_metrics (
   INDEX idx_synthetic_metric_scope (geographic_scope, category, metric_name, period_start)
 ) ENGINE=InnoDB;
 
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS trend_refresh_logs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   period_start DATETIME NOT NULL,

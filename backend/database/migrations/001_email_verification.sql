@@ -1,3 +1,6 @@
+-- File purpose: applies the 001_email_verification database change while upgrading an existing LFMIS installation.
+-- The database migration runner applies this file after the preceding migration.
+-- It depends on the earlier schema and preserves existing records while adding this capability.
 SET @email_verified_column_sql = IF(
   EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -26,6 +29,7 @@ PREPARE email_verified_index_stmt FROM @email_verified_index_sql;
 EXECUTE email_verified_index_stmt;
 DEALLOCATE PREPARE email_verified_index_stmt;
 
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
   user_id BIGINT UNSIGNED PRIMARY KEY,
   token_hash CHAR(64) NOT NULL,

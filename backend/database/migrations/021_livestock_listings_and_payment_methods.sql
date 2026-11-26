@@ -1,3 +1,7 @@
+-- File purpose: applies the 021_livestock_listings_and_payment_methods database change while upgrading an existing LFMIS installation.
+-- The database migration runner applies this file after the preceding migration.
+-- It depends on the earlier schema and preserves existing records while adding this capability.
+-- Updates the payments structure so it can store the capability introduced here.
 ALTER TABLE payments
   MODIFY method ENUM('cash', 'mpesa', 'bank', 'other', 'pay_on_premise', 'cheque') NOT NULL;
 

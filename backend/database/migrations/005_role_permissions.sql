@@ -1,8 +1,13 @@
+-- File purpose: applies the 005_role_permissions database change while upgrading an existing LFMIS installation.
+-- The database migration runner applies this file after the preceding migration.
+-- It depends on the earlier schema and preserves existing records while adding this capability.
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS permissions (
   code VARCHAR(60) PRIMARY KEY,
   label VARCHAR(120) NOT NULL
 ) ENGINE=InnoDB;
 
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS role_permissions (
   role_id TINYINT UNSIGNED NOT NULL,
   permission_code VARCHAR(60) NOT NULL,

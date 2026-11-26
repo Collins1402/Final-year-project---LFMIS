@@ -1,3 +1,7 @@
+-- File purpose: applies the 003_unified_farm_produce database change while upgrading an existing LFMIS installation.
+-- The database migration runner applies this file after the preceding migration.
+-- It depends on the earlier schema and preserves existing records while adding this capability.
+-- Adds or defines the IF records required by this migration.
 CREATE TABLE IF NOT EXISTS farm_produce (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   produce_name VARCHAR(120) NOT NULL,
