@@ -9,7 +9,6 @@ from ml.forecast_service import forecast
 
 def observations(days=28):
     """Runs the observations step and returns the result used by this module.
-
     :param days: Input used in this calculation.
     :return: The computed result or requested operation outcome.
     """
@@ -89,7 +88,6 @@ def test_metrics_are_deterministic_and_non_negative():
 
 def test_real_csv_loader_counts_missing_values_and_evaluation_reports_short_data(tmp_path):
     """Runs the test real csv loader counts missing values and evaluation reports short data step and returns the result used by this module.
-
     :param tmp_path: Input used in this calculation.
     :return: The computed result or requested operation outcome.
     """
@@ -109,7 +107,6 @@ def test_real_csv_loader_counts_missing_values_and_evaluation_reports_short_data
 
 def test_real_csv_evaluation_includes_ridge_and_each_baseline(tmp_path):
     """Runs the test real csv evaluation includes ridge and each baseline step and returns the result used by this module.
-
     :param tmp_path: Input used in this calculation.
     :return: The computed result or requested operation outcome.
     """

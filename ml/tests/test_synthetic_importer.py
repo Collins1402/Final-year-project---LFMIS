@@ -8,7 +8,6 @@ from scripts.import_synthetic_workbook import build_sql, unique_customer_map
 
 def test_workbook_converter_remaps_orders_and_labels_data(tmp_path):
     """Runs the test workbook converter remaps orders and labels data step and returns the result used by this module.
-
     :param tmp_path: Input used in this calculation.
     :return: The computed result or requested operation outcome.
     """

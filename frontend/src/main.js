@@ -807,7 +807,6 @@ function renderTwoFactorChallenge(methods, notice = '') {
 /**
  * Renders or performs the load public trends operation used by the page.
  */
-
 async function loadPublicTrends() {
   const content = app.querySelector('#public-trends-content')
   if (!content) return
@@ -926,7 +925,6 @@ function renderRegister(notice = '') {
  * Renders or performs the render account security operation used by the page.
  * @param {*} forced Value supplied to this operation.
  */
-
 async function renderAccountSecurity(forced = false) {
   let status
   try {
@@ -993,7 +991,6 @@ async function renderAccountSecurity(forced = false) {
 /**
  * Renders or performs the render app operation used by the page.
  */
-
 async function renderApp() {
   if (['customer', 'buyer', 'worker', 'veterinarian'].includes(currentUser.role)) {
     await renderRoleWorkspace()
@@ -1139,7 +1136,6 @@ function renderAdminModule(module) {
  * Renders or performs the render animal profiles module operation used by the page.
  * @param {*} animalId Value supplied to this operation.
  */
-
 async function renderAnimalProfilesModule(animalId = null) {
   const content = app.querySelector('.content')
   try {
@@ -1313,7 +1309,6 @@ function wireActivityHealthFields(form) {
 /**
  * Renders or performs the render activities module operation used by the page.
  */
-
 async function renderActivitiesModule() {
   const content = app.querySelector('.content')
   try {
@@ -1331,7 +1326,6 @@ async function renderActivitiesModule() {
 /**
  * Renders or performs the render events module operation used by the page.
  */
-
 async function renderEventsModule() {
   const content = app.querySelector('.content')
   try {
@@ -1456,7 +1450,6 @@ function bindProductionEditor(root, records, refresh) {
 /**
  * Renders or performs the render production module operation used by the page.
  */
-
 async function renderProductionModule() {
   const content = app.querySelector('.content')
   try {
@@ -1527,7 +1520,6 @@ function renderProductionSummary(summary) {
 /**
  * Renders or performs the render inventory module operation used by the page.
  */
-
 async function renderInventoryModule() {
   const content = app.querySelector('.content')
   try {
@@ -1813,7 +1805,6 @@ function renderForecastPanel(data, error, selectedProduct = 'milk', productOptio
 /**
  * Renders or performs the render farm trends module operation used by the page.
  */
-
 async function renderFarmTrendsModule() {
   const content = app.querySelector('.content')
   content.innerHTML = `<header><div><p class="kicker">AGRICULTURAL INTELLIGENCE</p><h1>Farm trends</h1><p class="muted">Separate live, synthetic and actual farm information.</p></div><button id="trends-refresh" class="secondary-action" type="button">Refresh now</button></header><div id="trends-content" aria-live="polite"><p class="muted">Loading agricultural intelligence...</p></div>`
@@ -1961,7 +1952,6 @@ async function renderFarmTrendsModule() {
 /**
  * Renders or performs the render reports module operation used by the page.
  */
-
 async function renderReportsModule() {
   const content = app.querySelector('.content')
   try {
@@ -2023,7 +2013,6 @@ async function renderReportsModule() {
  * Renders or performs the render assistant module operation used by the page.
  * @param {*} target Value supplied to this operation.
  */
-
 async function renderAssistantModule(target = app.querySelector('.content')) {
   const content = target
   const permissionData = await api.permissions()
@@ -2148,7 +2137,6 @@ function printAssistantReport(advice, charts) {
 /**
  * Renders or performs the render livestock module operation used by the page.
  */
-
 async function renderLivestockModule() {
   // Handles the user or browser event registered below.
   const content=app.querySelector('.content'); try { const data=await api.animals(); content.innerHTML=`<header><div><p class="kicker">FARM MODULE</p><h1>Livestock register</h1><p class="muted">Register and review the herd.</p></div><span class="health-pill">${data.animals.length} animals</span></header><section class="panel module-panel"><form id="animal-module-form" class="compact-form"><input name="tagNumber"   placeholder="e.g. CAT-001" required><select name="species"><option value="cattle">Cattle</option><option value="goat">Goat</option><option value="rabbit">Rabbit</option><option value="chicken">Chicken</option><option value="sheep">Sheep</option></select>  <input name="breed" placeholder="e.g. Friesian or Kienyeji"><select name="sex"><option value="female">Female</option><option value="male">Male</option></select><button>Add animal</button></form><div id="animal-module-feedback" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Species</th><th>Breed</th><th>Status</th></tr></thead><tbody>${data.animals.map((a)=>`<tr><td>${escapeHtml(a.tag_number)}</td><td>${a.species}</td><td>${escapeHtml(a.breed||'—')}</td><td>${a.status}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No animals yet.</td></tr>'}</tbody></table></div></section>`; content.querySelector('form').addEventListener('submit',async(e)=>{e.preventDefault();try{await api.createAnimal(Object.fromEntries(new FormData(e.target)));await renderLivestockModule()}catch(error){content.querySelector('#animal-module-feedback').innerHTML=message(error.message,true)}}) } catch(error){content.innerHTML=message(error.message,true)}
@@ -2157,7 +2145,6 @@ async function renderLivestockModule() {
 /**
  * Renders or performs the render health module operation used by the page.
  */
-
 async function renderHealthModule() {
   const content = app.querySelector('.content')
   const speciesNames = { cattle: 'Cattle', goat: 'Goat', sheep: 'Sheep', rabbit: 'Rabbit', chicken: 'Chicken', other: 'Other' }
@@ -2196,7 +2183,6 @@ async function renderHealthModule() {
 /**
  * Renders or performs the render users module operation used by the page.
  */
-
 async function renderUsersModule() {
   const content = app.querySelector('.content')
   try {
@@ -2230,7 +2216,6 @@ async function renderUsersModule() {
 /**
  * Renders or performs the render permissions module operation used by the page.
  */
-
 async function renderPermissionsModule() {
   const content = app.querySelector('.content')
   try {
@@ -2254,7 +2239,6 @@ async function renderPermissionsModule() {
  * Renders or performs the render audit module operation used by the page.
  * @param {*} filters Value supplied to this operation.
  */
-
 async function renderAuditModule(filters = {}) {
   const content = app.querySelector('.content')
   try {
@@ -2294,7 +2278,6 @@ async function renderAuditModule(filters = {}) {
  * Renders or performs the render rights module operation used by the page.
  * @param {*} target Value supplied to this operation.
  */
-
 async function renderRightsModule(target = app.querySelector('.content')) {
   const content = target
   try {
@@ -2356,7 +2339,6 @@ async function renderFeedbackModule() {
  * Renders or performs the render role workspace operation used by the page.
  * @param {*} initialModule Value supplied to this operation.
  */
-
 async function renderRoleWorkspace(initialModule) {
   const workspaces = {
     worker: { title: 'Daily operations', description: 'Production, farm tasks and stock movements.', modules: ['Home', 'Production', 'Activities', 'Inventory', 'Feedback', 'Assistant', 'Your rights'] },
@@ -2615,7 +2597,6 @@ async function renderRoleModule(module) {
 /**
  * Renders or performs the start operation used by the page.
  */
-
 async function start() {
   const resetToken = new URLSearchParams(window.location.search).get('reset')
   if (resetToken) {
