@@ -9,7 +9,18 @@ const animals = [
   ['cow', 'Cattle'], ['goat', 'Goats'], ['sheep', 'Sheep'], ['chicken', 'Chickens'], ['rabbit', 'Rabbits'],
 ]
 
+/**
+ * Handles the escape html operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
+/**
+ * Handles the format event date operation and returns its result.
+ * @param {*} date Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
 export const formatEventDate = (date) => new Date(`${date}T12:00:00`).toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 export function renderLanding(root, openSetup, openLogin) {

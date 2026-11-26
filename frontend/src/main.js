@@ -39,6 +39,10 @@ function installTablePagination(root = app) {
     controls.className = 'table-pagination'
     controls.innerHTML = '<button type="button" class="secondary-action" data-page-prev>Previous</button><span aria-live="polite"></span><button type="button" class="secondary-action" data-page-next>Next</button>'
     tbody.closest('.table-wrap').after(controls)
+    /**
+ * Handles the update operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const update = () => {
       const visibleRows = rows.filter((row) => row.dataset.filteredOut !== 'true')
       const pages = Math.max(1, Math.ceil(visibleRows.length / pageSize))
@@ -59,10 +63,38 @@ function installTablePagination(root = app) {
 
 new MutationObserver(() => installTablePagination()).observe(app, { childList: true, subtree: true })
 
+/**
+ * Handles the escape html operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
+/**
+ * Handles the nairobi date operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
 const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+/**
+ * Handles the message operation and returns its result.
+ * @param {*} text Value supplied to this operation.
+ * @param {*} danger Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
+/**
+ * Handles the role copy operation and returns its result.
+ * @param {*} english Value supplied to this operation.
+ * @param {*} swahili Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
 const roleCopy = (english, swahili) => roleLanguage === 'sw' && ['worker', 'veterinarian'].includes(currentUser?.role) ? swahili : english
+/**
+ * Handles the data export form operation and returns its result.
+ * @param {*} groups Value supplied to this operation.
+ * @param {*} id Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
 const dataExportForm = (groups, id = 'data-export-form') => `<form id="${id}" class="compact-form data-export-form"><fieldset><legend>Choose records to include</legend><label class="export-section-option"><input type="checkbox" data-export-select-all> Select all available groups</label><div class="export-section-list">${groups.map((group) => `<label class="export-section-option"><input type="checkbox" name="sections" value="${escapeHtml(group.id)}"> ${escapeHtml(group.label)}</label>`).join('')}</div></fieldset><label>Download format<select name="format"><option value="pdf">PDF document</option><option value="csv">CSV spreadsheet</option><option value="excel">Excel workbook (.xls)</option><option value="json">JSON data</option><option value="zip">ZIP archive (separate CSV files)</option></select></label><label>Current authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required></label><button>Download selected records</button></form>`
 
 /**
@@ -78,6 +110,11 @@ function sectionCsv(section, rows) {
     const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))]
     csvRows.push(headers, ...rows.map((row) => headers.map((header) => row[header] ?? '')))
   }
+  /**
+ * Handles the cell operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const cell = (value) => {
     let text = String(value ?? '')
     if (/^[\s]*[=+@\-]/.test(text)) text = `'${text}`
@@ -99,6 +136,11 @@ function createZip(files) {
     for (let bit = 0; bit < 8; bit += 1) value = (value & 1) ? (0xEDB88320 ^ (value >>> 1)) : (value >>> 1)
     crcTable[index] = value >>> 0
   }
+  /**
+ * Handles the crc32 operation and returns its result.
+ * @param {*} bytes Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const crc32 = (bytes) => {
     let value = 0xFFFFFFFF
     bytes.forEach((byte) => { value = crcTable[(value ^ byte) & 0xFF] ^ (value >>> 8) })
@@ -189,6 +231,11 @@ function downloadDataExport(result) {
       }
       csvRows.push([])
     }
+    /**
+ * Handles the cell operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
     const cell = (value) => {
       let text = String(value ?? '')
       if (/^[\s]*[=+@\-]/.test(text)) text = `'${text}`
@@ -197,10 +244,26 @@ function downloadDataExport(result) {
     blob = new Blob(['\uFEFF' + csvRows.map((row) => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
     extension = 'csv'
   } else if (result.format === 'excel') {
+    /**
+ * Handles the xml escape operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
     const xmlEscape = (value) => String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+    /**
+ * Handles the worksheet operation and returns its result.
+ * @param {*} name Value supplied to this operation.
+ * @param {*} rows Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
     const worksheet = (name, rows) => {
       const sheetName = name.replace(/[\\/:?*\[\]]/g, '_').slice(0, 31) || 'Records'
       const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))]
+      /**
+ * Handles the cell operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
       const cell = (value) => {
         const numeric = typeof value === 'number' && Number.isFinite(value)
         return `<Cell><Data ss:Type="${numeric ? 'Number' : 'String'}">${xmlEscape(numeric ? value : value ?? '')}</Data></Cell>`
@@ -413,6 +476,11 @@ function enhanceDataTable(table) {
   }
   search.value = String(savedState.search || '')
 
+  /**
+ * Handles the update bulk buttons operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
+
   let updateBulkButtons = () => {}
   if (table.dataset.bulkOrders === 'true') {
     const actions = document.createElement('div')
@@ -435,10 +503,31 @@ function enhanceDataTable(table) {
     actions.append(quote, accept, fulfill, cancel, feedback)
     toolbar.append(actions)
 
+    /**
+ * Handles the visible orders operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
+
     const visibleOrders = () => [...table.tBodies[0].rows].filter((row) => !row.hidden && row.dataset.orderId)
+    /**
+ * Handles the quote ids operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const quoteIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'pending').map((row) => Number(row.dataset.orderId))
+    /**
+ * Handles the accept ids operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const acceptIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'quoted' && row.dataset.orderCanAccept === 'true').map((row) => Number(row.dataset.orderId))
+    /**
+ * Handles the fulfill ids operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const fulfillIds = () => visibleOrders().filter((row) => row.dataset.orderStatus === 'accepted').map((row) => Number(row.dataset.orderId))
+    /**
+ * Handles the cancel ids operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const cancelIds = () => visibleOrders().filter((row) => ['pending', 'quoted', 'accepted'].includes(row.dataset.orderStatus)).map((row) => Number(row.dataset.orderId))
     updateBulkButtons = () => {
       const quoteCount = quoteIds().length
@@ -454,6 +543,13 @@ function enhanceDataTable(table) {
       fulfill.disabled = fulfillCount === 0
       cancel.disabled = cancelCount === 0
     }
+
+    /**
+ * Handles the submit bulk action operation and returns its result.
+ * @param {*} status Value supplied to this operation.
+ * @param {*} ids Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
 
     const submitBulkAction = async (status, ids) => {
       if (ids.length === 0) return
@@ -475,6 +571,10 @@ function enhanceDataTable(table) {
         updateBulkButtons()
       }
     }
+    /**
+ * Handles the quote visible orders operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const quoteVisibleOrders = async () => {
       const ids = quoteIds()
       if (!ids.length) return
@@ -519,6 +619,11 @@ function enhanceDataTable(table) {
   toolbar.append(resultCount)
   wrapper.parentElement.insertBefore(toolbar, wrapper)
 
+  /**
+ * Handles the filter rows operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
+
   const filterRows = () => {
     const query = search.value.trim().toLocaleLowerCase()
     const wantedStatus = statusFilter?.value || ''
@@ -551,6 +656,11 @@ const tableObserver = new MutationObserver(() => {
   app.querySelectorAll('.content .table-wrap table').forEach(enhanceDataTable)
 })
 tableObserver.observe(app, { childList: true, subtree: true })
+/**
+ * Handles the role module label operation and returns its result.
+ * @param {*} module Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
 const roleModuleLabel = (module) => {
   if (!['worker', 'veterinarian'].includes(currentUser?.role)) return module
   const labels = {
@@ -664,7 +774,17 @@ function renderTwoFactorChallenge(methods, notice = '') {
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-FACTOR AUTHENTICATION</p><h1>Verify it’s you</h1><p class="muted">Enter the code sent to your verified account email. Codes expire after 10 minutes.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><div class="button-row">${methodButtons}</div><form id="two-factor-code-form" hidden><label>6-digit code<input name="code" placeholder="e.g. 123456" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and sign in</button><button id="two-factor-resend" class="text-link" type="button">Send another code</button></form><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
   const codeForm = app.querySelector('#two-factor-code-form')
   let selectedMethod = ''
+  /**
+ * Handles the show error operation and returns its result.
+ * @param {*} error Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const showError = (error) => { app.querySelector('#two-factor-notice').innerHTML = message(error.message, true) }
+  /**
+ * Handles the send code operation and returns its result.
+ * @param {*} method Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const sendCode = async (method) => {
     selectedMethod = method
     try {
@@ -707,6 +827,12 @@ async function loadPublicTrends() {
   if (!content) return
   try {
     const data = await api.trends()
+    /**
+ * Handles the render group operation and returns its result.
+ * @param {*} title Value supplied to this operation.
+ * @param {*} group Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
     const renderGroup = (title, group) => {
       const articles = group.articles || []
       const rows = articles.map((article) => {
@@ -846,6 +972,11 @@ async function renderAccountSecurity(forced = false) {
     renderAuth('login')
   })
   const notice = app.querySelector('#security-notice')
+  /**
+ * Handles the show codes operation and returns its result.
+ * @param {*} codes Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const showCodes = (codes) => { app.querySelector('#recovery-values').textContent = codes.join('\n'); app.querySelector('#recovery-once').hidden = false }
   // Handles the user or browser event registered below.
   app.querySelector('#start-totp')?.addEventListener('click', async () => {
@@ -929,6 +1060,10 @@ async function renderApp() {
   app.querySelector('aside .brand').after(notificationControl)
   const notificationToggle = notificationControl.querySelector('.notification-toggle')
   const notificationPopover = notificationControl.querySelector('.notification-popover')
+  /**
+ * Handles the refresh notifications operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
   const refreshNotifications = async () => {
     const data = await api.notifications()
     const notifications = data.notifications || []
@@ -1041,6 +1176,10 @@ async function renderAnimalProfilesModule(animalId = null) {
     content.innerHTML = `<header><div><p class="kicker">ANIMAL RECORDS</p><h1>Animal profiles</h1><p class="muted">Open an individual record to see its identity, status, care, production and sale history.</p></div><span class="health-pill">${animals.length} animals</span></header><section class="panel"><div class="animal-profile-filters"><input id="animal-profile-search" type="search" placeholder="Search by tag, name or breed" aria-label="Search animals"><select id="animal-profile-status-filter" aria-label="Filter animals by status"><option value="">All statuses</option><option value="active">Active</option><option value="sold">Sold</option><option value="deceased">Deceased</option><option value="transferred">Transferred</option></select><select id="animal-profile-species-filter" aria-label="Filter animals by species"><option value="">All species</option>${speciesOptions}</select><span class="muted animal-record-count">${animals.length} records</span></div><div class="table-wrap"><table data-animal-directory data-no-tools="true"><thead><tr><th>Tag</th><th>Name</th><th>Species</th><th>Breed</th><th>Status</th><th></th></tr></thead><tbody>${animals.map((animal) => `<tr data-tag="${escapeHtml(animal.tag_number.toLowerCase())}" data-name="${escapeHtml((animal.name || '').toLowerCase())}" data-breed="${escapeHtml((animal.breed || '').toLowerCase())}" data-species="${escapeHtml(animal.species)}" data-status="${escapeHtml(animal.status)}"><td>${escapeHtml(animal.tag_number)}</td><td>${escapeHtml(animal.name || '—')}</td><td>${escapeHtml(animal.species)}</td><td>${escapeHtml(animal.breed || '—')}</td><td><span class="status">${escapeHtml(animal.status)}</span></td><td><button class="small-action" data-open-animal="${Number(animal.id)}">Open profile</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No animals registered.</td></tr>'}</tbody></table></div></section>`
     const directory = content.querySelector('[data-animal-directory]')
     const directoryRows = [...directory.querySelectorAll('tbody tr')]
+    /**
+ * Handles the filter directory operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const filterDirectory = () => {
       const query = content.querySelector('#animal-profile-search').value.trim().toLowerCase()
       const status = content.querySelector('#animal-profile-status-filter').value
@@ -1078,6 +1217,14 @@ async function renderAnimalProfilesModule(animalId = null) {
 async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDetails, onBack) {
   const profile = await api.animalProfile(animalId)
   const animal = profile.animal
+  /**
+ * Handles the table operation and returns its result.
+ * @param {*} title Value supplied to this operation.
+ * @param {*} columns Value supplied to this operation.
+ * @param {*} rows Value supplied to this operation.
+ * @param {*} empty Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const table = (title, columns, rows, empty) => `<section class="panel"><h2>${title}</h2><div class="table-wrap"><table><thead><tr>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${columns.length}" class="empty">${empty}</td></tr>`}</tbody></table></div></section>`
   target.innerHTML = `<header><div><p class="kicker">INDIVIDUAL ANIMAL RECORD</p><h1>${escapeHtml(animal.name || animal.tag_number)}</h1><p class="muted">${escapeHtml(animal.tag_number)} - ${escapeHtml(animal.species)} - ${escapeHtml(animal.breed || 'Breed not recorded')}</p></div><div class="animal-profile-actions"><button type="button" class="secondary-action" id="animal-profile-download">Download details</button><button type="button" class="secondary-action" id="animal-profile-back">Back to animal profiles</button></div></header><section class="panel animal-profile-summary"><div class="stats"><div><small>Status</small><strong>${escapeHtml(animal.status)}</strong>${animal.status_changed_at ? `<small>Updated ${escapeHtml(animal.status_changed_at)}</small>` : ''}</div><div><small>Sex</small><strong>${escapeHtml(animal.sex)}</strong></div><div><small>Date of birth</small><strong>${escapeHtml(animal.date_of_birth || 'Not recorded')}</strong></div><div><small>Weight</small><strong>${animal.weight_kg ? `${Number(animal.weight_kg).toLocaleString()} kg` : 'Not recorded'}</strong></div></div><p>${escapeHtml(animal.notes || 'No additional notes.')}</p>${canChangeStatus ? `<form id="animal-profile-status" class="compact-form"><label>Animal status<select name="status"><option value="active" ${animal.status === 'active' ? 'selected' : ''}>Active on farm</option><option value="sold" ${animal.status === 'sold' ? 'selected' : ''}>Sold</option><option value="deceased" ${animal.status === 'deceased' ? 'selected' : ''}>Deceased</option><option value="transferred" ${animal.status === 'transferred' ? 'selected' : ''}>Transferred</option></select></label><button>Update status</button></form><div id="animal-profile-feedback" aria-live="polite"></div>` : ''}</section>${table('Health and care history', ['Date', 'Type', 'Description', 'Medication'], profile.healthRecords.map((item) => `<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.medication || '-')}</td></tr>`).join(''), 'No health records for this animal.')}${table('Individual production history', ['Date', 'Produce', 'Session', 'Quantity'], profile.productionRecords.map((item) => `<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '-')}</td><td>${Number(item.quantity_produced).toLocaleString()} ${escapeHtml(item.unit)}</td></tr>`).join(''), 'No individual production records. Flock-level eggs are not assigned to individual animals.')}${table('Activities', ['Date', 'Activity', 'Details', 'Status'], profile.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td></tr>`).join(''), 'No activities linked to this animal.')}${table('Sale and order history', ['Order', 'Customer', 'Status', 'Order date', 'Fulfilled'], profile.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.customer_name || '-')}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.fulfilled_at || '-')}</td></tr>`).join(''), 'No sale or order history for this animal.')}`
   // Handles the user or browser event registered below.
@@ -1125,7 +1272,18 @@ function downloadAnimalProfile(profile) {
     { name: 'Activities', columns: [['Date', 'activity_at', 115], ['Activity', 'activity_type', 100], ['Details', 'description', 280], ['Status', 'status', 90], ['Completed', 'completed_at', 115]], rows: profile.activities || [] },
     { name: 'Sale history', columns: [['Order', 'id', 75], ['Customer', 'customer_name', 180], ['Status', 'status', 90], ['Total (KES)', 'total_amount', 100], ['Order date', 'ordered_at', 115], ['Fulfilled date', 'fulfilled_at', 115]], rows: profile.orders || [] },
   ]
+  /**
+ * Handles the xml escape operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const xmlEscape = (value) => String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+  /**
+ * Handles the cell operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @param {*} style Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const cell = (value, style = 'text') => {
     const numeric = typeof value === 'number' && Number.isFinite(value)
     return `<Cell ss:StyleID="${style}"><Data ss:Type="${numeric ? 'Number' : 'String'}">${xmlEscape(value)}</Data></Cell>`
@@ -1209,6 +1367,10 @@ async function renderEventsModule() {
     }).join('') : '<p class="empty">No events yet. Create a draft or publish your first event.</p>'}</div></section></section>`
 
     const form = content.querySelector('#event-form')
+    /**
+ * Handles the reset form operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const resetForm = () => {
       form.reset()
       form.elements.namedItem('id').value = ''
@@ -1272,6 +1434,11 @@ function bindProductionEditor(root, records, refresh) {
   if (!form) return
   let feedback = root.querySelector('#production-feedback')
   if (!feedback) { feedback = document.createElement('div'); feedback.id = 'production-feedback'; feedback.setAttribute('aria-live', 'polite'); form.after(feedback) }
+  /**
+ * Handles the load record operation and returns its result.
+ * @param {*} record Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const loadRecord = (record) => {
     form.dataset.recordId = record.id
     for (const [field, value] of Object.entries({ produceName: record.produce_name, productionDate: record.production_date, session: record.production_session || '', animalId: record.animal_id || '', quantityProduced: record.quantity_produced, quantitySold: record.quantity_sold, quantityDamaged: record.quantity_damaged, unit: record.unit, notes: record.notes || '' })) {
@@ -1334,6 +1501,10 @@ function bindRecentProduceFilters(root) {
   const panel = [...root.querySelectorAll('.module-grid > .panel')].find((item) => item.querySelector('#produce-filter-name'))
   if (!panel) return
   const rows = [...panel.querySelectorAll('tbody tr[data-produce]')]
+  /**
+ * Handles the apply operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
   const apply = () => {
     const product = panel.querySelector('#produce-filter-name').value
     const from = panel.querySelector('#produce-filter-from').value
@@ -1356,7 +1527,17 @@ function bindRecentProduceFilters(root) {
  */
 
 function renderProductionSummary(summary) {
+  /**
+ * Handles the format operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const format = (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  /**
+ * Handles the totals rows operation and returns its result.
+ * @param {*} totals Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const totalsRows = (totals) => Object.entries(totals).map(([product, amounts]) => `<tr><td>${escapeHtml(product)}</td><td>${format(amounts.produced)}</td><td>${format(amounts.sold)}</td><td>${format(amounts.damaged)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No records for this period.</td></tr>'
   const firstDay = new Date(`${summary.weekStart}T00:00:00Z`)
   const dates = Array.from({ length: 7 }, (_, index) => new Date(firstDay.getTime() + index * 86400000).toISOString().slice(0, 10))
@@ -1487,6 +1668,11 @@ async function renderCommerceModule() {
         })
       })
     }
+    /**
+ * Handles the show commerce error operation and returns its result.
+ * @param {*} error Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
     const showCommerceError = (error) => {
       let feedback = content.querySelector('#commerce-feedback')
       if (!feedback) {
@@ -1563,8 +1749,24 @@ function renderForecastChart(observations, predictions, unit = 'litres') {
   const minimum = Math.min(...quantities)
   const maximum = Math.max(...quantities)
   const range = Math.max(maximum - minimum, 1)
+  /**
+ * Handles the x operation and returns its result.
+ * @param {*} index Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const x = (index) => left + index * (width - left - right) / Math.max(values.length - 1, 1)
+  /**
+ * Handles the y operation and returns its result.
+ * @param {*} quantity Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const y = (quantity) => top + (maximum - Number(quantity)) * (height - top - bottom) / range
+  /**
+ * Handles the path operation and returns its result.
+ * @param {*} items Value supplied to this operation.
+ * @param {*} offset Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const path = (items, offset = 0) => items.map((item, index) => `${index === 0 ? 'M' : 'L'} ${x(index + offset).toFixed(1)} ${y(item.litres).toFixed(1)}`).join(' ')
   const actualPath = path(actual)
   const forecastPath = actual.length ? path([actual[actual.length - 1], ...predictions], actual.length - 1) : path(predictions)
@@ -1603,7 +1805,17 @@ function renderForecastPanel(data, error, selectedProduct = 'milk', productOptio
   const actual = data.observations || []
   const checks = data.insights?.checks || []
   const unit = data.unit || selectedInfo?.unit || 'units'
+  /**
+ * Handles the format quantity operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const formatQuantity = (value) => `${Number(value).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${unit}`
+  /**
+ * Handles the format mae operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const formatMae = (value) => `${Number(value).toFixed(2)} ${unit}`
   const improvement = Number(backtest.improvementPct)
   const verdict = improvement > 0
@@ -1638,8 +1850,24 @@ async function renderFarmTrendsModule() {
   let historyRange = '7d'
   let data = null
 
+  /**
+ * Handles the money operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
+
   const money = (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  /**
+ * Handles the format date operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const formatDate = (value) => value ? new Date(String(value).replace(' ', 'T') + (String(value).includes('Z') ? '' : 'Z')).toLocaleString() : 'Not available'
+
+  /**
+ * Handles the render live operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
 
   const renderLive = () => {
     const group = data?.[scope] || data?.regional || {}
@@ -1655,6 +1883,11 @@ async function renderFarmTrendsModule() {
     return `<section class="panel trend-section"><h2>Live trends</h2><p class="muted">EXTERNAL LIVE DATA: GDELT agriculture and food-security reporting. Publication and retrieval times are shown separately.</p>${rows || `<p class="empty">${group.unavailable ? 'Live feed is temporarily unavailable.' : 'No current agricultural reports found.'}</p>`}</section>`
   }
 
+  /**
+ * Handles the render synthetic operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
+
   const renderSynthetic = () => {
     const scopeData = data?.synthetic?.scopes?.[scope] || { categories: {} }
     const cards = Object.entries(scopeData.categories || {}).flatMap(([category, metrics]) =>
@@ -1663,6 +1896,11 @@ async function renderFarmTrendsModule() {
     return `<section class="panel trend-section"><h2>Simulated trends</h2><p class="forecast-warning"><strong>SIMULATED DATA — NOT REAL MARKET INFORMATION</strong></p><div class="synthetic-grid">${cards || '<p class="empty">No synthetic indicators are available yet.</p>'}</div><h3>Active simulated events</h3><ul class="simulated-events">${events || '<li class="empty">No active simulated events.</li>'}</ul></section>`
   }
 
+  /**
+ * Handles the render farm operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
+
   const renderFarm = () => {
     const farm = data?.actualFarm?.metrics
     if (!farm) return `<section class="panel trend-section"><h2>Actual farm performance</h2><p class="empty">No actual farm records are available.</p></section>`
@@ -1670,11 +1908,21 @@ async function renderFarmTrendsModule() {
     return `<section class="panel trend-section"><h2>Actual farm performance</h2><p class="muted">ACTUAL FARM DATA: measured operational records. These values are not market forecasts.</p><div class="stats trends-farm-stats"><div><small>Milk today</small><strong>${money(farm.milk.todayTotal)} L</strong><small>Morning ${money(farm.milk.morning)} · Evening ${money(farm.milk.evening)}</small></div><div><small>Eggs today</small><strong>${money(farm.eggs.todayTotal)} trays</strong></div><div><small>Active livestock</small><strong>${Number(farm.livestock.activeCount)}</strong></div><div><small>Inventory shortages</small><strong>${Number(farm.inventory.shortagesCount)}</strong></div><div><small>Sales this month</small><strong>KES ${money(farm.finance.salesThisMonth)}</strong></div><div><small>Expenses this month</small><strong>KES ${money(farm.finance.expensesThisMonth)}</strong></div></div><div class="weather-grid"><section><h3>Weather & climate</h3>${weather ? `<p>Latest observation: ${escapeHtml(weather.observation_date)}</p><p>Rainfall: ${money(weather.rain_mm)} mm · Temperature: ${money(weather.temp_c)} °C</p><small>Source: ${escapeHtml(weather.source)} · Recorded/fetched separately from forecasts.</small>` : '<p class="empty">No weather observations recorded.</p>'}</section><section><h3>Forecast caveat</h3><p class="muted">Historical observations, forecasts and synthetic weather scenarios must be kept separate. No synthetic weather scenario is presented here.</p></section></div></section>`
   }
 
+  /**
+ * Handles the render status operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
+
   const renderStatus = () => {
     const status = data?.status || {}
     const log = status.lastLog
     return `<section class="panel trend-status"><h2>Trend status</h2><div class="trend-status-grid"><div><small>Current reporting window</small><strong>${escapeHtml(status.currentPeriod || 'Calculating')}</strong></div><div><small>Next scheduled refresh</small><strong>${escapeHtml(status.nextScheduledRefresh ? formatDate(status.nextScheduledRefresh) : 'Not available')}</strong></div><div><small>Last job</small><strong>${escapeHtml(log ? formatDate(log.completed_at) : 'No refresh recorded')}</strong></div><div><small>Live / synthetic / farm</small><strong>${escapeHtml(log?.live_status || 'unknown')} / ${escapeHtml(log?.synthetic_status || 'unknown')} / ${escapeHtml(log?.actual_farm_status || 'unknown')}</strong></div></div><small>Missed periods: ${Number(status.missedPeriodsCount || 0)} · timezone: Africa/Nairobi</small></section>`
   }
+
+  /**
+ * Handles the render history operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
 
   const renderHistory = async () => {
     try {
@@ -1704,6 +1952,11 @@ async function renderFarmTrendsModule() {
       return `<section class="panel trend-section"><h2>Trend history</h2>${message(error.message, true)}</section>`
     }
   }
+
+  /**
+ * Handles the load operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
 
   const load = async () => {
     content.querySelector('#trends-content').innerHTML = '<p class="muted">Loading agricultural intelligence...</p>'
@@ -1761,6 +2014,11 @@ async function renderReportsModule() {
     let operations = null
     let operationsError = null
     try { operations = await api.operationalReports() } catch (error) { operationsError = error }
+    /**
+ * Handles the money operation and returns its result.
+ * @param {*} value Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
     const money = (value) => Math.round(Number(value)).toLocaleString()
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Reports</h1><p class="muted">Monthly financial performance and production forecasts from recorded products.</p></div><span class="health-pill">Current month</span></header><section class="stats"><div><small>Sales</small><strong>KES ${money(finance.salesThisMonth)}</strong></div><div><small>Confirmed payments</small><strong>KES ${money(finance.confirmedPaymentsThisMonth)}</strong></div><div><small>Expenses</small><strong>KES ${money(finance.expensesThisMonth)}</strong></div><div><small>Estimated net</small><strong>KES ${money(finance.estimatedNet)}</strong></div></section><section class="panel"><h2>Finance summary</h2><p class="muted">These totals are calculated from the records entered in Sales, Payments and Expenses.</p></section>${renderForecastPanel(forecastData, forecastError, initialProduct, forecastProducts)}`
     const annualReport = document.createElement('section')
@@ -1773,6 +2031,11 @@ async function renderReportsModule() {
       annualReport.innerHTML = `<h2>12-month operations</h2><p class="muted">Monthly production, recorded sales, expenses and estimated net.</p><div class="annual-health-summary"><div><small>Health records this month</small><strong>${Number(operations.health.healthRecordsThisMonth)}</strong></div><div><small>Open follow-ups due</small><strong>${Number(operations.health.followUpsDue)}</strong></div><div><small>Overdue follow-ups</small><strong>${Number(operations.health.overdueFollowUps)}</strong></div></div><div class="table-wrap"><table><thead><tr><th>Month</th><th>Milk (L)</th><th>Eggs (trays)</th><th>Sales</th><th>Expenses</th><th>Estimated net</th></tr></thead><tbody>${operations.months.map((month) => `<tr><td>${escapeHtml(month.month)}</td><td>${Number(month.production[milkKey] || 0).toLocaleString()}</td><td>${Number(month.production[eggsKey] || 0).toLocaleString()}</td><td>KES ${money(month.sales)}</td><td>KES ${money(month.expenses)}</td><td>KES ${money(month.net)}</td></tr>`).join('')}</tbody></table></div>`
     }
     content.querySelector('.forecast-panel').before(annualReport)
+    /**
+ * Handles the handle forecast product operation and returns its result.
+ * @param {*} event Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
     const handleForecastProduct = async (event) => {
       const product = event.target.value
       const panel = content.querySelector('.forecast-panel')
@@ -1944,6 +2207,10 @@ async function renderHealthModule() {
 
     const rows = content.querySelector('#health-record-rows')
     const filter = content.querySelector('#health-species-filter')
+    /**
+ * Handles the render rows operation and returns its result.
+ * @returns {*} Result of this operation.
+ */
     const renderRows = () => {
       const visibleRecords = data.records.filter((record) => !filter.value || record.species === filter.value)
       content.querySelector('#health-record-count').textContent = `${visibleRecords.length} records`
@@ -2179,6 +2446,11 @@ async function renderRoleWorkspace(initialModule) {
  */
 async function renderRoleModule(module) {
   const content = app.querySelector('#role-content')
+  /**
+ * Handles the show error operation and returns its result.
+ * @param {*} error Value supplied to this operation.
+ * @returns {*} Result of this operation.
+ */
   const showError = (error) => { content.innerHTML = message(error.message, true) }
   if (module === 'Assistant') {
     await renderAssistantModule(content)
