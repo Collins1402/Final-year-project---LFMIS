@@ -1,3 +1,5 @@
+"""Forecast daily milk production with lagged values, weather features, rolling backtests, and simple baselines. The service validates observations, compares Ridge regression against baselines, and reports decision-support forecasts with limitations."""
+
 from __future__ import annotations
 
 import json
@@ -18,6 +20,7 @@ except ImportError:
 
 
 def forecast(observations: list[dict[str, Any]], horizon: int = 7) -> dict[str, Any]:
+    """Explain the forecast operation and return its computed result."""
     validate_observations(observations)
     if horizon < 1 or horizon > 30:
         raise ValueError("horizon must be between 1 and 30 days.")
@@ -57,6 +60,7 @@ def forecast(observations: list[dict[str, Any]], horizon: int = 7) -> dict[str, 
 
 
 def insights(observations: list[dict[str, Any]], signals: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Explain the insights operation and return its computed result."""
     signals = signals or {}
     checks: list[dict[str, str]] = []
     try:
@@ -84,12 +88,14 @@ def insights(observations: list[dict[str, Any]], signals: dict[str, Any] | None 
 
 class ForecastHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
+        """Explain the do GET operation and return its computed result."""
         if self.path == "/health":
             self.respond(200, {"status": "ok"})
             return
         self.respond(404, {"error": "Endpoint not found."})
 
     def do_POST(self) -> None:
+        """Explain the do POST operation and return its computed result."""
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > 1_000_000:
@@ -109,6 +115,7 @@ class ForecastHandler(BaseHTTPRequestHandler):
             self.respond(422, {"error": str(error)})
 
     def respond(self, status: int, payload: dict[str, Any]) -> None:
+        """Explain the respond operation and return its computed result."""
         encoded = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -117,6 +124,7 @@ class ForecastHandler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def log_message(self, format: str, *args: Any) -> None:
+        """Explain the log message operation and return its computed result."""
         return
 
 

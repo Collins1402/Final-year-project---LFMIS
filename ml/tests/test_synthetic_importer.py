@@ -1,3 +1,5 @@
+"""Proves the ML forecasting, feature, evaluation, and import behavior covered by this test module."""
+
 from pathlib import Path
 
 import openpyxl
@@ -6,6 +8,11 @@ from scripts.import_synthetic_workbook import build_sql, unique_customer_map
 
 
 def test_workbook_converter_remaps_orders_and_labels_data(tmp_path):
+    """Runs the test workbook converter remaps orders and labels data step and returns the result used by this module.
+
+    :param tmp_path: Input used in this calculation.
+    :return: The computed result or requested operation outcome.
+    """
     workbook = openpyxl.Workbook()
     workbook.remove(workbook.active)
 
@@ -51,6 +58,9 @@ def test_workbook_converter_remaps_orders_and_labels_data(tmp_path):
 
 
 def test_customer_ids_are_remapped_without_colliding_with_real_ids():
+    """Runs the test customer ids are remapped without colliding with real ids step and returns the result used by this module.
+    :return: The computed result or requested operation outcome.
+    """
     mapping = unique_customer_map([
         {"id": 1},
         {"id": 60},

@@ -1,3 +1,5 @@
+"""Forecast daily milk production with lagged values, weather features, rolling backtests, and simple baselines. The service validates observations, compares Ridge regression against baselines, and reports decision-support forecasts with limitations."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -31,6 +33,7 @@ class Metrics:
 
 
 def validate_observations(observations: list[dict[str, Any]], minimum_days: int = 21) -> None:
+    """Explain the validate observations operation and return its computed result."""
     if len(observations) < minimum_days:
         raise ValueError(f"At least {minimum_days} consecutive recorded production days are required.")
     dates = []
@@ -50,6 +53,7 @@ def validate_observations(observations: list[dict[str, Any]], minimum_days: int 
 
 
 def metrics(actual: list[float], predicted: list[float]) -> Metrics:
+    """Explain the metrics operation and return its computed result."""
     errors = np.subtract(actual, predicted)
     non_zero = [abs(value) for value in actual if abs(value) > 1e-9]
     mape = None if not non_zero else float(np.mean([abs(error / value) for error, value in zip(errors, actual) if abs(value) > 1e-9]) * 100)
@@ -57,6 +61,7 @@ def metrics(actual: list[float], predicted: list[float]) -> Metrics:
 
 
 def baseline_predictions(values: list[float], start: int, kind: str) -> list[float]:
+    """Explain the baseline predictions operation and return its computed result."""
     predictions: list[float] = []
     for index in range(start, len(values)):
         if kind == "naive":
@@ -71,6 +76,7 @@ def baseline_predictions(values: list[float], start: int, kind: str) -> list[flo
 
 
 def model_backtest(observations: list[dict[str, Any]], use_weather: bool) -> tuple[Metrics, int]:
+    """Explain the model backtest operation and return its computed result."""
     values = [float(item["litres"]) for item in observations]
     start = max(14, 7)
     predictions: list[float] = []
@@ -88,6 +94,7 @@ def model_backtest(observations: list[dict[str, Any]], use_weather: bool) -> tup
 
 
 def evaluate_observations(observations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Explain the evaluate observations operation and return its computed result."""
     validate_observations(observations)
     values = [float(item["litres"]) for item in observations]
     start = 14
@@ -111,6 +118,7 @@ def evaluate_observations(observations: list[dict[str, Any]]) -> list[dict[str, 
 
 
 def load_csv(path: Path) -> tuple[list[dict[str, Any]], dict[str, int], int]:
+    """Explain the load csv operation and return its computed result."""
     missing = {field: 0 for field in CSV_FIELDS}
     observations: list[dict[str, Any]] = []
     with path.open(newline="", encoding="utf-8-sig") as handle:
@@ -136,6 +144,7 @@ def load_csv(path: Path) -> tuple[list[dict[str, Any]], dict[str, int], int]:
 
 
 def evaluation_report(source: Path, observations: list[dict[str, Any]], missing: dict[str, int], row_count: int) -> str:
+    """Explain the evaluation report operation and return its computed result."""
     lines = [
         "# ML Evaluation",
         "",

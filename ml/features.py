@@ -1,3 +1,5 @@
+"""Forecast daily milk production with lagged values, weather features, rolling backtests, and simple baselines. The service validates observations, compares Ridge regression against baselines, and reports decision-support forecasts with limitations."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -9,6 +11,7 @@ LAG_DAYS = 7
 
 
 def weather_values(observation: dict[str, Any]) -> tuple[float | None, float | None]:
+    """Explain the weather values operation and return its computed result."""
     rain = observation.get("rain_mm")
     temp = observation.get("temp_c")
     return (None if rain is None else float(rain), None if temp is None else float(temp))
@@ -21,6 +24,7 @@ def build_features(
     rain_mean: float | None = None,
     temp_mean: float | None = None,
 ) -> list[float]:
+    """Explain the build features operation and return its computed result."""
     if target_index < LAG_DAYS or target_index >= len(observations):
         raise ValueError("A feature row needs seven previous observations.")
     values = [float(item["litres"]) for item in observations]
@@ -36,6 +40,7 @@ def build_features(
 
 
 def weather_means(observations: list[dict[str, Any]], end_index: int) -> tuple[float, float]:
+    """Explain the weather means operation and return its computed result."""
     rains: list[float] = []
     temps: list[float] = []
     for item in observations[:end_index]:
