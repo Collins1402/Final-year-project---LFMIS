@@ -21,7 +21,6 @@ final class Totp
  * @param int $bytes Input used by this operation.
  * @return string Result of this operation.
  */
-
     public static function generateSecret(int $bytes = 20): string
     {
         if ($bytes < 16 || $bytes > 64) throw new RuntimeException('TOTP secret length must be between 16 and 64 bytes.');
@@ -34,7 +33,6 @@ final class Totp
  * @param int $time Input used by this operation.
  * @return string Result of this operation.
  */
-
     public static function code(string $secret, int $time): string
     {
         if ($time < 0) throw new RuntimeException('TOTP time cannot be negative.');
@@ -74,7 +72,6 @@ final class Totp
  * @param string $issuer Input used by this operation.
  * @return string Result of this operation.
  */
-
     public static function otpauthUri(string $secret, string $account, string $issuer = 'LFMIS'): string
     {
         $label = rawurlencode($issuer . ':' . $account);
@@ -93,7 +90,6 @@ final class Totp
  * @param string $secret Input used by this operation.
  * @return string Result of this operation.
  */
-
     public static function encrypt(string $secret): string
     {
         self::requireSodium();
@@ -106,7 +102,6 @@ final class Totp
  * @param string $encrypted Input used by this operation.
  * @return string Result of this operation.
  */
-
     public static function decrypt(string $encrypted): string
     {
         self::requireSodium();
@@ -123,7 +118,6 @@ final class Totp
  * Performs the encryption key operation for this service.
  * @return string Result of this operation.
  */
-
     private static function encryptionKey(): string
     {
         $encoded = Env::required('LFMIS_2FA_KEY');
@@ -138,7 +132,6 @@ final class Totp
  * Performs the require sodium operation for this service.
  * @return void Result of this operation.
  */
-
     private static function requireSodium(): void
     {
         if (!function_exists('sodium_crypto_secretbox')) {
@@ -151,7 +144,6 @@ final class Totp
  * @param string $value Input used by this operation.
  * @return string Result of this operation.
  */
-
     private static function base32Decode(string $value): string
     {
         $value = strtoupper(rtrim($value, '='));
@@ -174,7 +166,6 @@ final class Totp
  * @param string $bytes Input used by this operation.
  * @return string Result of this operation.
  */
-
     private static function base32Encode(string $bytes): string
     {
         $bits = '';

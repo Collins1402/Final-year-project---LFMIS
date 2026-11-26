@@ -3,7 +3,6 @@ Forecast features: constructs calendar, lagged production, and optional weather 
 The forecasting service calls these helpers when training and predicting milk output.
 The calculations depend on ordered daily observations and optional weather measurements.
 """
-
 from __future__ import annotations
 
 from datetime import date

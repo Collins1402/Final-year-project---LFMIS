@@ -49,7 +49,6 @@ final class AnalyticsService
  * Performs the metric names operation for this service.
  * @return array Result of this operation.
  */
-
     public static function metricNames(): array { return array_keys(self::METRICS); }
 
     /**

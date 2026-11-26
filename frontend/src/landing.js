@@ -14,7 +14,6 @@ const animals = [
  * @param {*} value Value supplied to this operation.
  * @returns {*} Result of this operation.
  */
-
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
 /**
  * Handles the format event date operation and returns its result.

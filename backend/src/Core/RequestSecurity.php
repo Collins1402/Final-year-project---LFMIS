@@ -31,7 +31,6 @@ final class RequestSecurity
  * Performs the send headers operation for this service.
  * @return void Result of this operation.
  */
-
     public static function sendHeaders(): void
     {
         header('X-Content-Type-Options: nosniff');
@@ -47,7 +46,6 @@ final class RequestSecurity
  * @param string $appUrl Input used by this operation.
  * @return bool Result of this operation.
  */
-
     public static function isTrustedOrigin(?string $origin, ?string $referer, string $appUrl): bool
     {
         $candidate = $origin;
@@ -86,7 +84,6 @@ final class RequestSecurity
  * @param string $host Input used by this operation.
  * @return bool Result of this operation.
  */
-
     private static function isPrivateHost(string $host): bool
     {
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
@@ -100,7 +97,6 @@ final class RequestSecurity
  * @param string $url Input used by this operation.
  * @return ?string Result of this operation.
  */
-
     private static function originOf(string $url): ?string
     {
         $parts = parse_url($url);

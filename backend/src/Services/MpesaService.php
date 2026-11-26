@@ -227,7 +227,6 @@ final class MpesaService
  * @param string $phone Input used by this operation.
  * @return string Result of this operation.
  */
-
     public static function normalizePhone(string $phone): string
     {
         $digits = preg_replace('/[\s()+-]/', '', trim($phone));

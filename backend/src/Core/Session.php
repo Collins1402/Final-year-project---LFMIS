@@ -32,7 +32,6 @@ final class Session
  * Performs the user id operation for this service.
  * @return ?int Result of this operation.
  */
-
     public static function userId(): ?int
     {
         return isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
@@ -43,7 +42,6 @@ final class Session
  * @param int $userId Input used by this operation.
  * @return void Result of this operation.
  */
-
     public static function login(int $userId): void
     {
         session_regenerate_id(true);
@@ -54,7 +52,6 @@ final class Session
  * Performs the logout operation for this service.
  * @return void Result of this operation.
  */
-
     public static function logout(): void
     {
         $_SESSION = [];

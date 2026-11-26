@@ -26,7 +26,6 @@ const adminNavigation = [
  * Renders or performs the install table pagination operation used by the page.
  * @param {*} root Value supplied to this operation.
  */
-
 function installTablePagination(root = app) {
   root.querySelectorAll('.table-wrap tbody').forEach((tbody) => {
     if (tbody.dataset.paged === 'true') return
@@ -68,7 +67,6 @@ new MutationObserver(() => installTablePagination()).observe(app, { childList: t
  * @param {*} value Value supplied to this operation.
  * @returns {*} Result of this operation.
  */
-
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]))
 /**
  * Handles the nairobi date operation and returns its result.
@@ -102,7 +100,6 @@ const dataExportForm = (groups, id = 'data-export-form') => `<form id="${id}" cl
  * @param {*} section Value supplied to this operation.
  * @param {*} rows Value supplied to this operation.
  */
-
 function sectionCsv(section, rows) {
   const csvRows = [[section]]
   if (!rows.length) csvRows.push(['No records'])
@@ -127,7 +124,6 @@ function sectionCsv(section, rows) {
  * Renders or performs the create zip operation used by the page.
  * @param {*} files Value supplied to this operation.
  */
-
 function createZip(files) {
   const encoder = new TextEncoder()
   const crcTable = new Uint32Array(256)
@@ -204,7 +200,6 @@ function createZip(files) {
  * Renders or performs the download data export operation used by the page.
  * @param {*} result Value supplied to this operation.
  */
-
 function downloadDataExport(result) {
   const filename = `lfmis-${String(result.role || 'user')}-data-${nairobiDate()}`
   const sections = Object.entries(result.data).filter(([, rows]) => Array.isArray(rows))
@@ -322,7 +317,6 @@ function downloadDataExport(result) {
  * @param {*} container Value supplied to this operation.
  * @param {*} formId Value supplied to this operation.
  */
-
 function bindDataExportForm(container, formId = 'data-export-form') {
   const form = container.querySelector(`#${formId}`)
   if (!form) return
@@ -391,7 +385,6 @@ function installFixedSidebar() {
  * @param {*} table Value supplied to this operation.
  * @param {*} columnTypes Value supplied to this operation.
  */
-
 function enableSortableTable(table, columnTypes = []) {
   const headers = table?.tHead?.rows[0]?.cells
   if (!headers || table.dataset.sortReady === 'true') return
@@ -432,7 +425,6 @@ function enableSortableTable(table, columnTypes = []) {
  * Renders or performs the enhance data table operation used by the page.
  * @param {*} table Value supplied to this operation.
  */
-
 function enhanceDataTable(table) {
   if (table.dataset.noTools === 'true' || table.dataset.tableToolsReady === 'true' || !table.tHead || !table.tBodies.length) return
   const wrapper = table.closest('.table-wrap')
@@ -480,7 +472,6 @@ function enhanceDataTable(table) {
  * Handles the update bulk buttons operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   let updateBulkButtons = () => {}
   if (table.dataset.bulkOrders === 'true') {
     const actions = document.createElement('div')
@@ -507,7 +498,6 @@ function enhanceDataTable(table) {
  * Handles the visible orders operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
     const visibleOrders = () => [...table.tBodies[0].rows].filter((row) => !row.hidden && row.dataset.orderId)
     /**
  * Handles the quote ids operation and returns its result.
@@ -550,7 +540,6 @@ function enhanceDataTable(table) {
  * @param {*} ids Value supplied to this operation.
  * @returns {*} Result of this operation.
  */
-
     const submitBulkAction = async (status, ids) => {
       if (ids.length === 0) return
       const confirmText = status === 'fulfilled'
@@ -623,7 +612,6 @@ function enhanceDataTable(table) {
  * Handles the filter rows operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   const filterRows = () => {
     const query = search.value.trim().toLocaleLowerCase()
     const wantedStatus = statusFilter?.value || ''
@@ -683,7 +671,6 @@ const roleModuleLabel = (module) => {
  * @param {*} mode Value supplied to this operation.
  * @param {*} notice Value supplied to this operation.
  */
-
 function renderAuth(mode = 'login', notice = '') {
   const setup = mode === 'setup'
   clearInterval(trendsRefreshTimer)
@@ -748,7 +735,6 @@ function renderAuth(mode = 'login', notice = '') {
  * @param {*} methods Value supplied to this operation.
  * @param {*} notice Value supplied to this operation.
  */
-
 function renderTwoFactorChallenge(methods, notice = '') {
   if (methods.includes('totp')) {
     app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-STEP VERIFICATION</p><h1>Verify it’s you</h1><p class="muted">Enter the 6-digit code from your authenticator app.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><form id="totp-login-form"><label>6-digit code<input name="code" placeholder="123456 or recovery code" inputmode="text" autocomplete="one-time-code" required></label><label class="checkbox-label"><input type="checkbox" name="rememberDevice"> Remember this device for 30 days</label><button>Verify and sign in</button></form><button id="use-recovery-code" class="text-link" type="button">Use a recovery code instead</button><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
@@ -856,7 +842,6 @@ async function loadPublicTrends() {
  * Renders or performs the render forgot password operation used by the page.
  * @param {*} notice Value supplied to this operation.
  */
-
 function renderForgotPassword(notice = '') {
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">ACCOUNT RECOVERY</p><h1>Reset your password</h1><p class="muted">Enter your account email. We will send a one-time reset link if it matches an active account.</p>${notice}<form id="forgot-form"><label>Email<input name="email" type="email" placeholder="name@example.com" required autocomplete="email"></label><button>Send reset link</button></form><button id="back-login" class="text-link" type="button">Back to sign in</button></section></main>`
   // Handles the user or browser event registered below.
@@ -876,7 +861,6 @@ function renderForgotPassword(notice = '') {
  * Renders or performs the render reset password operation used by the page.
  * @param {*} token Value supplied to this operation.
  */
-
 function renderResetPassword(token) {
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">ACCOUNT RECOVERY</p><h1>Choose a new password</h1><p class="muted">Use at least 12 characters. This link works once and expires after one hour.</p><form id="reset-form"><label>New password<span class="password-field"><input name="password" type="password" minlength="12" placeholder="At least 12 characters" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><label>Confirm password<span class="password-field"><input name="confirmPassword" type="password" minlength="12" placeholder="Enter the password again" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Update password</button></form></section></main>`
   // Handles the user or browser event registered below.
@@ -905,7 +889,6 @@ function renderResetPassword(token) {
  * @param {*} token Value supplied to this operation.
  * @param {*} text Value supplied to this operation.
  */
-
 function renderResetPasswordWithNotice(token, text) {
   renderResetPassword(token)
   const notice = document.createElement('p')
@@ -918,7 +901,6 @@ function renderResetPasswordWithNotice(token, text) {
  * Renders or performs the render register operation used by the page.
  * @param {*} notice Value supplied to this operation.
  */
-
 function renderRegister(notice = '') {
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>Create an account</h1><p class="muted">Create your farm customer or livestock buyer account.</p>${notice}<form id="register-form"><label>Full name<input name="fullName" placeholder="e.g. Alex Kamau" required></label><label>Username<input name="username" placeholder="e.g. alex.kamau" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" placeholder="name@example.com" required></label><label>Phone<input name="phone" type="tel" placeholder="e.g. 0712 345 678"></label><label>Account type<select name="role"><option value="customer">Farm customer</option><option value="buyer">Livestock buyer</option></select></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" placeholder="At least 12 characters" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create account</button></form><button id="back-login" class="text-link" type="button">Back to sign in</button></section></main>`
   // Handles the user or browser event registered below.
@@ -961,7 +943,6 @@ async function renderAccountSecurity(forced = false) {
   installFixedSidebar()
 
   // Handles the user or browser event registered below.
-
   app.querySelector('#security-back')?.addEventListener('click', renderApp)
   // Handles the user or browser event registered below.
   app.querySelector('#continue-after-2fa')?.addEventListener('click', () => { currentUser.mustEnable2fa = false; renderApp() })
@@ -1116,7 +1097,6 @@ async function renderApp() {
  * Renders or performs the render admin module operation used by the page.
  * @param {*} module Value supplied to this operation.
  */
-
 function renderAdminModule(module) {
   if (module === 'Events') return renderEventsModule()
   if (module === 'Activities') return renderActivitiesModule()
@@ -1250,7 +1230,6 @@ async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDet
   }
 
   // Handles the user or browser event registered below.
-
   target.querySelector('#animal-profile-status')?.addEventListener('submit', async (event) => {
     event.preventDefault()
     const feedback = target.querySelector('#animal-profile-feedback')
@@ -1310,7 +1289,6 @@ function downloadAnimalProfile(profile) {
  * Renders or performs the activity health fields operation used by the page.
  * @param {*} animals Value supplied to this operation.
  */
-
 function activityHealthFields(animals) {
   const options = animals.filter((animal) => animal.status === 'active')
     .map((animal) => `<option value="${Number(animal.id)}">${escapeHtml(animal.tag_number)} · ${escapeHtml(animal.species)}</option>`)
@@ -1322,7 +1300,6 @@ function activityHealthFields(animals) {
  * Renders or performs the wire activity health fields operation used by the page.
  * @param {*} form Value supplied to this operation.
  */
-
 function wireActivityHealthFields(form) {
   const checkbox = form.querySelector('[name="healthConcern"]')
   const fields = form.querySelector('[data-health-concern-fields]')
@@ -1428,7 +1405,6 @@ async function renderEventsModule() {
  * @param {*} records Value supplied to this operation.
  * @param {*} refresh Value supplied to this operation.
  */
-
 function bindProductionEditor(root, records, refresh) {
   const form = root.querySelector('#produce-form, #role-production-form')
   if (!form) return
@@ -1496,7 +1472,6 @@ async function renderProductionModule() {
  * Renders or performs the bind recent produce filters operation used by the page.
  * @param {*} root Value supplied to this operation.
  */
-
 function bindRecentProduceFilters(root) {
   const panel = [...root.querySelectorAll('.module-grid > .panel')].find((item) => item.querySelector('#produce-filter-name'))
   if (!panel) return
@@ -1525,7 +1500,6 @@ function bindRecentProduceFilters(root) {
  * Renders or performs the render production summary operation used by the page.
  * @param {*} summary Value supplied to this operation.
  */
-
 function renderProductionSummary(summary) {
   /**
  * Handles the format operation and returns its result.
@@ -1733,7 +1707,6 @@ async function renderCommerceModule() {
  * @param {*} predictions Value supplied to this operation.
  * @param {*} unit Value supplied to this operation.
  */
-
 function renderForecastChart(observations, predictions, unit = 'litres') {
   const actual = observations.slice(-28)
   const values = [...actual, ...predictions]
@@ -1790,7 +1763,6 @@ function renderForecastChart(observations, predictions, unit = 'litres') {
  * @param {*} selectedProduct Value supplied to this operation.
  * @param {*} productOptions Value supplied to this operation.
  */
-
 function renderForecastPanel(data, error, selectedProduct = 'milk', productOptions = []) {
   const selectedInfo = productOptions.find((item) => item.name.toLowerCase() === selectedProduct)
   const label = selectedInfo?.name || (selectedProduct ? selectedProduct[0].toUpperCase() + selectedProduct.slice(1) : 'Milk')
@@ -1855,7 +1827,6 @@ async function renderFarmTrendsModule() {
  * @param {*} value Value supplied to this operation.
  * @returns {*} Result of this operation.
  */
-
   const money = (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
   /**
  * Handles the format date operation and returns its result.
@@ -1868,7 +1839,6 @@ async function renderFarmTrendsModule() {
  * Handles the render live operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   const renderLive = () => {
     const group = data?.[scope] || data?.regional || {}
     const articles = group.articles || []
@@ -1887,7 +1857,6 @@ async function renderFarmTrendsModule() {
  * Handles the render synthetic operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   const renderSynthetic = () => {
     const scopeData = data?.synthetic?.scopes?.[scope] || { categories: {} }
     const cards = Object.entries(scopeData.categories || {}).flatMap(([category, metrics]) =>
@@ -1900,7 +1869,6 @@ async function renderFarmTrendsModule() {
  * Handles the render farm operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   const renderFarm = () => {
     const farm = data?.actualFarm?.metrics
     if (!farm) return `<section class="panel trend-section"><h2>Actual farm performance</h2><p class="empty">No actual farm records are available.</p></section>`
@@ -1912,7 +1880,6 @@ async function renderFarmTrendsModule() {
  * Handles the render status operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   const renderStatus = () => {
     const status = data?.status || {}
     const log = status.lastLog
@@ -1923,7 +1890,6 @@ async function renderFarmTrendsModule() {
  * Handles the render history operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   const renderHistory = async () => {
     try {
       const [history, metrics] = await Promise.all([
@@ -1957,7 +1923,6 @@ async function renderFarmTrendsModule() {
  * Handles the load operation and returns its result.
  * @returns {*} Result of this operation.
  */
-
   const load = async () => {
     content.querySelector('#trends-content').innerHTML = '<p class="muted">Loading agricultural intelligence...</p>'
     try {
@@ -1979,7 +1944,6 @@ async function renderFarmTrendsModule() {
   }
 
   // Handles the user or browser event registered below.
-
   content.querySelector('#trends-refresh').addEventListener('click', async (event) => {
     event.currentTarget.disabled = true
     try {
@@ -2111,7 +2075,6 @@ async function renderAssistantModule(target = app.querySelector('.content')) {
  * @param {*} messages Value supplied to this operation.
  * @param {*} result Value supplied to this operation.
  */
-
 function appendAssistantResponse(messages, result) {
   const bubble = document.createElement('article')
   bubble.className = 'assistant-response message success'
@@ -2165,7 +2128,6 @@ function appendAssistantResponse(messages, result) {
  * @param {*} blob Value supplied to this operation.
  * @param {*} filename Value supplied to this operation.
  */
-
 function downloadAssistantFile(blob, filename) {
   const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
@@ -2175,7 +2137,6 @@ function downloadAssistantFile(blob, filename) {
  * @param {*} advice Value supplied to this operation.
  * @param {*} charts Value supplied to this operation.
  */
-
 function printAssistantReport(advice, charts) {
   const popup = window.open('', '_blank')
   if (!popup) return

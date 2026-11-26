@@ -18,7 +18,6 @@ final class Database
  * Performs the connection operation for this service.
  * @return PDO Result of this operation.
  */
-
     public static function connection(): PDO
     {
         if (self::$connection === null) {

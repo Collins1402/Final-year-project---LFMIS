@@ -54,7 +54,6 @@ final class Env
  * @param ?string $default Input used by this operation.
  * @return ?string Result of this operation.
  */
-
     public static function get(string $key, ?string $default = null): ?string
     {
         $value = getenv($key);
@@ -66,7 +65,6 @@ final class Env
  * @param string $key Input used by this operation.
  * @return string Result of this operation.
  */
-
     public static function required(string $key): string
     {
         $value = self::get($key);

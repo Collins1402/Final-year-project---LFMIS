@@ -1,5 +1,4 @@
 """Proves the ML forecasting, feature, evaluation, and import behavior covered by this test module."""
-
 from datetime import date, timedelta
 
 import pytest

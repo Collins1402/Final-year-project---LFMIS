@@ -3,7 +3,6 @@ Forecast evaluation: validates history and measures rolling prediction errors.
 The forecast service uses these checks to compare Ridge regression with simple baselines.
 The calculations use historical production values and MAE and RMSE error measures.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

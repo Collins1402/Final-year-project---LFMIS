@@ -36,7 +36,6 @@ final class Mailer
  * @param ?string $html Input used by this operation.
  * @return bool Result of this operation.
  */
-
     public static function send(string $to, string $subject, string $text, ?string $html = null): bool
     {
         try {
@@ -148,7 +147,6 @@ final class Mailer
  * @param string $body Input used by this operation.
  * @return string Result of this operation.
  */
-
     private static function wrapBase64(string $body): string
     {
         return rtrim(chunk_split(base64_encode($body), 76, "\r\n"), "\r\n");
@@ -160,7 +158,6 @@ final class Mailer
  * @param ?string $html Input used by this operation.
  * @return string Result of this operation.
  */
-
     private static function emailHtml(string $text, ?string $html): string
     {
         $content = $html ?? '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>';
@@ -175,7 +172,6 @@ final class Mailer
  * @param array $headers Input used by this operation.
  * @return string Result of this operation.
  */
-
     private static function formatHeaders(array $headers): string
     {
         return implode("\r\n", array_map(static fn(string $name, string $value): string => $name . ': ' . $value, array_keys($headers), array_values($headers)));

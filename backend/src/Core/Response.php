@@ -30,7 +30,6 @@ final class Response
  * @param int $status Input used by this operation.
  * @return void Result of this operation.
  */
-
     public static function error(string $message, int $status): void
     {
         self::json(['error' => $message], $status);

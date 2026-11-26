@@ -32,7 +32,6 @@ async function request(path, options = {}) {
  * @param {*} data Value supplied to this operation.
  * @returns {*} Result of this operation.
  */
-
 const post = (path, data) => request(path, { method: 'POST', body: JSON.stringify(data) })
 
 export const api = {
