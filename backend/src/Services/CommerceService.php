@@ -14,7 +14,9 @@ final class CommerceService
         $query = "SELECT products.id, products.name, products.product_type, products.production_kind,
                  products.species, products.unit, products.unit_price, products.is_active,
                          CASE WHEN products.product_type = 'livestock'
-                              THEN (SELECT COUNT(*) FROM animals WHERE animals.status = 'active' AND animals.species = products.species)
+                              THEN (SELECT COUNT(*) FROM animals
+                                    WHERE animals.status = 'active' AND animals.species = products.species
+                                      AND NOT EXISTS (SELECT 1 FROM order_animals linked WHERE linked.animal_id = animals.id))
                               ELSE products.available_quantity END AS available_quantity
                   FROM products WHERE products.is_active = 1";
         if ($role === 'buyer') $query .= " AND products.product_type = 'livestock'";
@@ -385,7 +387,9 @@ final class CommerceService
     private function availableQuantity(array $product): float
     {
         if ($product['product_type'] !== 'livestock') return (float) $product['available_quantity'];
-        $statement = $this->db->prepare("SELECT COUNT(*) FROM animals WHERE species = ? AND status = 'active'");
+        $statement = $this->db->prepare("SELECT COUNT(*) FROM animals
+            WHERE species = ? AND status = 'active'
+              AND NOT EXISTS (SELECT 1 FROM order_animals linked WHERE linked.animal_id = animals.id)");
         $statement->execute([$product['species']]);
         return (float) $statement->fetchColumn();
     }
@@ -400,7 +404,10 @@ final class CommerceService
             $quantity = (float) $item['quantity'];
             if ($item['product_type'] === 'livestock') {
                 if (floor($quantity) !== $quantity || !$item['species']) throw new \DomainException('Livestock orders require a species and whole-animal quantity.');
-                $sql = "SELECT id FROM animals WHERE species = ? AND status = 'active' ORDER BY id LIMIT " . (int) $quantity;
+                $sql = "SELECT animals.id FROM animals
+                        WHERE animals.species = ? AND animals.status = 'active'
+                          AND NOT EXISTS (SELECT 1 FROM order_animals linked WHERE linked.animal_id = animals.id)
+                        ORDER BY animals.id LIMIT " . (int) $quantity;
                 if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $sql .= ' FOR UPDATE';
                 $animals = $this->db->prepare($sql);
                 $animals->execute([$item['species']]);
