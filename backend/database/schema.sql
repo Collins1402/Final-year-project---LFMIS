@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS payments (
   order_id BIGINT UNSIGNED NOT NULL,
   customer_id BIGINT UNSIGNED NULL,
   amount DECIMAL(12,2) NOT NULL,
-  method ENUM('cash', 'mpesa', 'bank', 'other') NOT NULL,
+  method ENUM('cash', 'mpesa', 'bank', 'other', 'pay_on_premise', 'cheque') NOT NULL,
   status ENUM('pending', 'confirmed', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
   transaction_reference VARCHAR(120) NULL,
   checkout_request_id VARCHAR(80) NULL,

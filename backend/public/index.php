@@ -754,6 +754,11 @@ try {
         if ($method === 'GET' && $path === '/api/payments' && $permissions->allows($current['role'], 'payments.view')) {
             Response::json(['payments' => $commerce->payments((int) $current['id'])]);
         }
+        if ($method === 'POST' && in_array($current['role'], ['buyer', 'customer'], true)
+            && $permissions->allows($current['role'], 'orders.create')
+            && in_array(($request->body()['method'] ?? ''), ['pay_on_premise', 'cheque'], true)) {
+            Response::json(['payment' => $commerce->requestOfflinePayment($request->body(), $current)], 201);
+        }
         if ($method === 'POST' && $permissions->allows($current['role'], 'finance.manage')) {
             if ($path === '/api/sales') Response::json(['sale' => $commerce->createSale($request->body(), $current['id'])], 201);
             if ($path === '/api/expenses') Response::json(['expense' => $commerce->createExpense($request->body(), $current['id'])], 201);

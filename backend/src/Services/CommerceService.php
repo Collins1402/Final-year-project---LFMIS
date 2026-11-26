@@ -304,9 +304,66 @@ final class CommerceService
     public function createPayment(array $input, int $userId): array
     {
         $orderId = filter_var($input['orderId'] ?? null, FILTER_VALIDATE_INT); $method = (string) ($input['method'] ?? ''); $reference = trim((string) ($input['transactionReference'] ?? '')) ?: null;
-        if (!$orderId || !in_array($method, ['cash', 'mpesa', 'bank', 'other'], true)) throw new \InvalidArgumentException('Choose an order and payment method.');
+        if (!$orderId || !in_array($method, ['cash', 'mpesa', 'bank', 'other', 'pay_on_premise', 'cheque'], true)) throw new \InvalidArgumentException('Choose an order and payment method.');
         $order = $this->db->prepare('SELECT customer_id, total_amount FROM orders WHERE id = ?'); $order->execute([$orderId]); $row = $order->fetch(); if (!$row || (float) $row['total_amount'] <= 0) throw new \InvalidArgumentException('The order must have a positive total.');
+        if (in_array($method, ['pay_on_premise', 'cheque'], true)) {
+            $pending = $this->db->prepare("SELECT id FROM payments WHERE order_id = ? AND method = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
+            $pending->execute([$orderId, $method]);
+            $paymentId = $pending->fetchColumn();
+            if ($paymentId) {
+                $this->db->beginTransaction();
+                try {
+                    $this->db->prepare("UPDATE payments SET status = 'confirmed', transaction_reference = ?, result_desc = 'Payment received and confirmed by farm staff.', paid_at = CURRENT_TIMESTAMP, recorded_by = ? WHERE id = ?")
+                        ->execute([$reference, $userId, (int) $paymentId]);
+                    $this->db->prepare("UPDATE orders SET status = 'paid' WHERE id = ? AND status NOT IN ('paid', 'fulfilled', 'cancelled')")->execute([$orderId]);
+                    $this->recordOrderSales($orderId, (int) $row['customer_id']);
+                    $this->db->commit();
+                    return ['id' => (int) $paymentId, 'status' => 'confirmed'];
+                } catch (\Throwable $error) {
+                    if ($this->db->inTransaction()) $this->db->rollBack();
+                    throw $error;
+                }
+            }
+        }
         $status = $method === 'mpesa' ? 'pending' : 'confirmed'; $statement = $this->db->prepare('INSERT INTO payments (order_id, customer_id, amount, method, status, transaction_reference, paid_at, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'); $statement->execute([$orderId, $row['customer_id'], $row['total_amount'], $method, $status, $reference, $status === 'confirmed' ? date('Y-m-d H:i:s') : null, $userId]); return ['id' => (int) $this->db->lastInsertId(), 'status' => $status];
+    }
+
+    public function requestOfflinePayment(array $input, array $user): array
+    {
+        $orderId = filter_var($input['orderId'] ?? null, FILTER_VALIDATE_INT);
+        $method = (string) ($input['method'] ?? '');
+        if (!$orderId || !in_array($method, ['pay_on_premise', 'cheque'], true)) {
+            throw new \InvalidArgumentException('Choose Pay on Premise or Cheque for this order.');
+        }
+        $orderQuery = $this->db->prepare(
+            "SELECT orders.id, orders.customer_id, orders.status, orders.total_amount
+             FROM orders JOIN customers ON customers.id = orders.customer_id
+             WHERE orders.id = ? AND customers.user_id = ?"
+        );
+        $orderQuery->execute([$orderId, (int) $user['id']]);
+        $order = $orderQuery->fetch(PDO::FETCH_ASSOC);
+        if (!$order || in_array($order['status'], ['paid', 'fulfilled', 'cancelled'], true)) {
+            throw new \DomainException('This order is not awaiting payment.');
+        }
+        if ((float) $order['total_amount'] <= 0) throw new \InvalidArgumentException('The order must have a positive total.');
+
+        $pending = $this->db->prepare("SELECT id, method FROM payments WHERE order_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
+        $pending->execute([$orderId]);
+        $existing = $pending->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            if ($existing['method'] === $method) return ['id' => (int) $existing['id'], 'status' => 'pending'];
+            throw new \DomainException('A payment method is already awaiting confirmation for this order.');
+        }
+
+        $insert = $this->db->prepare(
+            "INSERT INTO payments (order_id, customer_id, amount, method, status, result_desc, recorded_by)
+             VALUES (?, ?, ?, ?, 'pending', ?, ?)"
+        );
+        $description = $method === 'cheque'
+            ? 'Cheque selected; payment awaits farm confirmation.'
+            : 'Pay on Premise selected; payment awaits farm confirmation.';
+        $insert->execute([$orderId, $order['customer_id'], $order['total_amount'], $method, $description, (int) $user['id']]);
+        return ['id' => (int) $this->db->lastInsertId(), 'status' => 'pending'];
     }
 
     public function finance(): array

@@ -48,6 +48,17 @@ $resetCount = applySqlFile($db, $resetFile);
 $seedCount = 0;
 if (!$resetOnly) {
     $seedCount = applySqlFile($db, $seedFile);
+    $db->exec("INSERT INTO products (name, product_type, production_kind, species, unit, available_quantity, unit_price, is_active)
+        SELECT listing.name, 'livestock', NULL, listing.species, 'head', 0, listing.unit_price, 1
+        FROM (
+          SELECT 'SYN-Demo cattle' AS name, 'cattle' AS species, 75000 AS unit_price
+          UNION ALL SELECT 'SYN-Demo goat', 'goat', 12000
+          UNION ALL SELECT 'SYN-Demo sheep', 'sheep', 15000
+          UNION ALL SELECT 'SYN-Demo rabbit', 'rabbit', 4000
+          UNION ALL SELECT 'SYN-Demo chicken', 'chicken', 2000
+        ) AS listing
+        WHERE EXISTS (SELECT 1 FROM animals WHERE animals.species = listing.species AND animals.status = 'active')
+          AND NOT EXISTS (SELECT 1 FROM products WHERE products.product_type = 'livestock' AND products.species = listing.species AND products.name = listing.name)");
 }
 $db->exec('SET FOREIGN_KEY_CHECKS = 1');
 
