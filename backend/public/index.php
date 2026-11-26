@@ -1,4 +1,9 @@
 <?php
+/**
+ * Purpose: expose the LFMIS HTTP API and connect routes to their services.
+ * Called by: the PHP web server for each /api request from the frontend.
+ * Depends on: Core helpers, service classes, environment settings, and MySQL.
+ */
 declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -92,7 +97,9 @@ use Lfmis\Services\RateLimitService;
 use Lfmis\Services\TwoFactorService;
 use Lfmis\Services\TotpService;
 
+// Load private settings before opening services; operating-system environment values take precedence.
 Env::load(dirname(__DIR__, 2) . '/.env.local');
+// Set browser security headers and only grant credentialed CORS to a trusted frontend origin.
 RequestSecurity::sendHeaders();
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (RequestSecurity::isTrustedOrigin($origin ?: null, $_SERVER['HTTP_REFERER'] ?? null, Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'))) {
@@ -109,6 +116,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 Session::start();
 $request = new Request();
 $writeMethod = in_array($request->method(), ['POST', 'PATCH', 'DELETE'], true);
+// Reject state-changing browser requests from an untrusted origin to reduce cross-site request forgery.
 if ($writeMethod && $request->path() !== '/api/payments/mpesa/callback' && Session::userId() !== null
     && !RequestSecurity::isTrustedOrigin($_SERVER['HTTP_ORIGIN'] ?? null, $_SERVER['HTTP_REFERER'] ?? null, Env::get('LFMIS_APP_URL', 'http://127.0.0.1:5173'))
     && !RequestSecurity::isTrustedOrigin($_SERVER['HTTP_ORIGIN'] ?? null, $_SERVER['HTTP_REFERER'] ?? null, 'http://localhost:5173')) {
@@ -116,6 +124,7 @@ if ($writeMethod && $request->path() !== '/api/payments/mpesa/callback' && Sessi
 }
 
 try {
+    // Create request-scoped services that share this authenticated MySQL connection.
     $db = Database::connection();
     $auth = new AuthService($db);
     $rateLimits = new RateLimitService($db);
@@ -151,6 +160,7 @@ try {
     $dataExports = new DataExportService($db, $permissions);
     $method = $request->method();
     $path = $request->path();
+    // System health and market-trend routes.
     if ($method === 'GET' && $path === '/api/health') {
         $db->query('SELECT 1');
         $mlStatus = 'unavailable';
@@ -240,6 +250,7 @@ try {
         ]);
         Response::json($result);
     }
+    // Initial setup, sign-in, email verification, password recovery, and two-factor routes.
     if ($method === 'GET' && $path === '/api/setup-status') {
         Response::json(['setupRequired' => (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0]);
     }
@@ -404,6 +415,7 @@ try {
         $twoFactor->removeMethod($current['id'], (string) ($body['method'] ?? ''), (string) ($body['password'] ?? ''));
         Response::json($twoFactor->status($current['id']));
     }
+    // Livestock register, animal profiles, status changes, and health records.
     if ($path === '/api/animals') {
         $current = $auth->currentUser();
         if ($current === null) {
@@ -461,6 +473,7 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
+    // Administration routes for users, permissions, audit history, exports, and backups.
     if ($path === '/api/users') {
         $current = $auth->currentUser();
         if ($current === null) {
@@ -584,6 +597,7 @@ try {
         $audit->record((int) $current['id'], 'backup_created', 'backup', null, ['filename' => $created['filename']]);
         Response::json(['backup' => $created], 201);
     }
+    // Farm events and day-to-day activity routes.
     if ($method === 'GET' && $path === '/api/events') {
         Response::json(['events' => $events->publicList()]);
     }
@@ -633,6 +647,7 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
+    // Production records and summaries.
     if ($path === '/api/production' || $path === '/api/production/summary' || preg_match('#^/api/production/\d+$#', $path)) {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
@@ -650,6 +665,7 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
+    // Inventory item and stock-movement routes.
     if ($path === '/api/inventory' || $path === '/api/inventory/items' || $path === '/api/inventory/transactions' || preg_match('#^/api/inventory/\d+/transactions$#', $path)) {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
@@ -667,6 +683,7 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
+    // Product catalogue, buyer orders, and farm order-management routes.
     if ($path === '/api/products' || $path === '/api/store/products') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
@@ -674,6 +691,7 @@ try {
         if ($method === 'POST' && $permissions->allows($current['role'], 'products.manage')) Response::json(['product' => $commerce->createProduct($request->body())], 201);
         Response::error('You do not have permission to perform this action.', 403);
     }
+    // Payment routes; this installation records local M-Pesa simulations and offline receipts only.
     if ($method === 'POST' && $path === '/api/payments/mpesa/callback') {
         Response::error('M-PESA callbacks are disabled; this installation uses local payment simulation.', 410);
     }
@@ -780,6 +798,7 @@ try {
         }
         Response::error('You do not have permission to perform this action.', 403);
     }
+    // Financial, operational, forecast, and analytics reports.
     if ($method === 'GET' && $path === '/api/reports/finance') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
@@ -822,6 +841,7 @@ try {
         $chart = $analytics->series($matches[1], (string)($_GET['period'] ?? '30d'), isset($_GET['groupBy']) ? (string)$_GET['groupBy'] : null, isset($_GET['type']) ? (string)$_GET['type'] : null, (string)$current['role']);
         Response::json($chart);
     }
+    // Assistant, demonstration data, notification, and feedback routes.
     if ($path === '/api/assistant/chat' && $method === 'POST') {
         $current = $auth->currentUser();
         if ($current === null) Response::error('Please sign in to continue.', 401);
