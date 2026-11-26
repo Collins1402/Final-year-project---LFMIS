@@ -1,3 +1,8 @@
+/**
+ * File purpose: main.js contains the farm application screens and interactions.
+ * The frontend entry point imports this module to serve farm users and livestock buyers.
+ * It depends on the browser DOM, the application API, and shared frontend state.
+ */
 import './style.css'
 import { api } from './api.js'
 import { renderLanding, formatEventDate } from './landing.js'
@@ -16,6 +21,11 @@ const adminNavigation = [
   ['Insights', ['Reports', 'Farm trends', 'Assistant']],
   ['Administration', ['User accounts', 'Role permissions', 'Audit log', 'Your rights', 'Events']],
 ]
+
+/**
+ * Renders or performs the install table pagination operation used by the page.
+ * @param {*} root Value supplied to this operation.
+ */
 
 function installTablePagination(root = app) {
   root.querySelectorAll('.table-wrap tbody').forEach((tbody) => {
@@ -39,7 +49,9 @@ function installTablePagination(root = app) {
       controls.querySelector('[data-page-next]').disabled = page === pages
     }
     controls.refreshPagination = update
+    // Handles the user or browser event registered below.
     controls.querySelector('[data-page-prev]').addEventListener('click', () => { if (page > 1) { page--; update() } })
+    // Handles the user or browser event registered below.
     controls.querySelector('[data-page-next]').addEventListener('click', () => { if (page < pages) { page++; update() } })
     update()
   })
@@ -52,6 +64,12 @@ const nairobiDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/N
 const message = (text, danger = false) => `<p class="message ${danger ? 'danger' : 'success'}">${escapeHtml(text)}</p>`
 const roleCopy = (english, swahili) => roleLanguage === 'sw' && ['worker', 'veterinarian'].includes(currentUser?.role) ? swahili : english
 const dataExportForm = (groups, id = 'data-export-form') => `<form id="${id}" class="compact-form data-export-form"><fieldset><legend>Choose records to include</legend><label class="export-section-option"><input type="checkbox" data-export-select-all> Select all available groups</label><div class="export-section-list">${groups.map((group) => `<label class="export-section-option"><input type="checkbox" name="sections" value="${escapeHtml(group.id)}"> ${escapeHtml(group.label)}</label>`).join('')}</div></fieldset><label>Download format<select name="format"><option value="pdf">PDF document</option><option value="csv">CSV spreadsheet</option><option value="excel">Excel workbook (.xls)</option><option value="json">JSON data</option><option value="zip">ZIP archive (separate CSV files)</option></select></label><label>Current authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required></label><button>Download selected records</button></form>`
+
+/**
+ * Renders or performs the section csv operation used by the page.
+ * @param {*} section Value supplied to this operation.
+ * @param {*} rows Value supplied to this operation.
+ */
 
 function sectionCsv(section, rows) {
   const csvRows = [[section]]
@@ -67,6 +85,11 @@ function sectionCsv(section, rows) {
   }
   return '\uFEFF' + csvRows.map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n'
 }
+
+/**
+ * Renders or performs the create zip operation used by the page.
+ * @param {*} files Value supplied to this operation.
+ */
 
 function createZip(files) {
   const encoder = new TextEncoder()
@@ -134,6 +157,11 @@ function createZip(files) {
   endView.setUint32(16, localOffset, true)
   return new Blob([...parts, ...centralParts, end], { type: 'application/zip' })
 }
+
+/**
+ * Renders or performs the download data export operation used by the page.
+ * @param {*} result Value supplied to this operation.
+ */
 
 function downloadDataExport(result) {
   const filename = `lfmis-${String(result.role || 'user')}-data-${nairobiDate()}`
@@ -226,15 +254,24 @@ function downloadDataExport(result) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+/**
+ * Renders or performs the bind data export form operation used by the page.
+ * @param {*} container Value supplied to this operation.
+ * @param {*} formId Value supplied to this operation.
+ */
+
 function bindDataExportForm(container, formId = 'data-export-form') {
   const form = container.querySelector(`#${formId}`)
   if (!form) return
   const selectAll = form.querySelector('[data-export-select-all]')
   const sectionInputs = [...form.querySelectorAll('input[name="sections"]')]
+  // Handles the user or browser event registered below.
   selectAll?.addEventListener('change', () => sectionInputs.forEach((input) => { input.checked = selectAll.checked }))
+  // Handles the user or browser event registered below.
   sectionInputs.forEach((input) => input.addEventListener('change', () => {
     if (selectAll) selectAll.checked = sectionInputs.length > 0 && sectionInputs.every((item) => item.checked)
   }))
+  // Handles the user or browser event registered below.
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const button = form.querySelector('button[type="submit"], button:not([type])')
@@ -261,6 +298,9 @@ function bindDataExportForm(container, formId = 'data-export-form') {
     }
   })
 }
+/**
+ * Renders or performs the install fixed sidebar operation used by the page.
+ */
 function installFixedSidebar() {
   const sidebar = app.querySelector('.shell > aside')
   if (!sidebar || sidebar.dataset.fixedSidebar === 'true') return
@@ -271,15 +311,23 @@ function installFixedSidebar() {
   toggle.setAttribute('aria-expanded', 'false')
   toggle.textContent = 'Menu'
   sidebar.querySelector('.brand')?.after(toggle)
+  // Handles the user or browser event registered below.
   toggle.addEventListener('click', () => {
     const open = sidebar.classList.toggle('sidebar-open')
     toggle.setAttribute('aria-expanded', String(open))
     toggle.textContent = open ? 'Close menu' : 'Menu'
   })
+  // Handles the user or browser event registered below.
   sidebar.querySelectorAll('nav button, #logout, #security-back, #account-security').forEach((button) => button.addEventListener('click', () => {
     if (window.matchMedia('(max-width: 900px)').matches) sidebar.classList.remove('sidebar-open')
   }))
 }
+
+/**
+ * Renders or performs the enable sortable table operation used by the page.
+ * @param {*} table Value supplied to this operation.
+ * @param {*} columnTypes Value supplied to this operation.
+ */
 
 function enableSortableTable(table, columnTypes = []) {
   const headers = table?.tHead?.rows[0]?.cells
@@ -293,6 +341,7 @@ function enableSortableTable(table, columnTypes = []) {
     const type = columnTypes[index] || (/order|amount|total|quantity|price|balance|count|stock/i.test(normalizedLabel) ? 'number' : 'text')
     header.dataset.sortLabel = label
     header.innerHTML = `<button type="button" class="table-sort" aria-label="Sort by ${escapeHtml(label)}">${escapeHtml(label)} <span aria-hidden="true">&harr;</span></button>`
+    // Handles the user or browser event registered below.
     header.querySelector('button').addEventListener('click', () => {
       const sameColumn = table.dataset.sortColumn === String(index)
       const direction = sameColumn && table.dataset.sortDirection === 'asc' ? 'desc' : 'asc'
@@ -315,6 +364,11 @@ function enableSortableTable(table, columnTypes = []) {
     })
   })
 }
+
+/**
+ * Renders or performs the enhance data table operation used by the page.
+ * @param {*} table Value supplied to this operation.
+ */
 
 function enhanceDataTable(table) {
   if (table.dataset.noTools === 'true' || table.dataset.tableToolsReady === 'true' || !table.tHead || !table.tBodies.length) return
@@ -449,9 +503,13 @@ function enhanceDataTable(table) {
         updateBulkButtons()
       }
     }
+    // Handles the user or browser event registered below.
     quote.addEventListener('click', quoteVisibleOrders)
+    // Handles the user or browser event registered below.
     fulfill.addEventListener('click', () => submitBulkAction('fulfilled', fulfillIds()))
+    // Handles the user or browser event registered below.
     accept.addEventListener('click', () => submitBulkAction('accepted', acceptIds()))
+    // Handles the user or browser event registered below.
     cancel.addEventListener('click', () => submitBulkAction('cancelled', cancelIds()))
   }
 
@@ -482,7 +540,9 @@ function enhanceDataTable(table) {
     updateBulkButtons()
     try { sessionStorage.setItem(stateKey, JSON.stringify({ search: search.value, status: statusFilter?.value || '' })) } catch {}
   }
+  // Handles the user or browser event registered below.
   search.addEventListener('input', filterRows)
+  // Handles the user or browser event registered below.
   statusFilter?.addEventListener('change', filterRows)
   filterRows()
 }
@@ -508,11 +568,18 @@ const roleModuleLabel = (module) => {
   return labelsForModule ? labelsForModule[roleLanguage === 'sw' ? 1 : 0] : module
 }
 
+/**
+ * Renders or performs the render auth operation used by the page.
+ * @param {*} mode Value supplied to this operation.
+ * @param {*} notice Value supplied to this operation.
+ */
+
 function renderAuth(mode = 'login', notice = '') {
   const setup = mode === 'setup'
   clearInterval(trendsRefreshTimer)
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>${setup ? 'Set up the farm workspace' : 'Welcome back'}</h1><p class="muted">${setup ? 'Create the first farm owner account.' : 'Sign in to manage the farm.'}</p>${notice}${setup ? `<form id="setup-form"><label>Full name<input name="fullName" placeholder="e.g. Alex Kamau" required></label><label>Username<input name="username" placeholder="e.g. alex.kamau" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" placeholder="name@example.com" required></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" placeholder="At least 12 characters" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create owner account</button></form>` : `<nav class="auth-tabs" aria-label="Account information"><button type="button" class="auth-tab active" data-auth-view="login" aria-selected="true">Sign in</button><button type="button" class="auth-tab" data-auth-view="trends" aria-selected="false">Farm trends</button><button type="button" class="auth-tab" data-auth-view="rights" aria-selected="false">Your rights</button></nav><section id="auth-login-panel"><form id="login-form"><label>Username or email<input name="login" placeholder="Username or name@example.com" required autocomplete="username"></label><label>Password<span class="password-field"><input name="password" type="password" placeholder="Enter your password" required autocomplete="current-password"><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Sign in</button></form><button id="forgot-link" class="text-link" type="button">Forgot password?</button><button id="register-link" class="text-link" type="button">Create a farm account</button></section><section id="auth-trends-panel" class="auth-info-panel" hidden><p class="kicker">AGRICULTURE NEWS SIGNALS</p><h2>Farm trends</h2><p class="muted">Public Kenya and worldwide agriculture coverage. These are news signals, not measured nearby-farm yields.</p><div id="public-trends-content" aria-live="polite">Loading current reports...</div></section><section id="auth-rights-panel" class="auth-info-panel" hidden><p class="kicker">ACCOUNT & DATA</p><h2>Your rights</h2><div class="rights-copy"><p>You can access the records allowed by your assigned role. Farm records are shared only with roles that need them to operate the service.</p><p>You may ask the farm administrator to correct your account details or a record, provide a copy of your personal account data, or delete/deactivate your account.</p><p>Some transaction and audit records may need to be retained for farm operations or legal obligations. The administrator can explain what applies to a specific request.</p><p>Sign-in alerts are sent to the email address registered to your account after each successful login.</p></div></section>`}</section></main>`
   const form = app.querySelector('form')
+  // Handles the user or browser event registered below.
   app.querySelectorAll('[data-auth-view]').forEach((tab) => tab.addEventListener('click', () => {
     const view = tab.dataset.authView
     app.querySelectorAll('[data-auth-view]').forEach((item) => {
@@ -529,8 +596,11 @@ function renderAuth(mode = 'login', notice = '') {
       trendsRefreshTimer = setInterval(loadPublicTrends, 6 * 60 * 60 * 1000)
     }
   }))
+  // Handles the user or browser event registered below.
   app.querySelector('#register-link')?.addEventListener('click', () => renderRegister())
+  // Handles the user or browser event registered below.
   app.querySelector('#forgot-link')?.addEventListener('click', () => renderForgotPassword())
+  // Handles the user or browser event registered below.
   app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
     const input = toggle.parentElement.querySelector('input')
     const visible = input.type === 'text'
@@ -538,6 +608,7 @@ function renderAuth(mode = 'login', notice = '') {
     toggle.setAttribute('aria-label', visible ? 'Show password' : 'Hide password')
     toggle.textContent = visible ? '👁' : '🙈'
   }))
+  // Handles the user or browser event registered below.
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(form))
@@ -562,11 +633,19 @@ function renderAuth(mode = 'login', notice = '') {
   })
 }
 
+/**
+ * Renders or performs the render two factor challenge operation used by the page.
+ * @param {*} methods Value supplied to this operation.
+ * @param {*} notice Value supplied to this operation.
+ */
+
 function renderTwoFactorChallenge(methods, notice = '') {
   if (methods.includes('totp')) {
     app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">TWO-STEP VERIFICATION</p><h1>Verify it’s you</h1><p class="muted">Enter the 6-digit code from your authenticator app.</p><div id="two-factor-notice" aria-live="polite">${notice}</div><form id="totp-login-form"><label>6-digit code<input name="code" placeholder="123456 or recovery code" inputmode="text" autocomplete="one-time-code" required></label><label class="checkbox-label"><input type="checkbox" name="rememberDevice"> Remember this device for 30 days</label><button>Verify and sign in</button></form><button id="use-recovery-code" class="text-link" type="button">Use a recovery code instead</button><button id="two-factor-back" class="text-link" type="button">Back to sign in</button></section></main>`
     const code = app.querySelector('#totp-login-form').elements.namedItem('code')
+    // Handles the user or browser event registered below.
     app.querySelector('#use-recovery-code').addEventListener('click', () => { code.placeholder = 'Enter a recovery code'; code.focus() })
+    // Handles the user or browser event registered below.
     app.querySelector('#totp-login-form').addEventListener('submit', async (event) => {
       event.preventDefault()
       const form = event.currentTarget
@@ -577,6 +656,7 @@ function renderTwoFactorChallenge(methods, notice = '') {
         else renderApp()
       } catch (error) { app.querySelector('#two-factor-notice').innerHTML = message(error.message, true) }
     })
+    // Handles the user or browser event registered below.
     app.querySelector('#two-factor-back').addEventListener('click', async () => { try { await api.cancelLoginTwoFactor() } catch {} renderAuth('login') })
     return
   }
@@ -594,7 +674,9 @@ function renderTwoFactorChallenge(methods, notice = '') {
       codeForm.elements.namedItem('code').focus()
     } catch (error) { showError(error) }
   }
+  // Handles the user or browser event registered below.
   app.querySelectorAll('[data-two-factor-method]').forEach((button) => button.addEventListener('click', () => sendCode(button.dataset.twoFactorMethod)))
+  // Handles the user or browser event registered below.
   codeForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
@@ -603,7 +685,9 @@ function renderTwoFactorChallenge(methods, notice = '') {
       renderApp()
     } catch (error) { showError(error) }
   })
+  // Handles the user or browser event registered below.
   app.querySelector('#two-factor-resend').addEventListener('click', () => sendCode(selectedMethod))
+  // Handles the user or browser event registered below.
   app.querySelector('#two-factor-back').addEventListener('click', async () => {
     try {
       await api.cancelLoginTwoFactor()
@@ -613,6 +697,10 @@ function renderTwoFactorChallenge(methods, notice = '') {
     }
   })
 }
+
+/**
+ * Renders or performs the load public trends operation used by the page.
+ */
 
 async function loadPublicTrends() {
   const content = app.querySelector('#public-trends-content')
@@ -638,9 +726,16 @@ async function loadPublicTrends() {
   }
 }
 
+/**
+ * Renders or performs the render forgot password operation used by the page.
+ * @param {*} notice Value supplied to this operation.
+ */
+
 function renderForgotPassword(notice = '') {
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">ACCOUNT RECOVERY</p><h1>Reset your password</h1><p class="muted">Enter your account email. We will send a one-time reset link if it matches an active account.</p>${notice}<form id="forgot-form"><label>Email<input name="email" type="email" placeholder="name@example.com" required autocomplete="email"></label><button>Send reset link</button></form><button id="back-login" class="text-link" type="button">Back to sign in</button></section></main>`
+  // Handles the user or browser event registered below.
   app.querySelector('#back-login').addEventListener('click', () => renderAuth('login'))
+  // Handles the user or browser event registered below.
   app.querySelector('#forgot-form').addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
@@ -651,12 +746,19 @@ function renderForgotPassword(notice = '') {
   })
 }
 
+/**
+ * Renders or performs the render reset password operation used by the page.
+ * @param {*} token Value supplied to this operation.
+ */
+
 function renderResetPassword(token) {
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">ACCOUNT RECOVERY</p><h1>Choose a new password</h1><p class="muted">Use at least 12 characters. This link works once and expires after one hour.</p><form id="reset-form"><label>New password<span class="password-field"><input name="password" type="password" minlength="12" placeholder="At least 12 characters" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><label>Confirm password<span class="password-field"><input name="confirmPassword" type="password" minlength="12" placeholder="Enter the password again" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Update password</button></form></section></main>`
+  // Handles the user or browser event registered below.
   app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
     const input = toggle.parentElement.querySelector('input')
     input.type = input.type === 'password' ? 'text' : 'password'
   }))
+  // Handles the user or browser event registered below.
   app.querySelector('#reset-form').addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(event.target))
@@ -672,6 +774,12 @@ function renderResetPassword(token) {
   })
 }
 
+/**
+ * Renders or performs the render reset password with notice operation used by the page.
+ * @param {*} token Value supplied to this operation.
+ * @param {*} text Value supplied to this operation.
+ */
+
 function renderResetPasswordWithNotice(token, text) {
   renderResetPassword(token)
   const notice = document.createElement('p')
@@ -680,14 +788,22 @@ function renderResetPasswordWithNotice(token, text) {
   app.querySelector('#reset-form').before(notice)
 }
 
+/**
+ * Renders or performs the render register operation used by the page.
+ * @param {*} notice Value supplied to this operation.
+ */
+
 function renderRegister(notice = '') {
   app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><p class="kicker">FLOURi FARM · LFMIS</p><h1>Create an account</h1><p class="muted">Create your farm customer or livestock buyer account.</p>${notice}<form id="register-form"><label>Full name<input name="fullName" placeholder="e.g. Alex Kamau" required></label><label>Username<input name="username" placeholder="e.g. alex.kamau" required pattern="[A-Za-z0-9_.]{3,30}"></label><label>Email<input name="email" type="email" placeholder="name@example.com" required></label><label>Phone<input name="phone" type="tel" placeholder="e.g. 0712 345 678"></label><label>Account type<select name="role"><option value="customer">Farm customer</option><option value="buyer">Livestock buyer</option></select></label><label>Password<span class="password-field"><input name="password" type="password" minlength="12" placeholder="At least 12 characters" required><button type="button" class="password-toggle" aria-label="Show password">◉</button></span></label><button>Create account</button></form><button id="back-login" class="text-link" type="button">Back to sign in</button></section></main>`
+  // Handles the user or browser event registered below.
   app.querySelectorAll('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
     const input = toggle.parentElement.querySelector('input')
     input.type = input.type === 'password' ? 'text' : 'password'
     toggle.setAttribute('aria-label', input.type === 'password' ? 'Show password' : 'Hide password')
   }))
+  // Handles the user or browser event registered below.
   app.querySelector('#back-login').addEventListener('click', () => renderAuth('login'))
+  // Handles the user or browser event registered below.
   app.querySelector('#register-form').addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
@@ -698,12 +814,18 @@ function renderRegister(notice = '') {
   })
 }
 
+/**
+ * Renders or performs the render account security operation used by the page.
+ * @param {*} forced Value supplied to this operation.
+ */
+
 async function renderAccountSecurity(forced = false) {
   let status
   try {
     status = await api.twoFactorStatus()
   } catch (error) {
     app.innerHTML = `<main class="auth-shell"><section class="auth-panel"><h1>Account security</h1>${message(error.message, true)}<button id="security-back">Back to workspace</button></section></main>`
+    // Handles the user or browser event registered below.
     app.querySelector('#security-back').addEventListener('click', renderApp)
     return
   }
@@ -712,8 +834,12 @@ async function renderAccountSecurity(forced = false) {
   app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>Account security</h2>${forced ? '' : '<button id="security-back" class="quiet">Back to workspace</button>'}<div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="security-logout" class="quiet">Sign out</button></aside><main class="content"><header><div><p class="kicker">ACCOUNT SECURITY</p><h1>Two-step verification</h1><p class="muted">Use an authenticator app each time you sign in.</p></div><span class="health-pill">Two-factor ${status.enabled ? 'On' : 'Off'}</span></header><div id="security-notice" aria-live="polite">${forced ? message(status.enabled ? 'Two-step verification is on. Continue to your workspace below.' : 'Administrator accounts must turn on two-step verification before continuing.') : ''}</div><section class="module-grid"><section class="panel"><h2>Authenticator app</h2>${enabledPanel}<div id="totp-setup" hidden><p>Scan this QR code in your authenticator app, or enter the secret manually.</p><canvas id="totp-qr"></canvas><p><strong id="totp-secret"></strong></p><form id="totp-enable-form"><label>First 6-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><button>Verify and turn on</button></form></div><div id="recovery-once" hidden><h3>Save these recovery codes</h3><p>Each code works once. They will not be shown again.</p><pre id="recovery-values"></pre><button id="copy-recovery" class="secondary-action">Copy</button><button id="saved-recovery">I saved them</button></div>${forced && status.enabled ? '<button id="continue-after-2fa">Continue to workspace</button>' : ''}</section></section></main></div>`
   installFixedSidebar()
 
+  // Handles the user or browser event registered below.
+
   app.querySelector('#security-back')?.addEventListener('click', renderApp)
+  // Handles the user or browser event registered below.
   app.querySelector('#continue-after-2fa')?.addEventListener('click', () => { currentUser.mustEnable2fa = false; renderApp() })
+  // Handles the user or browser event registered below.
   app.querySelector('#security-logout').addEventListener('click', async () => {
     await api.logout()
     currentUser = null
@@ -721,16 +847,24 @@ async function renderAccountSecurity(forced = false) {
   })
   const notice = app.querySelector('#security-notice')
   const showCodes = (codes) => { app.querySelector('#recovery-values').textContent = codes.join('\n'); app.querySelector('#recovery-once').hidden = false }
+  // Handles the user or browser event registered below.
   app.querySelector('#start-totp')?.addEventListener('click', async () => {
     try { const setup = await api.setupTotp(); app.querySelector('#totp-setup').hidden = false; app.querySelector('#totp-secret').textContent = setup.secret; await QRCode.toCanvas(app.querySelector('#totp-qr'), setup.otpauthUri, { width: 220 }); }
     catch (error) { notice.innerHTML = message(error.message, true) }
   })
+  // Handles the user or browser event registered below.
   app.querySelector('#totp-enable-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { const result = await api.enableTotp(event.currentTarget.elements.namedItem('code').value); showCodes(result.recoveryCodes); app.querySelector('#totp-setup').hidden = true; } catch (error) { notice.innerHTML = message(error.message, true) } })
+  // Handles the user or browser event registered below.
   app.querySelector('#copy-recovery')?.addEventListener('click', async () => { await navigator.clipboard.writeText(app.querySelector('#recovery-values').textContent); notice.innerHTML = message('Recovery codes copied.') })
+  // Handles the user or browser event registered below.
   app.querySelector('#saved-recovery')?.addEventListener('click', () => { if (forced) renderAccountSecurity(true); else renderAccountSecurity() })
+  // Handles the user or browser event registered below.
   app.querySelector('#totp-disable-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { const data = Object.fromEntries(new FormData(event.currentTarget)); await api.disableTotp(data); currentUser.mustEnable2fa = currentUser.role === 'admin'; if (currentUser.mustEnable2fa) renderAccountSecurity(true); else renderAccountSecurity(); } catch (error) { notice.innerHTML = message(error.message, true) } })
+  // Handles the user or browser event registered below.
   app.querySelector('#recovery-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { showCodes((await api.regenerateRecoveryCodes(Object.fromEntries(new FormData(event.currentTarget)))).recoveryCodes) } catch (error) { notice.innerHTML = message(error.message, true) } })
+  // Handles the user or browser event registered below.
   app.querySelector('#revoke-devices')?.addEventListener('click', async () => { try { await api.revokeTrustedDevices(); await renderAccountSecurity() } catch (error) { notice.innerHTML = message(error.message, true) } })
+  // Handles the user or browser event registered below.
   app.querySelectorAll('.remove-two-factor-form').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(form))
@@ -743,6 +877,10 @@ async function renderAccountSecurity(forced = false) {
     }
   }))
 }
+
+/**
+ * Renders or performs the render app operation used by the page.
+ */
 
 async function renderApp() {
   if (['customer', 'buyer', 'worker', 'veterinarian'].includes(currentUser.role)) {
@@ -768,6 +906,7 @@ async function renderApp() {
   accountSecurityButton.className = 'quiet'
   accountSecurityButton.textContent = 'Account security'
   app.querySelector('aside .user-chip').before(accountSecurityButton)
+  // Handles the user or browser event registered below.
   accountSecurityButton.addEventListener('click', renderAccountSecurity)
   const stats = app.querySelector('.stats')
   stats.classList.add('overview-stats')
@@ -781,6 +920,7 @@ async function renderApp() {
   const dashboardGrid = app.querySelector('.content .grid')
   dashboardGrid.classList.add('dashboard-shortcuts')
   dashboardGrid.innerHTML = `<section class="panel"><h2>Animal records</h2><p class="muted">${animals.length} total records · ${Number(overviewData.activeAnimals || 0)} active</p><div class="dashboard-actions"><button type="button" class="secondary-action" data-overview-module="Livestock">Livestock register</button><button type="button" class="secondary-action" data-overview-module="Animal profiles">Animal profiles</button></div></section><section class="panel"><h2>Care and tasks</h2><p class="muted">${healthRecords.length} health records · ${Number(overviewData.healthFollowUpsDue || 0)} follow-ups due</p><div class="dashboard-actions"><button type="button" class="secondary-action" data-overview-module="Animal health">Animal health</button><button type="button" class="secondary-action" data-overview-module="Activities">Activities</button></div></section><section class="panel"><h2>Production and stock</h2><p class="muted">${milkTotal.toFixed(1)} L milk · ${Number(overviewData.eggsToday || 0).toLocaleString()} trays today</p><div class="dashboard-actions"><button type="button" class="secondary-action" data-overview-module="Production">Production</button><button type="button" class="secondary-action" data-overview-module="Inventory">Inventory</button></div></section><section class="panel"><h2>Customers and sales</h2><p class="muted">${Number(overviewData.pendingOrders || 0)} orders awaiting review</p><div class="dashboard-actions"><button type="button" class="secondary-action" data-overview-module="Sales & orders">Sales and orders</button><button type="button" class="secondary-action" data-overview-module="Feedback">Feedback</button></div></section>`
+  // Handles the user or browser event registered below.
   dashboardGrid.querySelectorAll('[data-overview-module]').forEach((button) => button.addEventListener('click', () => renderAdminModule(button.dataset.overviewModule)))
 
   const notificationControl = document.createElement('section')
@@ -799,11 +939,13 @@ async function renderApp() {
     notificationControl.querySelector('.notification-list').innerHTML = notifications.length
       ? notifications.map((item) => `<li class="notification-item ${Number(item.is_read) === 0 ? 'unread' : ''}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.message)}</p><small>${escapeHtml(item.created_at)}</small>${Number(item.is_read) === 0 ? `<button type="button" class="small-action" data-notification-read="${Number(item.id)}">Mark read</button>` : ''}</li>`).join('')
       : '<li class="empty">No notifications.</li>'
+    // Handles the user or browser event registered below.
     notificationControl.querySelectorAll('[data-notification-read]').forEach((button) => button.addEventListener('click', async () => {
       await api.markNotificationRead(button.dataset.notificationRead)
       await refreshNotifications()
     }))
   }
+  // Handles the user or browser event registered below.
   notificationToggle.addEventListener('click', async () => {
     const open = notificationPopover.hidden
     notificationPopover.hidden = !open
@@ -818,19 +960,27 @@ async function renderApp() {
   demoButton.type = 'button'
   demoButton.className = 'secondary-action'
   demoButton.textContent = 'Load demo data'
+  // Handles the user or browser event registered below.
   demoButton.addEventListener('click', async () => {
     try { const result = await api.loadDemoData(); alert(result.message); await renderApp() } catch (error) { alert(error.message) }
   })
   app.querySelector('.content header').append(demoButton)
   const navigation = app.querySelector('.workspace-nav')
   navigation.innerHTML = adminNavigation.map(([group, items], index) => `<details class="nav-group" ${index === 0 ? 'open' : ''}><summary>${group}</summary>${items.map((item) => `<button class="workspace-nav-item ${item === 'Overview' ? 'active' : ''}" data-module="${item}">${item}</button>`).join('')}</details>`).join('')
+  // Handles the user or browser event registered below.
   app.querySelectorAll('[data-module]').forEach((item) => item.addEventListener('click', () => {
     if (item.dataset.module === 'Overview') return renderApp()
     renderAdminModule(item.dataset.module)
   }))
   installFixedSidebar()
+  // Handles the user or browser event registered below.
   app.querySelector('#logout').addEventListener('click', async () => { await api.logout(); currentUser = null; renderAuth() })
 }
+
+/**
+ * Renders or performs the render admin module operation used by the page.
+ * @param {*} module Value supplied to this operation.
+ */
 
 function renderAdminModule(module) {
   if (module === 'Events') return renderEventsModule()
@@ -866,8 +1016,14 @@ function renderAdminModule(module) {
   app.querySelectorAll('[data-module]').forEach((item) => item.classList.toggle('active', item.dataset.module === module))
   const [title, description] = details
   app.querySelector('.content').innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>${escapeHtml(title)}</h1><p class="muted">${escapeHtml(description)}</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel module-intro"><p class="kicker">WORKSPACE</p><h2>${escapeHtml(title)}</h2><p class="muted">This module is now part of the admin workspace. Its records and actions will appear here as the backend slice is connected.</p><button class="primary-action" data-module="Overview">Back to overview</button></section><section class="panel"><p class="kicker">NEXT ACTION</p><h2>Keep records complete</h2><p class="muted">Use the overview for the currently connected livestock and animal-health records.</p></section></section>`
+  // Handles the user or browser event registered below.
   app.querySelector('[data-module="Overview"]').addEventListener('click', renderApp)
 }
+
+/**
+ * Renders or performs the render animal profiles module operation used by the page.
+ * @param {*} animalId Value supplied to this operation.
+ */
 
 async function renderAnimalProfilesModule(animalId = null) {
   const content = app.querySelector('.content')
@@ -899,20 +1055,34 @@ async function renderAnimalProfilesModule(animalId = null) {
       directory.closest('.table-wrap').nextElementSibling?.refreshPagination?.()
       if (!directory.closest('.table-wrap').nextElementSibling?.refreshPagination) directoryRows.forEach((row) => { row.hidden = row.dataset.filteredOut === 'true' })
     }
+    // Handles the user or browser event registered below.
     content.querySelector('#animal-profile-search').addEventListener('input', filterDirectory)
+    // Handles the user or browser event registered below.
     content.querySelector('#animal-profile-status-filter').addEventListener('change', filterDirectory)
+    // Handles the user or browser event registered below.
     content.querySelector('#animal-profile-species-filter').addEventListener('change', filterDirectory)
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-open-animal]').forEach((button) => button.addEventListener('click', () => renderAnimalProfilesModule(Number(button.dataset.openAnimal))))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
 // Show the animal record and, when permitted, the form that edits its profile fields.
+/**
+ * Renders or performs the render animal profile operation used by the page.
+ * @param {*} target Value supplied to this operation.
+ * @param {*} animalId Value supplied to this operation.
+ * @param {*} canChangeStatus Value supplied to this operation.
+ * @param {*} canEditDetails Value supplied to this operation.
+ * @param {*} onBack Value supplied to this operation.
+ */
 async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDetails, onBack) {
   const profile = await api.animalProfile(animalId)
   const animal = profile.animal
   const table = (title, columns, rows, empty) => `<section class="panel"><h2>${title}</h2><div class="table-wrap"><table><thead><tr>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${columns.length}" class="empty">${empty}</td></tr>`}</tbody></table></div></section>`
   target.innerHTML = `<header><div><p class="kicker">INDIVIDUAL ANIMAL RECORD</p><h1>${escapeHtml(animal.name || animal.tag_number)}</h1><p class="muted">${escapeHtml(animal.tag_number)} - ${escapeHtml(animal.species)} - ${escapeHtml(animal.breed || 'Breed not recorded')}</p></div><div class="animal-profile-actions"><button type="button" class="secondary-action" id="animal-profile-download">Download details</button><button type="button" class="secondary-action" id="animal-profile-back">Back to animal profiles</button></div></header><section class="panel animal-profile-summary"><div class="stats"><div><small>Status</small><strong>${escapeHtml(animal.status)}</strong>${animal.status_changed_at ? `<small>Updated ${escapeHtml(animal.status_changed_at)}</small>` : ''}</div><div><small>Sex</small><strong>${escapeHtml(animal.sex)}</strong></div><div><small>Date of birth</small><strong>${escapeHtml(animal.date_of_birth || 'Not recorded')}</strong></div><div><small>Weight</small><strong>${animal.weight_kg ? `${Number(animal.weight_kg).toLocaleString()} kg` : 'Not recorded'}</strong></div></div><p>${escapeHtml(animal.notes || 'No additional notes.')}</p>${canChangeStatus ? `<form id="animal-profile-status" class="compact-form"><label>Animal status<select name="status"><option value="active" ${animal.status === 'active' ? 'selected' : ''}>Active on farm</option><option value="sold" ${animal.status === 'sold' ? 'selected' : ''}>Sold</option><option value="deceased" ${animal.status === 'deceased' ? 'selected' : ''}>Deceased</option><option value="transferred" ${animal.status === 'transferred' ? 'selected' : ''}>Transferred</option></select></label><button>Update status</button></form><div id="animal-profile-feedback" aria-live="polite"></div>` : ''}</section>${table('Health and care history', ['Date', 'Type', 'Description', 'Medication'], profile.healthRecords.map((item) => `<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.medication || '-')}</td></tr>`).join(''), 'No health records for this animal.')}${table('Individual production history', ['Date', 'Produce', 'Session', 'Quantity'], profile.productionRecords.map((item) => `<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '-')}</td><td>${Number(item.quantity_produced).toLocaleString()} ${escapeHtml(item.unit)}</td></tr>`).join(''), 'No individual production records. Flock-level eggs are not assigned to individual animals.')}${table('Activities', ['Date', 'Activity', 'Details', 'Status'], profile.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td></tr>`).join(''), 'No activities linked to this animal.')}${table('Sale and order history', ['Order', 'Customer', 'Status', 'Order date', 'Fulfilled'], profile.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.customer_name || '-')}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.fulfilled_at || '-')}</td></tr>`).join(''), 'No sale or order history for this animal.')}`
+  // Handles the user or browser event registered below.
   target.querySelector('#animal-profile-back').addEventListener('click', onBack)
+  // Handles the user or browser event registered below.
   target.querySelector('#animal-profile-download').addEventListener('click', () => downloadAnimalProfile(profile))
 
   if (canEditDetails) {
@@ -921,6 +1091,7 @@ async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDet
     const species = ['cattle', 'goat', 'sheep', 'rabbit', 'chicken', 'other']
     editPanel.innerHTML = `<h2>Edit animal details</h2><form id="animal-profile-edit-form" class="compact-form"><label>Tag number<input name="tagNumber" maxlength="40" value="${escapeHtml(animal.tag_number)}" required></label><label>Name<input name="name" maxlength="80" value="${escapeHtml(animal.name || '')}"></label><label>Species<select name="species">${species.map((item) => `<option value="${item}" ${animal.species === item ? 'selected' : ''}>${item[0].toUpperCase()}${item.slice(1)}</option>`).join('')}</select></label><label>Breed<input name="breed" maxlength="80" value="${escapeHtml(animal.breed || '')}"></label><label>Sex<select name="sex"><option value="female" ${animal.sex === 'female' ? 'selected' : ''}>Female</option><option value="male" ${animal.sex === 'male' ? 'selected' : ''}>Male</option></select></label><label>Date of birth<input name="dateOfBirth" type="date" value="${escapeHtml(animal.date_of_birth || '')}"></label><label>Weight (kg)<input name="weightKg" type="number" min="0.01" step="0.01" value="${animal.weight_kg === null ? '' : Number(animal.weight_kg)}"></label><label>Notes<textarea name="notes" maxlength="500" rows="3">${escapeHtml(animal.notes || '')}</textarea></label><button>Save details</button></form><div id="animal-profile-edit-feedback" aria-live="polite"></div>`
     target.querySelector('.animal-profile-summary').after(editPanel)
+    // Handles the user or browser event registered below.
     editPanel.querySelector('#animal-profile-edit-form').addEventListener('submit', async (event) => {
       event.preventDefault()
       const feedback = editPanel.querySelector('#animal-profile-edit-feedback')
@@ -931,6 +1102,8 @@ async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDet
     })
   }
 
+  // Handles the user or browser event registered below.
+
   target.querySelector('#animal-profile-status')?.addEventListener('submit', async (event) => {
     event.preventDefault()
     const feedback = target.querySelector('#animal-profile-feedback')
@@ -940,6 +1113,10 @@ async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDet
     } catch (error) { feedback.innerHTML = message(error.message, true) }
   })
 }
+/**
+ * Renders or performs the download animal profile operation used by the page.
+ * @param {*} profile Value supplied to this operation.
+ */
 function downloadAnimalProfile(profile) {
   const sheets = [
     { name: 'Animal profile', columns: [['Tag number', 'tag_number', 95], ['Name', 'name', 120], ['Species', 'species', 80], ['Breed', 'breed', 115], ['Status', 'status', 80], ['Sex', 'sex', 65], ['Date of birth', 'date_of_birth', 90], ['Weight (kg)', 'weight_kg', 80], ['Notes', 'notes', 240]], rows: [profile.animal] },
@@ -971,6 +1148,11 @@ function downloadAnimalProfile(profile) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+/**
+ * Renders or performs the activity health fields operation used by the page.
+ * @param {*} animals Value supplied to this operation.
+ */
+
 function activityHealthFields(animals) {
   const options = animals.filter((animal) => animal.status === 'active')
     .map((animal) => `<option value="${Number(animal.id)}">${escapeHtml(animal.tag_number)} · ${escapeHtml(animal.species)}</option>`)
@@ -978,14 +1160,24 @@ function activityHealthFields(animals) {
   return `<label class="checkbox-field"><input type="checkbox" name="healthConcern" value="1"> I noticed a health problem</label><fieldset data-health-concern-fields disabled hidden><label>Animal<select name="animalId" required><option value="">Choose animal</option>${options}</select></label><label>Symptoms<textarea name="symptoms" rows="3" maxlength="220" required placeholder="What did you notice?"></textarea></label></fieldset>`
 }
 
+/**
+ * Renders or performs the wire activity health fields operation used by the page.
+ * @param {*} form Value supplied to this operation.
+ */
+
 function wireActivityHealthFields(form) {
   const checkbox = form.querySelector('[name="healthConcern"]')
   const fields = form.querySelector('[data-health-concern-fields]')
+  // Handles the user or browser event registered below.
   checkbox.addEventListener('change', () => {
     fields.hidden = !checkbox.checked
     fields.disabled = !checkbox.checked
   })
 }
+
+/**
+ * Renders or performs the render activities module operation used by the page.
+ */
 
 async function renderActivitiesModule() {
   const content = app.querySelector('.content')
@@ -994,10 +1186,16 @@ async function renderActivitiesModule() {
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Activities</h1><p class="muted">Plan and complete daily farm work.</p></div><span class="health-pill">Live records</span></header><section class="module-grid"><section class="panel"><h2>Plan activity</h2><form id="activity-form" class="compact-form"><select name="activityType"><option value="feeding">Feeding</option><option value="milking">Milking</option><option value="cleaning">Cleaning</option><option value="health">Health follow-up</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select><input name="description" placeholder="e.g. Feed cattle in the west pen" required><input name="activityAt" type="datetime-local" required>${activityHealthFields(animalData.animals)}<button>Save activity</button></form></section><section class="panel"><h2>Activity list</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>${data.activities.length ? data.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td><td>${item.status === 'planned' ? `<button class="small-action" data-complete="${item.id}">Complete</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No activities yet.</td></tr>'}</tbody></table></div></section></section>`
     const form = content.querySelector('#activity-form')
     wireActivityHealthFields(form)
+    // Handles the user or browser event registered below.
     form.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createActivity(Object.fromEntries(new FormData(form))); await renderActivitiesModule() } catch (error) { content.insertAdjacentHTML('afterbegin', message(error.message, true)) } })
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-complete]').forEach((button) => button.addEventListener('click', async () => { await api.completeActivity(button.dataset.complete); await renderActivitiesModule() }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
+
+/**
+ * Renders or performs the render events module operation used by the page.
+ */
 
 async function renderEventsModule() {
   const content = app.querySelector('.content')
@@ -1018,6 +1216,7 @@ async function renderEventsModule() {
       content.querySelector('#event-form-title').textContent = 'Create event'
       content.querySelector('#event-save-button').textContent = 'Save event'
     }
+    // Handles the user or browser event registered below.
     form.addEventListener('submit', async (event) => {
       event.preventDefault()
       const values = Object.fromEntries(new FormData(form))
@@ -1031,7 +1230,9 @@ async function renderEventsModule() {
         content.querySelector('#events-feedback').innerHTML = message(error.message, true)
       }
     })
+    // Handles the user or browser event registered below.
     content.querySelector('#event-reset-button').addEventListener('click', resetForm)
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-event-edit]').forEach((button) => button.addEventListener('click', () => {
       const selected = events.find((event) => String(event.id) === button.dataset.eventEdit)
       if (!selected) return
@@ -1047,6 +1248,7 @@ async function renderEventsModule() {
       content.querySelector('#event-save-button').textContent = 'Save changes'
       form.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }))
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-event-status]').forEach((button) => button.addEventListener('click', async () => {
       try {
         await api.setEventStatus(button.dataset.eventStatus, button.dataset.status)
@@ -1057,6 +1259,13 @@ async function renderEventsModule() {
     }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
+
+/**
+ * Renders or performs the bind production editor operation used by the page.
+ * @param {*} root Value supplied to this operation.
+ * @param {*} records Value supplied to this operation.
+ * @param {*} refresh Value supplied to this operation.
+ */
 
 function bindProductionEditor(root, records, refresh) {
   const form = root.querySelector('#produce-form, #role-production-form')
@@ -1074,11 +1283,14 @@ function bindProductionEditor(root, records, refresh) {
     feedback.innerHTML = ''
     form.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
+  // Handles the user or browser event registered below.
   root.querySelectorAll('[data-production-edit]').forEach((button) => button.addEventListener('click', () => {
     const record = records.find((item) => Number(item.id) === Number(button.dataset.productionEdit))
     if (record) loadRecord(record)
   }))
+  // Handles the user or browser event registered below.
   form.querySelector('[data-cancel-production]')?.addEventListener('click', () => refresh())
+  // Handles the user or browser event registered below.
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const recordId = form.dataset.recordId
@@ -1091,11 +1303,16 @@ function bindProductionEditor(root, records, refresh) {
       feedback.innerHTML = message(error.message, true)
       if (error.existingRecord) {
         feedback.insertAdjacentHTML('beforeend', '<button type="button" class="small-action" data-edit-existing-record>Edit existing record</button>')
+        // Handles the user or browser event registered below.
         feedback.querySelector('[data-edit-existing-record]').addEventListener('click', () => loadRecord(error.existingRecord))
       }
     }
   })
 }
+
+/**
+ * Renders or performs the render production module operation used by the page.
+ */
 
 async function renderProductionModule() {
   const content = app.querySelector('.content')
@@ -1107,6 +1324,11 @@ async function renderProductionModule() {
     bindRecentProduceFilters(content)
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
+
+/**
+ * Renders or performs the bind recent produce filters operation used by the page.
+ * @param {*} root Value supplied to this operation.
+ */
 
 function bindRecentProduceFilters(root) {
   const panel = [...root.querySelectorAll('.module-grid > .panel')].find((item) => item.querySelector('#produce-filter-name'))
@@ -1123,9 +1345,15 @@ function bindRecentProduceFilters(root) {
     if (controls?.refreshPagination) controls.refreshPagination()
     else rows.forEach((row) => { row.hidden = row.dataset.filteredOut === 'true' })
   }
+  // Handles the user or browser event registered below.
   panel.querySelectorAll('.produce-record-filters select, .produce-record-filters input').forEach((control) => control.addEventListener('change', apply))
   apply()
 }
+
+/**
+ * Renders or performs the render production summary operation used by the page.
+ * @param {*} summary Value supplied to this operation.
+ */
 
 function renderProductionSummary(summary) {
   const format = (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
@@ -1140,6 +1368,10 @@ function renderProductionSummary(summary) {
   const shareText = `Flouri Farm production summary (${summary.weekStart} to ${summary.today})\n${shareLines.join('\n') || 'No production records.'}`
   return `<section class="panel production-summary"><div class="panel-head"><div><h2>Production summary</h2><p class="muted">Recorded totals through ${escapeHtml(summary.today)}.</p></div><a class="share-link" href="https://wa.me/?text=${encodeURIComponent(shareText)}" target="_blank" rel="noopener noreferrer">Share on WhatsApp</a></div><div class="production-summary-grid"><section><h3>Last seven days</h3><div class="table-wrap"><table><thead><tr><th>Produce</th><th>Produced</th><th>Sold</th><th>Damaged</th></tr></thead><tbody>${totalsRows(summary.weeklyTotals)}</tbody></table></div></section><section><h3>This month</h3><div class="table-wrap"><table><thead><tr><th>Produce</th><th>Produced</th><th>Sold</th><th>Damaged</th></tr></thead><tbody>${totalsRows(summary.monthlyTotals)}</tbody></table></div></section></div><h3>Daily figures</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produce</th><th>Produced</th></tr></thead><tbody>${dailyRows}</tbody></table></div></section>`
 }
+
+/**
+ * Renders or performs the render inventory module operation used by the page.
+ */
 
 async function renderInventoryModule() {
   const content = app.querySelector('.content')
@@ -1157,7 +1389,9 @@ async function renderInventoryModule() {
     transactionPanel.className = 'panel inventory-history'
     transactionPanel.innerHTML = `<h2>Record stock movement</h2><p class="muted">Use a positive quantity for stock in and a negative quantity for stock out. Adjustments may be positive or negative.</p><form id="inventory-transaction-form" class="compact-form"><select name="itemId" required><option value="">Choose item</option>${data.items.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.quantity_on_hand)} ${escapeHtml(item.unit)}</option>`).join('')}</select><select name="transactionType"><option value="in">Stock in</option><option value="out">Stock out</option><option value="adjustment">Adjustment</option></select><input name="quantityChange" type="number" step="0.01" placeholder="e.g. 20 or -5" required><input name="reason" maxlength="255" placeholder="e.g. Feed given to cattle" required><button>Save movement</button></form><h2>Transaction history</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Item</th><th>Type</th><th>Change</th><th>Reason</th></tr></thead><tbody>${transactionData.transactions.length ? transactionData.transactions.map((item) => `<tr><td>${escapeHtml(item.transaction_date)}</td><td>${escapeHtml(item.item_name)}</td><td>${escapeHtml(item.transaction_type)}</td><td>${Number(item.quantity_change).toLocaleString()}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No stock movements recorded.</td></tr>'}</tbody></table></div>`
     content.append(transactionPanel)
+    // Handles the user or browser event registered below.
     content.querySelector('#inventory-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createInventoryItem(Object.fromEntries(new FormData(event.target))); await renderInventoryModule() })
+    // Handles the user or browser event registered below.
     transactionPanel.querySelector('#inventory-transaction-form').addEventListener('submit', async (event) => {
       event.preventDefault()
       const values = Object.fromEntries(new FormData(event.target))
@@ -1169,6 +1403,9 @@ async function renderInventoryModule() {
 }
 
 // Render the farm's order, sales, catalogue, expense, and payment controls.
+/**
+ * Renders or performs the render commerce module operation used by the page.
+ */
 async function renderCommerceModule() {
   const content = app.querySelector('.content')
   try {
@@ -1180,7 +1417,9 @@ async function renderCommerceModule() {
       warning.textContent = 'Some orders cannot be accepted until every order item is linked to an active product listing.'
       content.querySelector('.module-grid').before(warning)
     }
+    // Handles the user or browser event registered below.
     content.querySelector('#order-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createOrder(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
+    // Handles the user or browser event registered below.
     content.querySelector('#sale-form').addEventListener('submit', async (event) => { event.preventDefault(); await api.createSale(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() })
     const commerceTools = document.createElement('section')
     commerceTools.className = 'module-grid commerce-tools'
@@ -1257,6 +1496,7 @@ async function renderCommerceModule() {
       }
       feedback.innerHTML = message(error.message, true)
     }
+    // Handles the user or browser event registered below.
     content.querySelectorAll('.order-action').forEach((button) => button.addEventListener('click', async () => {
       let totalAmount
       if (button.dataset.orderStatus === 'quoted') {
@@ -1269,6 +1509,7 @@ async function renderCommerceModule() {
         await renderCommerceModule()
       } catch (error) { showCommerceError(error) }
     }))
+    // Handles the user or browser event registered below.
     content.querySelectorAll('.order-link-action').forEach((button) => button.addEventListener('click', async () => {
       const select = button.parentElement.querySelector('.order-product-link')
       if (!select?.value) {
@@ -1280,9 +1521,13 @@ async function renderCommerceModule() {
         await renderCommerceModule()
       } catch (error) { showCommerceError(error) }
     }))
+    // Handles the user or browser event registered below.
     content.querySelector('#product-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createProduct(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() } catch (error) { showCommerceError(error) } })
+    // Handles the user or browser event registered below.
     content.querySelector('#expense-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createExpense(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() } catch (error) { showCommerceError(error) } })
+    // Handles the user or browser event registered below.
     content.querySelector('#payment-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createPayment(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() } catch (error) { showCommerceError(error) } })
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-confirm-payment]').forEach((button) => button.addEventListener('click', async () => {
       button.disabled = true
       try {
@@ -1295,6 +1540,13 @@ async function renderCommerceModule() {
     }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
+
+/**
+ * Renders or performs the render forecast chart operation used by the page.
+ * @param {*} observations Value supplied to this operation.
+ * @param {*} predictions Value supplied to this operation.
+ * @param {*} unit Value supplied to this operation.
+ */
 
 function renderForecastChart(observations, predictions, unit = 'litres') {
   const actual = observations.slice(-28)
@@ -1328,6 +1580,14 @@ function renderForecastChart(observations, predictions, unit = 'litres') {
     <text x="4" y="${Math.max(top + 8, midY - 5)}">${Number((minimum + maximum) / 2).toFixed(0)} ${escapeHtml(unit)}</text>
   </svg><div class="forecast-legend"><span><i class="forecast-legend-actual"></i>Recorded</span><span><i class="forecast-legend-prediction"></i>Forecast</span></div>`
 }
+
+/**
+ * Renders or performs the render forecast panel operation used by the page.
+ * @param {*} data Value supplied to this operation.
+ * @param {*} error Value supplied to this operation.
+ * @param {*} selectedProduct Value supplied to this operation.
+ * @param {*} productOptions Value supplied to this operation.
+ */
 
 function renderForecastPanel(data, error, selectedProduct = 'milk', productOptions = []) {
   const selectedInfo = productOptions.find((item) => item.name.toLowerCase() === selectedProduct)
@@ -1365,6 +1625,10 @@ function renderForecastPanel(data, error, selectedProduct = 'milk', productOptio
     <p class="muted forecast-limitation">${escapeHtml(result.limitations)} Backtest results are one-day-ahead; the forecast horizon is seven days.</p>
   </section>`
 }
+
+/**
+ * Renders or performs the render farm trends module operation used by the page.
+ */
 
 async function renderFarmTrendsModule() {
   const content = app.querySelector('.content')
@@ -1446,10 +1710,12 @@ async function renderFarmTrendsModule() {
     try {
       data = await api.trends()
       content.querySelector('#trends-content').innerHTML = `<nav class="trend-tabs" aria-label="Geographic scope"><button type="button" data-trend-scope="kenya" class="${scope === 'kenya' ? 'active' : ''}">Kenya</button><button type="button" data-trend-scope="east_africa" class="${scope === 'east_africa' ? 'active' : ''}">East Africa</button><button type="button" data-trend-scope="global" class="${scope === 'global' ? 'active' : ''}">Global</button></nav>${renderStatus()}${renderLive()}${renderSynthetic()}${await renderHistory()}${renderFarm()}`
+      // Handles the user or browser event registered below.
       content.querySelectorAll('[data-trend-scope]').forEach((button) => button.addEventListener('click', () => {
         scope = button.dataset.trendScope
         load()
       }))
+      // Handles the user or browser event registered below.
       content.querySelector('#trend-history-range')?.addEventListener('change', (event) => {
         historyRange = event.target.value
         load()
@@ -1458,6 +1724,8 @@ async function renderFarmTrendsModule() {
       content.querySelector('#trends-content').innerHTML = message(error.message, true)
     }
   }
+
+  // Handles the user or browser event registered below.
 
   content.querySelector('#trends-refresh').addEventListener('click', async (event) => {
     event.currentTarget.disabled = true
@@ -1472,6 +1740,10 @@ async function renderFarmTrendsModule() {
   })
   await load()
 }
+
+/**
+ * Renders or performs the render reports module operation used by the page.
+ */
 
 async function renderReportsModule() {
   const content = app.querySelector('.content')
@@ -1512,11 +1784,18 @@ async function renderReportsModule() {
       } catch (error) {
         if (panel.isConnected) panel.outerHTML = renderForecastPanel(null, error, product, forecastProducts)
       }
+      // Handles the user or browser event registered below.
       content.querySelector('#forecast-product')?.addEventListener('change', handleForecastProduct)
     }
+    // Handles the user or browser event registered below.
     content.querySelector('#forecast-product')?.addEventListener('change', handleForecastProduct)
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
+
+/**
+ * Renders or performs the render assistant module operation used by the page.
+ * @param {*} target Value supplied to this operation.
+ */
 
 async function renderAssistantModule(target = app.querySelector('.content')) {
   const content = target
@@ -1527,10 +1806,12 @@ async function renderAssistantModule(target = app.querySelector('.content')) {
   const starterPrompts = document.createElement('div'); starterPrompts.className = 'assistant-suggestions'
   for (const text of ['Show milk production for the last 30 days', 'Compare sales and expenses this year', 'How is my farm doing?']) {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary-action'; button.textContent = text
+    // Handles the user or browser event registered below.
     button.addEventListener('click', () => { const form = content.querySelector('#assistant-form'); form.elements.namedItem('message').value = text; form.requestSubmit() })
     starterPrompts.append(button)
   }
   content.querySelector('#assistant-messages').append(starterPrompts)
+  // Handles the user or browser event registered below.
   content.querySelector('#assistant-form').addEventListener('submit', async (event) => {
     event.preventDefault()
     const form = event.target
@@ -1541,6 +1822,7 @@ async function renderAssistantModule(target = app.querySelector('.content')) {
     input.value = ''
     try { const result = await api.assistantChat(question); content.querySelector('#assistant-mode').textContent = result.mode || 'Analytics'; appendAssistantResponse(messages, result) } catch (error) { messages.insertAdjacentHTML('beforeend', `<p class="message danger">${escapeHtml(error.message)}</p>`) }
   })
+  // Handles the user or browser event registered below.
   content.querySelector('#assistant-scenario-form')?.addEventListener('submit', async (event) => {
     event.preventDefault()
     const result = content.querySelector('#assistant-scenario-result')
@@ -1560,6 +1842,12 @@ async function renderAssistantModule(target = app.querySelector('.content')) {
     } catch (error) { result.innerHTML = message(error.message, true) }
   })
 }
+
+/**
+ * Renders or performs the append assistant response operation used by the page.
+ * @param {*} messages Value supplied to this operation.
+ * @param {*} result Value supplied to this operation.
+ */
 
 function appendAssistantResponse(messages, result) {
   const bubble = document.createElement('article')
@@ -1585,7 +1873,9 @@ function appendAssistantResponse(messages, result) {
     const chart = new Chart(canvas, { type: chartData.type, data: { labels: chartData.labels, datasets }, options: { responsive: true, maintainAspectRatio: false, color: ink, plugins: { legend: { display: chartData.type === 'pie' || datasets.length > 1, labels: { color: ink, usePointStyle: true } }, tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${context.formattedValue} ${chartData.unit || ''}` } } }, scales: chartData.type === 'pie' ? {} : { x: { ticks: { color: ink, maxRotation: 45 }, grid: { color: `${ink}18` } }, y: { beginAtZero: true, ticks: { color: ink }, grid: { color: `${ink}18` }, title: { display: Boolean(chartData.unit), text: chartData.unit, color: ink } } } } })
     refs.push({ chartData, canvas, chart })
     const filename = String(chartData.title || 'chart').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    // Handles the user or browser event registered below.
     png.addEventListener('click', () => canvas.toBlob((blob) => { if (blob) downloadAssistantFile(blob, `${filename}.png`) }, 'image/png'))
+    // Handles the user or browser event registered below.
     csv.addEventListener('click', () => {
       const rows = [['period', ...(chartData.datasets || []).map((set) => `${set.label} (${chartData.unit || ''})`)]]
       chartData.labels.forEach((label, row) => rows.push([label, ...(chartData.datasets || []).map((set) => set.data[row] ?? '')]))
@@ -1595,19 +1885,33 @@ function appendAssistantResponse(messages, result) {
   }
   if (refs.length > 1) {
     const pdf = document.createElement('button'); pdf.type = 'button'; pdf.className = 'secondary-action assistant-pdf-action'; pdf.textContent = 'Download report (PDF)'
+    // Handles the user or browser event registered below.
     pdf.addEventListener('click', () => printAssistantReport(result.answer || '', refs)); bubble.append(pdf)
   }
   if (Array.isArray(result.suggestions) && result.suggestions.length) {
     const suggestions = document.createElement('div'); suggestions.className = 'assistant-suggestions'
+    // Handles the user or browser event registered below.
     result.suggestions.forEach((text) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary-action'; button.textContent = text; button.addEventListener('click', () => { const form = messages.parentElement.querySelector('#assistant-form'); form.elements.namedItem('message').value = text; form.requestSubmit() }); suggestions.append(button) })
     bubble.append(suggestions)
   }
   messages.append(bubble); messages.scrollTop = messages.scrollHeight
 }
 
+/**
+ * Renders or performs the download assistant file operation used by the page.
+ * @param {*} blob Value supplied to this operation.
+ * @param {*} filename Value supplied to this operation.
+ */
+
 function downloadAssistantFile(blob, filename) {
   const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
+
+/**
+ * Renders or performs the print assistant report operation used by the page.
+ * @param {*} advice Value supplied to this operation.
+ * @param {*} charts Value supplied to this operation.
+ */
 
 function printAssistantReport(advice, charts) {
   const popup = window.open('', '_blank')
@@ -1617,9 +1921,18 @@ function printAssistantReport(advice, charts) {
   popup.document.close()
 }
 
+/**
+ * Renders or performs the render livestock module operation used by the page.
+ */
+
 async function renderLivestockModule() {
+  // Handles the user or browser event registered below.
   const content=app.querySelector('.content'); try { const data=await api.animals(); content.innerHTML=`<header><div><p class="kicker">FARM MODULE</p><h1>Livestock register</h1><p class="muted">Register and review the herd.</p></div><span class="health-pill">${data.animals.length} animals</span></header><section class="panel module-panel"><form id="animal-module-form" class="compact-form"><input name="tagNumber"   placeholder="e.g. CAT-001" required><select name="species"><option value="cattle">Cattle</option><option value="goat">Goat</option><option value="rabbit">Rabbit</option><option value="chicken">Chicken</option><option value="sheep">Sheep</option></select>  <input name="breed" placeholder="e.g. Friesian or Kienyeji"><select name="sex"><option value="female">Female</option><option value="male">Male</option></select><button>Add animal</button></form><div id="animal-module-feedback" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Species</th><th>Breed</th><th>Status</th></tr></thead><tbody>${data.animals.map((a)=>`<tr><td>${escapeHtml(a.tag_number)}</td><td>${a.species}</td><td>${escapeHtml(a.breed||'—')}</td><td>${a.status}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No animals yet.</td></tr>'}</tbody></table></div></section>`; content.querySelector('form').addEventListener('submit',async(e)=>{e.preventDefault();try{await api.createAnimal(Object.fromEntries(new FormData(e.target)));await renderLivestockModule()}catch(error){content.querySelector('#animal-module-feedback').innerHTML=message(error.message,true)}}) } catch(error){content.innerHTML=message(error.message,true)}
 }
+
+/**
+ * Renders or performs the render health module operation used by the page.
+ */
 
 async function renderHealthModule() {
   const content = app.querySelector('.content')
@@ -1638,8 +1951,10 @@ async function renderHealthModule() {
         ? visibleRecords.map((record) => `<tr><td>${escapeHtml(record.record_date)}</td><td>${escapeHtml(speciesNames[record.species] || record.species)}</td><td>${escapeHtml(record.tag_number)}</td><td>${escapeHtml(record.record_type)}</td><td>${escapeHtml(record.description)}</td></tr>`).join('')
         : '<tr><td colspan="5" class="empty">No health records for this animal type.</td></tr>'
     }
+    // Handles the user or browser event registered below.
     filter.addEventListener('change', renderRows)
     renderRows()
+    // Handles the user or browser event registered below.
     content.querySelector('#health-module-form').addEventListener('submit', async (event) => {
       event.preventDefault()
       try {
@@ -1650,11 +1965,16 @@ async function renderHealthModule() {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
+/**
+ * Renders or performs the render users module operation used by the page.
+ */
+
 async function renderUsersModule() {
   const content = app.querySelector('.content')
   try {
     const data = await api.users()
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>User accounts</h1><p class="muted">Create accounts and control access.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create account</h2><form id="user-module-form" class="compact-form">    <input name="fullName" placeholder="e.g. Alex Kamau" required>    <input name="username" placeholder="e.g. alex.kamau" required>    <input name="email" type="email" placeholder="name@example.com" required>    <input name="password" type="password" minlength="12" placeholder="Temporary password, at least 12 characters" required><select name="role"><option value="worker">Worker</option><option value="veterinarian">Veterinarian</option><option value="buyer">Buyer</option><option value="customer">Customer</option></select><button>Create account</button></form></section><section class="panel"><h2>Accounts</h2><p class="muted">Removing an account revokes sign-in access; farm records are retained.</p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody>${data.users.length ? data.users.map((user) => `<tr><td>${escapeHtml(user.full_name)}</td><td>${escapeHtml(user.role)}</td><td>${user.is_active ? 'Active' : 'Inactive'}</td><td><button class="danger-action" type="button" data-remove-user="${user.id}" ${Number(user.id) === Number(currentUser.id) ? 'disabled title="You cannot remove your own account"' : ''}>Remove</button></td></tr>`).join('') : '<tr><td colspan="4" class="empty">No user accounts.</td></tr>'}</tbody></table></div></section></section>`
+    // Handles the user or browser event registered below.
     content.querySelector('#user-module-form').addEventListener('submit', async (event) => {
       event.preventDefault()
       try {
@@ -1662,6 +1982,7 @@ async function renderUsersModule() {
         await renderUsersModule()
       } catch (error) { content.prepend(Object.assign(document.createElement('div'), { innerHTML: message(error.message, true) })) }
     })
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-remove-user]').forEach((button) => button.addEventListener('click', async () => {
       const user = data.users.find((item) => Number(item.id) === Number(button.dataset.removeUser))
       if (!user || !window.confirm(`Remove ${user.full_name}'s account? They will lose sign-in access. Farm records will be retained.`)) return
@@ -1678,12 +1999,17 @@ async function renderUsersModule() {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
+/**
+ * Renders or performs the render permissions module operation used by the page.
+ */
+
 async function renderPermissionsModule() {
   const content = app.querySelector('.content')
   try {
     const { matrix } = await api.permissions()
     const roleForms = Object.entries(matrix).filter(([role]) => role !== 'admin').map(([role, permissions]) => `<section class="panel permission-role"><h2>${escapeHtml(role)}</h2><form data-permission-role="${escapeHtml(role)}"><div class="permission-list">${Object.entries(permissions).map(([code, permission]) => `<label class="permission-item"><input type="checkbox" name="permission" value="${escapeHtml(code)}" ${permission.allowed ? 'checked' : ''}><span>${escapeHtml(permission.label)}</span></label>`).join('')}</div><button type="submit">Save ${escapeHtml(role)} access</button></form></section>`).join('')
     content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Role permissions</h1><p class="muted">Changes take effect on the next API request. Administrator access is fixed to prevent lockout.</p></div><span class="health-pill">${Object.keys(matrix).length - 1} configurable roles</span></header><div class="permissions-grid">${roleForms}</div>`
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-permission-role]').forEach((form) => form.addEventListener('submit', async (event) => {
       event.preventDefault()
       const selected = new FormData(form).getAll('permission')
@@ -1696,6 +2022,11 @@ async function renderPermissionsModule() {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
+/**
+ * Renders or performs the render audit module operation used by the page.
+ * @param {*} filters Value supplied to this operation.
+ */
+
 async function renderAuditModule(filters = {}) {
   const content = app.querySelector('.content')
   try {
@@ -1707,12 +2038,15 @@ async function renderAuditModule(filters = {}) {
       return `<tr><td>${escapeHtml(log.created_at)}</td><td>${escapeHtml(log.user_name || 'System/unknown')}</td><td>${escapeHtml(log.action)}</td><td>${escapeHtml(log.entity_type)}${log.entity_id ? ` #${Number(log.entity_id)}` : ''}</td><td><pre>${escapeHtml(details)}</pre></td><td>${escapeHtml(log.ip_address || '—')}</td></tr>`
     }).join('')
     content.innerHTML = `<header><div><p class="kicker">ADMINISTRATION</p><h1>Audit log</h1><p class="muted">Review sign-ins, permission changes, account actions, payments, orders and exports.</p></div><div class="button-row"><button id="audit-export" class="secondary-action">Export farm data</button><button id="backup-now">Back up now</button></div></header><section class="panel" id="audit-export-panel" hidden><h2>Download farm data</h2><p class="muted">Select the records and format, then enter a fresh code from your authenticator app.</p>${dataExportForm(exportOptions.sections || [], 'audit-data-export-form')}<div data-export-feedback aria-live="polite"></div></section><section class="panel"><form id="audit-filter-form" class="audit-filters"><label>User<select name="userId"><option value="">All users</option>${users}</select></label><label>Action    <input name="action" placeholder="e.g. sign_in_succeeded" value="${escapeHtml(filters.action || '')}" maxlength="40"></label><label>From<input type="date" name="from" value="${escapeHtml(filters.from || '')}"></label><label>To<input type="date" name="to" value="${escapeHtml(filters.to || '')}"></label><button>Filter</button></form><div id="audit-notice" aria-live="polite"></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP address</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No audit entries match these filters.</td></tr>'}</tbody></table></div></section>`
+    // Handles the user or browser event registered below.
     content.querySelector('#audit-filter-form').addEventListener('submit', (event) => {
       event.preventDefault()
       renderAuditModule(Object.fromEntries(new FormData(event.target)))
     })
+    // Handles the user or browser event registered below.
     content.querySelector('#audit-export').addEventListener('click', () => { content.querySelector('#audit-export-panel').hidden = !content.querySelector('#audit-export-panel').hidden })
     bindDataExportForm(content, 'audit-data-export-form')
+    // Handles the user or browser event registered below.
     content.querySelector('#backup-now').addEventListener('click', async (event) => {
       const button = event.currentTarget
       button.disabled = true
@@ -1727,6 +2061,11 @@ async function renderAuditModule(filters = {}) {
     })
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
+
+/**
+ * Renders or performs the render rights module operation used by the page.
+ * @param {*} target Value supplied to this operation.
+ */
 
 async function renderRightsModule(target = app.querySelector('.content')) {
   const content = target
@@ -1752,17 +2091,22 @@ async function renderRightsModule(target = app.querySelector('.content')) {
     const exportPanel = !canExport ? '' : `<section class="panel"><h2>Download your data</h2><p class="muted">You can download ${escapeHtml(exportScope)}. Select the record groups and format, then enter a fresh code from your authenticator app for each download.</p>${!exportSections.length ? '<p class="message danger">No exportable record groups are available to this account.</p>' : secondFactor?.enabled ? `${dataExportForm(exportSections)}<div data-export-feedback aria-live="polite"></div>` : `<p class="message danger">Turn on authenticator 2-step verification before downloading data.</p><button type="button" id="export-enable-2fa">Set up authenticator</button>`}</section>`
     content.innerHTML = `<header><div><p class="kicker">ACCOUNT & DATA</p><h1>Your rights</h1><p class="muted">Access is based on your assigned role: ${escapeHtml(data.role)}.</p></div><span class="health-pill">${grants.length} granted actions</span></header><section class="panel rights-panel"><h2>Your access</h2><ul class="rights-permissions">${grants.map((permission) => `<li>${escapeHtml(permission.label)}</li>`).join('') || '<li>No module permissions are currently assigned.</li>'}</ul><h2>Personal data</h2><div class="rights-copy"><p>You may access records made available to your role and ask the farm administrator to correct your account details or a farm record.</p><p>You may request a copy of your personal account data or ask for your account to be deleted or deactivated. Some transaction and audit records may need to be retained for farm operations or legal obligations; the administrator can explain what applies.</p><p>Your sign-in email address is used for security alerts. Contact the farm administrator to update it or discuss a data request.</p></div></section>${exportPanel}`
     bindDataExportForm(content)
+    // Handles the user or browser event registered below.
     content.querySelector('#export-enable-2fa')?.addEventListener('click', () => renderAccountSecurity())
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
 // Admin view of all users' feedback, including individual and bulk resolution actions.
+/**
+ * Renders or performs the render feedback module operation used by the page.
+ */
 async function renderFeedbackModule() {
   const content = app.querySelector('.content')
   try {
     const data = await api.feedback()
     const openCount = data.feedback.filter((item) => item.status === 'open').length
     content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Feedback</h1><p class="muted">Review customer feedback, complaints and suggestions.</p></div><div class="feedback-header-actions"><span class="health-pill">${data.feedback.length} messages</span><button type="button" class="secondary-action" id="resolve-all-feedback" ${openCount ? '' : 'disabled'}>Resolve all (${openCount})</button></div></header><div id="feedback-admin-notice" aria-live="polite"></div><section class="panel module-panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>From</th><th>Type</th><th>Message</th><th>Status</th><th></th></tr></thead><tbody>${data.feedback.map((item) => `<tr><td>${escapeHtml(item.created_at)}</td><td>${escapeHtml(item.user_name || 'Customer')}</td><td>${escapeHtml(item.category)}</td><td>${escapeHtml(item.message)}</td><td>${escapeHtml(item.status)}</td><td>${item.status === 'open' ? `<button class="small-action" data-resolve="${Number(item.id)}">Resolve</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No feedback yet.</td></tr>'}</tbody></table></div></section>`
+    // Handles the user or browser event registered below.
     content.querySelector('#resolve-all-feedback').addEventListener('click', async (event) => {
       if (!openCount || !window.confirm(`Resolve all ${openCount} open feedback messages?`)) return
       event.currentTarget.disabled = true
@@ -1772,12 +2116,18 @@ async function renderFeedbackModule() {
         content.querySelector('#feedback-admin-notice').innerHTML = message(`${Number(result.resolved)} messages resolved.`)
       } catch (error) { content.querySelector('#feedback-admin-notice').innerHTML = message(error.message, true) }
     })
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-resolve]').forEach((button) => button.addEventListener('click', async () => {
       try { await api.resolveFeedback(button.dataset.resolve); await renderFeedbackModule() }
       catch (error) { content.querySelector('#feedback-admin-notice').innerHTML = message(error.message, true) }
     }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
+
+/**
+ * Renders or performs the render role workspace operation used by the page.
+ * @param {*} initialModule Value supplied to this operation.
+ */
 
 async function renderRoleWorkspace(initialModule) {
   const workspaces = {
@@ -1802,6 +2152,7 @@ async function renderRoleWorkspace(initialModule) {
   const isLowLiteracyRole = ['worker', 'veterinarian'].includes(currentUser.role)
   const translatedModule = roleModuleLabel(activeModule)
   app.innerHTML = `<div class="shell"><aside><p class="brand">F<span>F</span></p><p class="kicker">LFMIS</p><h2>${escapeHtml(isLowLiteracyRole ? roleCopy(workspace.title, currentUser.role === 'worker' ? 'Kazi za kila siku' : 'Afya ya wanyama') : workspace.title)}</h2><nav class="workspace-nav" aria-label="${escapeHtml(roleCopy('Workspace modules', 'Sehemu za kazi'))}">${visibleModules.map((item) => `<button class="workspace-nav-item ${item === activeModule ? 'active' : ''}" data-role-module="${escapeHtml(item)}">${escapeHtml(roleModuleLabel(item))}</button>`).join('')}</nav><div class="user-chip">${escapeHtml(currentUser.fullName)}<small>${escapeHtml(currentUser.role)}</small></div><button id="logout" class="quiet">${escapeHtml(roleCopy('Sign out', 'Toka'))}</button></aside><main class="content"><header><div><p class="kicker">${escapeHtml(roleCopy('YOUR WORKSPACE', 'SEHEMU YAKO'))}</p><h1>${escapeHtml(translatedModule)}</h1><p class="muted">${escapeHtml(roleCopy(workspace.description, currentUser.role === 'worker' ? 'Rekodi maziwa, mayai, kazi na stoo.' : 'Rekodi matibabu ya wanyama na miadi.'))}</p></div><div class="workspace-header-actions">${isLowLiteracyRole ? `<button id="role-language-toggle" class="secondary-action" type="button">${roleLanguage === 'en' ? 'Kiswahili' : 'English'}</button>` : ''}<span class="health-pill">${escapeHtml(roleCopy('Role protected', 'Akaunti salama'))}</span></div></header><div id="role-content"></div></main></div>`
+  // Handles the user or browser event registered below.
   app.querySelector('#role-language-toggle')?.addEventListener('click', () => {
     roleLanguage = roleLanguage === 'en' ? 'sw' : 'en'
     renderRoleWorkspace(activeModule)
@@ -1811,14 +2162,21 @@ async function renderRoleWorkspace(initialModule) {
   accountSecurityButton.className = 'quiet'
   accountSecurityButton.textContent = roleCopy('Account security', 'Usalama wa akaunti')
   app.querySelector('aside .user-chip').before(accountSecurityButton)
+  // Handles the user or browser event registered below.
   accountSecurityButton.addEventListener('click', renderAccountSecurity)
   installFixedSidebar()
+  // Handles the user or browser event registered below.
   app.querySelector('#logout').addEventListener('click', async () => { await api.logout(); currentUser = null; renderLanding(app, () => renderAuth('login'), () => renderAuth('login')) })
+  // Handles the user or browser event registered below.
   app.querySelectorAll('[data-role-module]').forEach((button) => button.addEventListener('click', () => renderRoleWorkspace(button.dataset.roleModule)))
   await renderRoleModule(activeModule)
 }
 
 // Render role-specific modules; customer and buyer data is scoped by the API to the signed-in user.
+/**
+ * Renders or performs the render role module operation used by the page.
+ * @param {*} module Value supplied to this operation.
+ */
 async function renderRoleModule(module) {
   const content = app.querySelector('#role-content')
   const showError = (error) => { content.innerHTML = message(error.message, true) }
@@ -1835,6 +2193,7 @@ async function renderRoleModule(module) {
       ? [['Production', '🥛', roleCopy('Record milk or eggs', 'Rekodi maziwa au mayai')], ['Activities', '📝', roleCopy('Record a task', 'Rekodi kazi')], ['Inventory', '📦', roleCopy('Check stock', 'Angalia stoo')]]
       : [['Health records', '🩺', roleCopy('Add animal care', 'Ongeza matibabu')], ['Due follow-ups', '⏰', roleCopy('Check follow-ups', 'Angalia miadi')], ['Livestock', '🐄', roleCopy('View animals', 'Tazama wanyama')]]
     content.innerHTML = `<section class="panel quick-actions-panel"><h2>${escapeHtml(roleCopy('Choose an action', 'Chagua kazi'))}</h2><div class="quick-action-grid">${actions.map(([moduleName, icon, label]) => `<button class="quick-action" type="button" data-quick-module="${moduleName}"><span aria-hidden="true">${icon}</span><strong>${escapeHtml(label)}</strong></button>`).join('')}</div></section>`
+    // Handles the user or browser event registered below.
     content.querySelectorAll('[data-quick-module]').forEach((button) => button.addEventListener('click', () => renderRoleWorkspace(button.dataset.quickModule)))
     return
   }
@@ -1872,8 +2231,10 @@ async function renderRoleModule(module) {
       const activityForm = content.querySelector('#role-activity-form')
       if (activityForm) {
         wireActivityHealthFields(activityForm)
+        // Handles the user or browser event registered below.
         activityForm.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createActivity(Object.fromEntries(new FormData(activityForm))); await renderRoleModule(module) } catch (error) { showError(error) } })
       }
+      // Handles the user or browser event registered below.
       content.querySelectorAll('[data-complete-activity]').forEach((button) => button.addEventListener('click', async () => { try { await api.completeActivity(button.dataset.completeActivity); await renderRoleModule(module) } catch (error) { showError(error) } }))
       return
     }
@@ -1881,6 +2242,7 @@ async function renderRoleModule(module) {
       const [data, history] = await Promise.all([api.inventory(), api.inventoryTransactions()])
       const canTransact = Boolean(currentPermissions['inventory.transact']?.allowed)
       content.innerHTML = `<section class="module-grid"><section class="panel"><h2>${escapeHtml(roleCopy('Stock on hand', 'Stoo iliyopo'))}</h2><div class="table-wrap"><table><thead><tr><th>${escapeHtml(roleCopy('Item', 'Bidhaa'))}</th><th>${escapeHtml(roleCopy('Balance', 'Kiasi'))}</th><th>${escapeHtml(roleCopy('Reorder at', 'Kiwango cha kuagiza'))}</th></tr></thead><tbody>${data.items.map((item) => `<tr class="${Number(item.quantity_on_hand) <= Number(item.reorder_level) ? 'low-stock-row' : ''}"><td>${escapeHtml(item.name)}</td><td>${Number(item.quantity_on_hand).toLocaleString()} ${escapeHtml(item.unit)}</td><td>${Number(item.reorder_level).toLocaleString()}</td></tr>`).join('')}</tbody></table></div></section>${canTransact ? `<section class="panel"><h2>${escapeHtml(roleCopy('Record stock use', 'Rekodi matumizi ya stoo'))}</h2><form id="role-stock-form" class="compact-form"><select name="itemId" aria-label="${escapeHtml(roleCopy('Choose item', 'Chagua bidhaa'))}" required><option value="">${escapeHtml(roleCopy('Choose item', 'Chagua bidhaa'))}</option>${data.items.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.quantity_on_hand)} ${escapeHtml(item.unit)}</option>`).join('')}</select><select name="transactionType" aria-label="${escapeHtml(roleCopy('Stock movement', 'Mabadiliko ya stoo'))}"><option value="out">${escapeHtml(roleCopy('Stock out', 'Toa stoo'))}</option><option value="in">${escapeHtml(roleCopy('Stock in', 'Ongeza stoo'))}</option><option value="adjustment">${escapeHtml(roleCopy('Adjustment', 'Marekebisho'))}</option></select><input name="quantityChange" type="number" step="0.01" placeholder="${escapeHtml(roleCopy('Quantity', 'Kiasi'))}" required><input name="reason" placeholder="${escapeHtml(roleCopy('Reason', 'Sababu'))}" required><button>${escapeHtml(roleCopy('Save movement', 'Hifadhi mabadiliko'))}</button></form></section>` : ''}</section><section class="panel"><h2>${escapeHtml(roleCopy('Recent stock movements', 'Mabadiliko ya stoo ya hivi karibuni'))}</h2><div class="table-wrap"><table><thead><tr><th>${escapeHtml(roleCopy('Date', 'Tarehe'))}</th><th>${escapeHtml(roleCopy('Item', 'Bidhaa'))}</th><th>${escapeHtml(roleCopy('Change', 'Mabadiliko'))}</th><th>${escapeHtml(roleCopy('Reason', 'Sababu'))}</th></tr></thead><tbody>${history.transactions.map((item) => `<tr><td>${escapeHtml(item.transaction_date)}</td><td>${escapeHtml(item.item_name)}</td><td>${Number(item.quantity_change).toLocaleString()}</td><td>${escapeHtml(item.reason || '—')}</td></tr>`).join('') || `<tr><td colspan="4" class="empty">${escapeHtml(roleCopy('No stock movements.', 'Hakuna mabadiliko ya stoo.'))}</td></tr>`}</tbody></table></div></section>`
+      // Handles the user or browser event registered below.
       content.querySelector('#role-stock-form')?.addEventListener('submit', async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); const itemId = values.itemId; delete values.itemId; try { await api.inventoryTransaction(itemId, values); await renderRoleModule(module) } catch (error) { showError(error) } })
       return
     }
@@ -1888,6 +2250,7 @@ async function renderRoleModule(module) {
       const [animals, health] = await Promise.all([api.animals(), api.healthRecords()])
       if (module === 'Livestock') {
         content.innerHTML = `<section class="panel"><h2>Animal profiles</h2><p class="muted">Select an animal to open its individual record and history.</p><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Name</th><th>Species</th><th>Status</th><th></th></tr></thead><tbody>${animals.animals.map((item) => `<tr><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.name || '—')}</td><td>${escapeHtml(item.species)}</td><td>${escapeHtml(item.status)}</td><td><button type="button" class="small-action" data-role-open-animal="${Number(item.id)}">Open profile</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">No animals registered.</td></tr>'}</tbody></table></div></section>`
+        // Handles the user or browser event registered below.
         content.querySelectorAll('[data-role-open-animal]').forEach((button) => button.addEventListener('click', async () => {
           try { await renderAnimalProfile(content, Number(button.dataset.roleOpenAnimal), Boolean(currentPermissions['animals.status']?.allowed), Boolean(currentPermissions['animals.create']?.allowed), () => renderRoleModule('Livestock')) }
           catch (error) { content.innerHTML = message(error.message, true) }
@@ -1898,6 +2261,7 @@ async function renderRoleModule(module) {
       const recordRows = health.records.map((item) => `<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td></tr>`).join('')
       const canRecordHealth = Boolean(currentPermissions['health.record']?.allowed)
       content.innerHTML = `<section class="module-grid">${canRecordHealth ? `<section class="panel"><h2>${escapeHtml(roleCopy('Record treatment or care', 'Rekodi matibabu'))}</h2><form id="role-health-form" class="compact-form"><select name="animalId" aria-label="${escapeHtml(roleCopy('Choose animal', 'Chagua mnyama'))}" required><option value="">${escapeHtml(roleCopy('Choose animal', 'Chagua mnyama'))}</option>${animals.animals.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.tag_number)} · ${escapeHtml(item.species)}</option>`).join('')}</select><select name="recordType" aria-label="${escapeHtml(roleCopy('Care type', 'Aina ya matibabu'))}"><option value="treatment">${escapeHtml(roleCopy('Treatment', 'Matibabu'))}</option><option value="vaccination">${escapeHtml(roleCopy('Vaccination', 'Chanjo'))}</option><option value="deworming">${escapeHtml(roleCopy('Deworming', 'Dawa ya minyoo'))}</option><option value="checkup">${escapeHtml(roleCopy('Checkup', 'Uchunguzi'))}</option><option value="illness">${escapeHtml(roleCopy('Illness', 'Ugonjwa'))}</option><option value="issue">${escapeHtml(roleCopy('Issue', 'Tatizo'))}</option></select><input name="description" placeholder="${escapeHtml(roleCopy('Clinical note or action', 'Maelezo ya afya au hatua'))}" required><input name="medication" placeholder="${escapeHtml(roleCopy('Medication, if applicable', 'Dawa, ikiwa ipo'))}"><input name="recordDate" type="date" aria-label="${escapeHtml(roleCopy('Record date', 'Tarehe ya rekodi'))}" value="${nairobiDate()}" required><input name="nextDueDate" type="date" aria-label="${escapeHtml(roleCopy('Next follow-up date', 'Tarehe ya ufuatiliaji'))}"><button>${escapeHtml(roleCopy('Save health record', 'Hifadhi rekodi ya afya'))}</button></form></section>` : ''}<section class="panel"><h2>${escapeHtml(roleCopy('Due follow-ups', 'Miadi inayofuata'))}</h2><div class="table-wrap"><table><thead><tr><th>${escapeHtml(roleCopy('Due', 'Tarehe'))}</th><th>${escapeHtml(roleCopy('Animal', 'Mnyama'))}</th><th>${escapeHtml(roleCopy('Type', 'Aina'))}</th><th>${escapeHtml(roleCopy('Description', 'Maelezo'))}</th></tr></thead><tbody>${dueRows || `<tr><td colspan="4" class="empty">${escapeHtml(roleCopy('No open follow-ups due.', 'Hakuna miadi inayosubiri.'))}</td></tr>`}</tbody></table></div></section></section><section class="panel"><h2>${escapeHtml(roleCopy('Health history', 'Historia ya afya'))}</h2><div class="table-wrap"><table><thead><tr><th>${escapeHtml(roleCopy('Date', 'Tarehe'))}</th><th>${escapeHtml(roleCopy('Animal', 'Mnyama'))}</th><th>${escapeHtml(roleCopy('Type', 'Aina'))}</th><th>${escapeHtml(roleCopy('Description', 'Maelezo'))}</th></tr></thead><tbody>${recordRows || `<tr><td colspan="4" class="empty">${escapeHtml(roleCopy('No health records.', 'Hakuna rekodi za afya.'))}</td></tr>`}</tbody></table></div></section>`
+      // Handles the user or browser event registered below.
       content.querySelector('#role-health-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createHealthRecord(Object.fromEntries(new FormData(event.target))); await renderRoleModule(module) } catch (error) { showError(error) } })
       return
     }
@@ -1906,6 +2270,7 @@ async function renderRoleModule(module) {
       const products = data.products.filter((item) => Number(item.available_quantity) > 0)
       const canOrder = Boolean(currentPermissions['orders.create']?.allowed)
       content.innerHTML = `<section class="panel"><h2>Available listings</h2>${module === 'Livestock catalogue' ? '<p class="muted">SYN-Demo livestock prices are sample values for demonstration only. Available counts come from active farm animal records.</p>' : ''}${canOrder ? `<form id="role-order-form" class="compact-form"><select name="productId" required><option value="">Choose listing</option>${products.map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity).toLocaleString()} ${escapeHtml(item.unit)} · KES ${Math.round(Number(item.unit_price)).toLocaleString()}</option>`).join('')}</select><input name="quantity" type="number" min="${module === 'Livestock catalogue' ? '1' : '0.01'}" step="${module === 'Livestock catalogue' ? '1' : '0.01'}" placeholder="${module === 'Livestock catalogue' ? 'Number of animals' : 'e.g. 5 litres'}" required><button>Request order</button></form>` : ''}<div class="table-wrap"><table><thead><tr><th>Listing</th><th>Type</th><th>Available</th><th>Unit price</th></tr></thead><tbody>${products.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.product_type)}</td><td>${Number(item.available_quantity).toLocaleString()} ${escapeHtml(item.unit)}</td><td>KES ${Math.round(Number(item.unit_price)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No available listings.</td></tr>'}</tbody></table></div></section>`
+      // Handles the user or browser event registered below.
       content.querySelector('#role-order-form')?.addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createOrder(Object.fromEntries(new FormData(event.target))); await renderRoleWorkspace('My orders') } catch (error) { showError(error) } })
       return
     }
@@ -1929,6 +2294,7 @@ async function renderRoleModule(module) {
         return `<tr><td>#${orderId}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.status === 'fulfilled' && payment?.status === 'confirmed' ? 'Fulfilled / Paid' : item.status)}</td><td>KES ${Math.round(Number(item.total_amount)).toLocaleString()}</td><td>${paymentAction}<span data-mpesa-status="${orderId}" aria-live="polite">${escapeHtml(paymentStatus)}</span></td></tr>`
       }).join('')
       content.innerHTML = `<section class="module-grid orders-payments-grid"><section class="panel"><h2>My orders</h2>${message('M-PESA is simulated locally; no real payment is made. Pay on Premise and cheque remain pending until the farm confirms receipt.') }<div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th><th>Payment</th></tr></thead><tbody>${orders || '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Payments</h2><p class="muted">M-PESA simulation uses a SIM receipt. Pay on Premise and cheque are confirmed by the farm after receipt.</p><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${paymentData.payments.map((item) => `<tr><td>#${Number(item.order_id)}</td><td>${escapeHtml(item.method === 'pay_on_premise' ? 'Pay on Premise' : item.method)}</td><td>${escapeHtml(item.status)}</td><td>KES ${Math.round(Number(item.amount)).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No payments recorded.</td></tr>'}</tbody></table></div></section></section>`
+      // Handles the user or browser event registered below.
       content.querySelectorAll('[data-offline-payment]').forEach((button) => button.addEventListener('click', async () => {
         const orderId = Number(button.dataset.offlinePayment)
         const method = content.querySelector(`#offline-method-${orderId}`).value
@@ -1941,6 +2307,7 @@ async function renderRoleModule(module) {
           content.querySelector(`[data-mpesa-status="${orderId}"]`).textContent = error.message
         }
       }))
+      // Handles the user or browser event registered below.
       content.querySelectorAll('[data-mpesa-demo]').forEach((button) => button.addEventListener('click', async () => {
         const orderId = Number(button.dataset.mpesaDemo)
         button.disabled = true
@@ -1954,6 +2321,7 @@ async function renderRoleModule(module) {
           content.querySelector(`[data-mpesa-status="${orderId}"]`).textContent = error.message
         }
       }))
+      // Handles the user or browser event registered below.
       content.querySelectorAll('[data-mpesa-pay]').forEach((button) => button.addEventListener('click', async () => {
         const orderId = Number(button.dataset.mpesaPay)
         const phone = content.querySelector(`#mpesa-phone-${orderId}`).value
@@ -1994,6 +2362,7 @@ async function renderRoleModule(module) {
       const canCreate = Boolean(currentPermissions['feedback.create']?.allowed)
       const data = canView ? await api.feedback() : { feedback: [] }
       content.innerHTML = `<section class="module-grid">${canCreate ? `<section class="panel"><h2>Send feedback</h2><form id="role-feedback-form" class="compact-form"><select name="category"><option value="feedback">Feedback</option><option value="compliment">Compliment</option><option value="complaint">Complaint</option><option value="suggestion">Suggestion</option></select>      <textarea name="message" rows="5" placeholder="Describe your compliment, question, complaint or suggestion" required></textarea><button>Send message</button></form></section>` : ''}${canView ? `<section class="panel"><h2>My messages</h2><div class="feedback-list">${data.feedback.map((item) => `<article class="feedback-item"><p class="kicker">${escapeHtml(item.category)} · ${escapeHtml(item.status)}</p><p>${escapeHtml(item.message)}</p><small>${escapeHtml(item.created_at)}</small></article>`).join('') || '<p class="empty">No messages sent.</p>'}</div></section>` : ''}</section>`
+      // Handles the user or browser event registered below.
       content.querySelector('#role-feedback-form')?.addEventListener('submit', async (event) => {
         event.preventDefault()
         try {
@@ -2009,6 +2378,10 @@ async function renderRoleModule(module) {
     }
   } catch (error) { showError(error) }
 }
+
+/**
+ * Renders or performs the start operation used by the page.
+ */
 
 async function start() {
   const resetToken = new URLSearchParams(window.location.search).get('reset')
@@ -2042,6 +2415,7 @@ async function start() {
 // a text field (for example, when the form has multiple controls/buttons).
 // Keep the usual form submit path so validation and existing submit handlers
 // still run, while leaving multiline fields and IME composition untouched.
+// Handles the user or browser event registered below.
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented) return
   const field = event.target

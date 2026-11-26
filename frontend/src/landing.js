@@ -1,3 +1,8 @@
+/**
+ * File purpose: landing.js contains the public landing page rendering and interactions.
+ * The frontend entry point imports this module to serve farm users and livestock buyers.
+ * It depends on the browser DOM, the application API, and shared frontend state.
+ */
 import { api } from './api.js'
 
 const animals = [
@@ -42,8 +47,11 @@ export function renderLanding(root, openSetup, openLogin) {
   }).catch(() => {
     eventSection.querySelector('#public-event-list').innerHTML = '<p class="muted">Upcoming event information is temporarily unavailable. Please check back soon.</p>'
   })
+  // Handles the user or browser event registered below.
   root.querySelectorAll('[data-start]').forEach((button) => button.addEventListener('click', openSetup))
+  // Handles the user or browser event registered below.
   root.querySelector('[data-login]').addEventListener('click', openLogin)
+  // Handles the user or browser event registered below.
   root.querySelectorAll('a[href^="#"]').forEach((link) => link.addEventListener('click', (event) => {
     event.preventDefault()
     root.querySelector(link.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' })
