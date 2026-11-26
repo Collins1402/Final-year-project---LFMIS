@@ -12,7 +12,7 @@ use PDO;
 
 final class ProductionService
 {
-    private const PLAUSIBILITY_LIMITS = ['milk_litres' => 40.0, 'egg_trays' => 150.0];
+    private const PLAUSIBILITY_LIMITS = ['milk_litres' => 60.0, 'egg_trays' => 150.0];
 
     /**
  * Connects this service to its required dependency.
@@ -151,7 +151,7 @@ final class ProductionService
     private function checkPlausibility(string $name, string $unit, float $quantity): void
     {
         if (strtolower($name) === 'milk' && strtolower($unit) === 'litres' && $quantity > self::PLAUSIBILITY_LIMITS['milk_litres']) {
-            throw new ProductionPlausibilityWarning('More than 40 litres of milk in one session is unusual. Check the quantity; this record was not saved.');
+            throw new ProductionPlausibilityWarning('More than 60 litres of milk in one session is unusual. Check the quantity; this record was not saved.');
         }
         if (strtolower($name) === 'eggs' && strtolower($unit) === 'trays' && $quantity > self::PLAUSIBILITY_LIMITS['egg_trays']) {
             throw new ProductionPlausibilityWarning('More than 150 egg trays in one flock entry is unusual. Check the quantity; this record was not saved.');
