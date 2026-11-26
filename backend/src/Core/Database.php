@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements Database for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Core;
@@ -8,6 +13,11 @@ use PDO;
 final class Database
 {
     private static ?PDO $connection = null;
+
+    /**
+ * Performs the connection operation for this service.
+ * @return PDO Result of this operation.
+ */
 
     public static function connection(): PDO
     {

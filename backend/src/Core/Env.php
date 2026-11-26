@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements Env for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Core;
@@ -8,6 +13,11 @@ final class Env
     private static bool $loaded = false;
 
     /** Loads KEY=VALUE lines from .env.local; real environment variables take precedence. */
+    /**
+ * Performs the load operation for this service.
+ * @param string $file Input used by this operation.
+ * @return void Result of this operation.
+ */
     public static function load(string $file): void
     {
         if (self::$loaded) {
@@ -38,11 +48,24 @@ final class Env
         }
     }
 
+    /**
+ * Performs the get operation for this service.
+ * @param string $key Input used by this operation.
+ * @param ?string $default Input used by this operation.
+ * @return ?string Result of this operation.
+ */
+
     public static function get(string $key, ?string $default = null): ?string
     {
         $value = getenv($key);
         return $value === false || $value === '' ? $default : $value;
     }
+
+    /**
+ * Performs the required operation for this service.
+ * @param string $key Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     public static function required(string $key): string
     {

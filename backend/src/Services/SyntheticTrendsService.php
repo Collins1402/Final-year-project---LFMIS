@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements SyntheticTrendsService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -23,8 +28,19 @@ final class SyntheticTrendsService
 
     public const SCOPES = ['kenya', 'east_africa', 'global'];
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Performs the generate operation for this service.
+ * @param string $periodStart Input used by this operation.
+ * @param ?int $seed Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function generate(string $periodStart, ?int $seed = null): array
     {
         // Deterministic seed if specified or derived from periodStart
@@ -93,6 +109,10 @@ final class SyntheticTrendsService
         ];
     }
 
+    /**
+ * Performs the latest operation for this service.
+ * @return array Result of this operation.
+ */
     public function latest(): array
     {
         $scopesData = [];
@@ -118,6 +138,14 @@ final class SyntheticTrendsService
         ];
     }
 
+    /**
+ * Performs the history metrics operation for this service.
+ * @param string $scope Input used by this operation.
+ * @param ?string $category Input used by this operation.
+ * @param ?string $metricName Input used by this operation.
+ * @param int $limit Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function historyMetrics(string $scope = 'kenya', ?string $category = null, ?string $metricName = null, int $limit = 40): array
     {
         try {
@@ -172,6 +200,12 @@ final class SyntheticTrendsService
         }
     }
 
+    /**
+ * Performs the active events operation for this service.
+ * @param string $periodStart Input used by this operation.
+ * @param int $seed Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function activeEvents(string $periodStart, int $seed): array
     {
         $pool = [
@@ -242,6 +276,10 @@ final class SyntheticTrendsService
         return $selected;
     }
 
+    /**
+ * Performs the current reporting period start operation for this service.
+ * @return string Result of this operation.
+ */
     public function currentReportingPeriodStart(): string
     {
         $tz = new DateTimeZone('Africa/Nairobi');
@@ -252,6 +290,13 @@ final class SyntheticTrendsService
         return $periodStart->format('Y-m-d H:i:s');
     }
 
+    /**
+ * Performs the calculate variation operation for this service.
+ * @param string $metricKey Input used by this operation.
+ * @param string $scope Input used by this operation.
+ * @param int $seed Input used by this operation.
+ * @return float Result of this operation.
+ */
     private function calculateVariation(string $metricKey, string $scope, int $seed): float
     {
         // Deterministic pseudo-random variation in range [-0.025, +0.025]
@@ -260,6 +305,13 @@ final class SyntheticTrendsService
         return (float) ($val / 10000.0); // -0.025 to +0.0249
     }
 
+    /**
+ * Performs the evaluate event multiplier operation for this service.
+ * @param string $metricKey Input used by this operation.
+ * @param string $scope Input used by this operation.
+ * @param array $events Input used by this operation.
+ * @return float Result of this operation.
+ */
     private function evaluateEventMultiplier(string $metricKey, string $scope, array $events): float
     {
         $mult = 1.0;
@@ -271,6 +323,11 @@ final class SyntheticTrendsService
         return $mult;
     }
 
+    /**
+ * Performs the load previous metrics operation for this service.
+ * @param string $scope Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function loadPreviousMetrics(string $scope): array
     {
         try {
@@ -291,6 +348,11 @@ final class SyntheticTrendsService
         }
     }
 
+    /**
+ * Performs the load latest grouped operation for this service.
+ * @param string $scope Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function loadLatestGrouped(string $scope): array
     {
         $grouped = [];
@@ -316,6 +378,12 @@ final class SyntheticTrendsService
         return $grouped;
     }
 
+    /**
+ * Performs the persist metric operation for this service.
+ * @param string $periodStart Input used by this operation.
+ * @param array $metric Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function persistMetric(string $periodStart, array $metric): void
     {
         try {
@@ -340,6 +408,10 @@ final class SyntheticTrendsService
         }
     }
 
+    /**
+ * Performs the definitions operation for this service.
+ * @return array Result of this operation.
+ */
     public function definitions(): array
     {
         return [

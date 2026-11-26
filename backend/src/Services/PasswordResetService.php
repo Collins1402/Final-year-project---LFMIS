@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements PasswordResetService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -10,10 +15,20 @@ use PDO;
 
 final class PasswordResetService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Performs the request operation for this service.
+ * @param string $email Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     public function request(string $email): ?string
     {
         $statement = $this->db->prepare(
@@ -44,6 +59,12 @@ final class PasswordResetService
         return Env::get('LFMIS_DEV_LOG_PASSWORD_RESET_LINK', '0') === '1' ? $link : null;
     }
 
+    /**
+ * Performs the reset operation for this service.
+ * @param string $token Input used by this operation.
+ * @param string $password Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function reset(string $token, string $password): void
     {
         if (!preg_match('/^[a-f0-9]{64}$/', $token) || strlen($password) < 12) {

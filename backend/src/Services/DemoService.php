@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements DemoService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,8 +12,18 @@ use PDO;
 
 final class DemoService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Performs the seed operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function seed(int $userId): array
     {
         $existingAnimals = (int) $this->db->query('SELECT COUNT(*) FROM animals')->fetchColumn();

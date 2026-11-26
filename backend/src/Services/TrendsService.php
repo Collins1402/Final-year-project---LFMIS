@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements TrendsService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -18,11 +23,22 @@ final class TrendsService
     public const SCOPE_EAST_AFRICA = 'east_africa';
     public const SCOPE_GLOBAL = 'global';
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param ?Closure $httpRequest Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db, ?Closure $httpRequest = null)
     {
         $this->httpRequest = $httpRequest;
     }
 
+    /**
+ * Performs the current operation for this service.
+ * @param bool $force Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function current(bool $force = false): array
     {
         $countryCode = strtoupper((string) Env::get('LFMIS_TRENDS_COUNTRY_CODE', 'KE'));
@@ -48,6 +64,13 @@ final class TrendsService
         ];
     }
 
+    /**
+ * Performs the snapshot operation for this service.
+ * @param string $scope Input used by this operation.
+ * @param string $query Input used by this operation.
+ * @param bool $force Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function snapshot(string $scope, string $query, bool $force = false): array
     {
         $cacheKey = $scope;
@@ -101,6 +124,12 @@ final class TrendsService
         ];
     }
 
+    /**
+ * Performs the fetch articles operation for this service.
+ * @param string $query Input used by this operation.
+ * @param string $scope Input used by this operation.
+ * @return ?array Result of this operation.
+ */
     public function fetchArticles(string $query, string $scope = self::SCOPE_GLOBAL): ?array
     {
         $url = 'https://api.gdeltproject.org/api/v2/doc/doc?' . http_build_query([
@@ -184,6 +213,11 @@ final class TrendsService
         return $articles;
     }
 
+    /**
+ * Performs the canonicalize url operation for this service.
+ * @param string $url Input used by this operation.
+ * @return string Result of this operation.
+ */
     public function canonicalizeUrl(string $url): string
     {
         $parts = parse_url($url);
@@ -221,6 +255,11 @@ final class TrendsService
         return "{$scheme}://{$host}{$path}{$cleanQuery}";
     }
 
+    /**
+ * Performs the parse seen date operation for this service.
+ * @param string $seendate Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     public function parseSeenDate(string $seendate): ?string
     {
         $clean = trim($seendate);
@@ -246,6 +285,13 @@ final class TrendsService
         }
     }
 
+    /**
+ * Performs the infer country code operation for this service.
+ * @param string $domain Input used by this operation.
+ * @param string $scope Input used by this operation.
+ * @param string $sourceCountry Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     private function inferCountryCode(string $domain, string $scope, string $sourceCountry): ?string
     {
         $code = strtoupper(trim($sourceCountry));
@@ -263,6 +309,11 @@ final class TrendsService
         return null;
     }
 
+    /**
+ * Performs the categorize article operation for this service.
+ * @param string $title Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function categorizeArticle(string $title): string
     {
         $lower = strtolower($title);
@@ -293,6 +344,11 @@ final class TrendsService
         return 'general';
     }
 
+    /**
+ * Performs the is purely political or irrelevant operation for this service.
+ * @param string $title Input used by this operation.
+ * @return bool Result of this operation.
+ */
     private function isPurelyPoliticalOrIrrelevant(string $title): bool
     {
         $lower = strtolower($title);
@@ -304,6 +360,14 @@ final class TrendsService
         return (bool) preg_match('/\b(election|ballot|impeach|parliament debate|celebrity|football|soccer|hollywood)\b/i', $lower);
     }
 
+    /**
+ * Performs the persist snapshot operation for this service.
+ * @param string $key Input used by this operation.
+ * @param string $payload Input used by this operation.
+ * @param string $fetchedAt Input used by this operation.
+ * @param array $articles Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function persistSnapshot(string $key, string $payload, string $fetchedAt, array $articles): void
     {
         try {
@@ -322,6 +386,13 @@ final class TrendsService
         }
     }
 
+    /**
+ * Performs the persist historical articles operation for this service.
+ * @param string $scope Input used by this operation.
+ * @param array $articles Input used by this operation.
+ * @param string $fetchedAt Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function persistHistoricalArticles(string $scope, array $articles, string $fetchedAt): void
     {
         try {

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements UserService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -10,10 +15,19 @@ final class UserService
 {
     private const ROLES = ['admin', 'worker', 'veterinarian', 'customer', 'buyer'];
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Returns the matching records for the requested scope.
+ * @return array Result of this operation.
+ */
     public function list(): array
     {
         return $this->db->query(
@@ -23,6 +37,11 @@ final class UserService
         )->fetchAll();
     }
 
+    /**
+ * Validates input and creates a new record.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function create(array $input): array
     {
         $name = trim((string) ($input['fullName'] ?? ''));
@@ -54,6 +73,12 @@ final class UserService
         }
     }
 
+    /**
+ * Validates input and updates the matching record.
+ * @param int $id Input used by this operation.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function update(int $id, array $input): array
     {
         if ($id <= 0) {
@@ -91,6 +116,12 @@ final class UserService
         return $this->find($id);
     }
 
+    /**
+ * Removes the requested record after applying this service operation.
+ * @param int $id Input used by this operation.
+ * @param int $actingUserId Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function delete(int $id, int $actingUserId): void
     {
         if ($id <= 0) {
@@ -130,6 +161,11 @@ final class UserService
         }
     }
 
+    /**
+ * Loads one record by its identifier.
+ * @param int $id Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function find(int $id): array
     {
         $statement = $this->db->prepare(
@@ -147,6 +183,11 @@ final class UserService
         return $user;
     }
 
+    /**
+ * Performs the active admin count operation for this service.
+ * @param bool $lock Input used by this operation.
+ * @return int Result of this operation.
+ */
     private function activeAdminCount(bool $lock = false): int
     {
         $sql = "SELECT users.id FROM users JOIN roles ON roles.id = users.role_id WHERE roles.name = 'admin' AND users.is_active = 1";

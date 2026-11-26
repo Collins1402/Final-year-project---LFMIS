@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements Mailer for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Core;
@@ -13,10 +18,24 @@ final class Mailer
     private static ?Closure $transport = null;
 
     /** Test hook. The callback receives the envelope and fully encoded message. */
+    /**
+ * Performs the use transport operation for this service.
+ * @param ?Closure $transport Input used by this operation.
+ * @return void Result of this operation.
+ */
     public static function useTransport(?Closure $transport): void
     {
         self::$transport = $transport;
     }
+
+    /**
+ * Performs the send operation for this service.
+ * @param string $to Input used by this operation.
+ * @param string $subject Input used by this operation.
+ * @param string $text Input used by this operation.
+ * @param ?string $html Input used by this operation.
+ * @return bool Result of this operation.
+ */
 
     public static function send(string $to, string $subject, string $text, ?string $html = null): bool
     {
@@ -124,10 +143,23 @@ final class Mailer
         }
     }
 
+    /**
+ * Performs the wrap base64 operation for this service.
+ * @param string $body Input used by this operation.
+ * @return string Result of this operation.
+ */
+
     private static function wrapBase64(string $body): string
     {
         return rtrim(chunk_split(base64_encode($body), 76, "\r\n"), "\r\n");
     }
+
+    /**
+ * Performs the email html operation for this service.
+ * @param string $text Input used by this operation.
+ * @param ?string $html Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     private static function emailHtml(string $text, ?string $html): string
     {
@@ -137,6 +169,12 @@ final class Mailer
         return '<!doctype html><html><body style="margin:0;padding:24px;background:#f6f5ef;font-family:Arial,sans-serif;color:#19352d"><div style="max-width:600px;margin:auto;padding:28px;background:#fffdf7;border-radius:10px">'
             . $logo . $content . '<p style="margin-top:28px;color:#668078;font-size:12px">Flouri Farm · Livestock Farm Management</p></div></body></html>';
     }
+
+    /**
+ * Performs the format headers operation for this service.
+ * @param array $headers Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     private static function formatHeaders(array $headers): string
     {

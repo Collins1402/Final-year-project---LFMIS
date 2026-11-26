@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements AuthService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -9,10 +14,19 @@ use PDO;
 
 final class AuthService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Performs the current user operation for this service.
+ * @return ?array Result of this operation.
+ */
     public function currentUser(): ?array
     {
         $userId = Session::userId();
@@ -42,6 +56,11 @@ final class AuthService
         return $formatted;
     }
 
+    /**
+ * Performs the create first admin operation for this service.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function createFirstAdmin(array $input): array
     {
         if ((int) $this->db->query('SELECT COUNT(*) FROM users')->fetchColumn() !== 0) {
@@ -56,11 +75,19 @@ final class AuthService
         $statement = $this->db->prepare(
             'INSERT INTO users (role_id, full_name, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, 0)'
         );
+        // Store only a one-way password hash so a database read cannot reveal the submitted password.
         $statement->execute([$roleId, $name, $username, $email, password_hash($password, PASSWORD_DEFAULT)]);
         $id = (int) $this->db->lastInsertId();
         return $this->findUser($id);
     }
 
+    /**
+ * Validates credentials and starts or prepares a secure sign-in.
+ * @param string $login Input used by this operation.
+ * @param string $password Input used by this operation.
+ * @param ?string $trustedDeviceToken Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function login(string $login, string $password, ?string $trustedDeviceToken = null): array
     {
         unset($_SESSION['pending_2fa']);
@@ -74,6 +101,7 @@ final class AuthService
         );
         $statement->execute([$login]);
         $user = $statement->fetch();
+        // Verify the password hash and honor the temporary lockout before revealing account state.
         if (!$user || ($user['locked_until'] !== null && strtotime($user['locked_until']) > time()) || !password_verify($password, (string) ($user['password_hash'] ?? ''))) {
             if ($user) {
                 $this->recordFailedLogin($user);
@@ -97,6 +125,7 @@ final class AuthService
         $methods = $this->db->prepare('SELECT method FROM user_two_factor_methods WHERE user_id = ? ORDER BY method');
         $methods->execute([(int) $user['id']]);
         $enabledMethods = $methods->fetchAll(PDO::FETCH_COLUMN);
+        // A configured second factor must be completed before the session is authenticated.
         if ($enabledMethods !== []) {
             unset($_SESSION['user_id']);
             return [
@@ -108,6 +137,11 @@ final class AuthService
         return $this->completeLogin((int) $user['id']);
     }
 
+    /**
+ * Rechecks account eligibility, resets lockout state, and starts the session.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function completeLogin(int $userId): array
     {
         $account = $this->db->prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1 AND email_verified_at IS NOT NULL');
@@ -123,6 +157,11 @@ final class AuthService
         return $this->currentUser() ?? throw new \RuntimeException('Could not load your account.');
     }
 
+    /**
+ * Validates and creates a new account.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function register(array $input): array
     {
         $name = trim((string) ($input['fullName'] ?? ''));
@@ -140,6 +179,7 @@ final class AuthService
             $statement = $this->db->prepare(
                 'INSERT INTO users (role_id, full_name, username, email, phone, password_hash, is_active) VALUES (?, ?, ?, ?, ?, ?, 0)'
             );
+            // Passwords are persisted as adaptive hashes, never as readable text.
             $statement->execute([$roleId, $name, $username, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
             $userId = (int) $this->db->lastInsertId();
             if (in_array($role, ['customer', 'buyer'], true)) {
@@ -153,6 +193,11 @@ final class AuthService
         }
     }
 
+    /**
+ * Performs the record failed login operation for this service.
+ * @param array $user Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function recordFailedLogin(array $user): void
     {
         $attempts = (int) $user['failed_login_attempts'] + 1;
@@ -160,6 +205,14 @@ final class AuthService
         $this->db->prepare('UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE id = ?')->execute([$attempts, $lockedUntil, $user['id']]);
     }
 
+    /**
+ * Performs the validate identity operation for this service.
+ * @param string $name Input used by this operation.
+ * @param string $username Input used by this operation.
+ * @param mixed $email Input used by this operation.
+ * @param string $password Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function validateIdentity(string $name, string $username, mixed $email, string $password): void
     {
         if ($name === '' || !preg_match('/^[A-Za-z0-9_.]{3,30}$/', $username) || $email === false || strlen($password) < 12) {
@@ -167,6 +220,11 @@ final class AuthService
         }
     }
 
+    /**
+ * Performs the role id operation for this service.
+ * @param string $role Input used by this operation.
+ * @return int Result of this operation.
+ */
     private function roleId(string $role): int
     {
         $statement = $this->db->prepare('SELECT id FROM roles WHERE name = ?');
@@ -174,6 +232,11 @@ final class AuthService
         return (int) $statement->fetchColumn();
     }
 
+    /**
+ * Performs the format user operation for this service.
+ * @param array $user Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function formatUser(array $user): array
     {
         return [
@@ -187,6 +250,11 @@ final class AuthService
         ];
     }
 
+    /**
+ * Performs the find user operation for this service.
+ * @param int $id Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function findUser(int $id): array
     {
         $statement = $this->db->prepare(

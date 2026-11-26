@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements TotpService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -11,8 +16,18 @@ final class TotpService
 {
     private const LOGIN_COOKIE = 'lfmis_trusted_device';
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Performs the begin setup operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function beginSetup(int $userId): array
     {
         $user = $this->user($userId);
@@ -22,6 +37,12 @@ final class TotpService
         return ['secret' => $secret, 'otpauthUri' => Totp::otpauthUri($secret, (string) $user['email'])];
     }
 
+    /**
+ * Performs the enable operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function enable(int $userId, string $code): array
     {
         $setup = $_SESSION['totp_setup'] ?? null;
@@ -38,6 +59,11 @@ final class TotpService
         return ['enabled' => true, 'recoveryCodes' => $codes];
     }
 
+    /**
+ * Performs the status operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function status(int $userId): array
     {
         $user = $this->user($userId);
@@ -48,11 +74,24 @@ final class TotpService
         return ['enabled' => !empty($user['totp_enabled_at']), 'recoveryCodesRemaining' => (int) $count->fetchColumn(), 'trustedDevices' => $devices->fetchAll(PDO::FETCH_ASSOC)];
     }
 
+    /**
+ * Performs the verify sensitive action operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function verifySensitiveAction(int $userId, string $code): void
     {
         $this->consumeCurrentTotpStep($this->user($userId), $code);
     }
 
+    /**
+ * Performs the disable operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $password Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function disable(int $userId, string $password, string $code): void
     {
         $user = $this->user($userId);
@@ -68,6 +107,13 @@ final class TotpService
         $this->clearTrustedCookie();
     }
 
+    /**
+ * Performs the regenerate recovery codes operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $password Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function regenerateRecoveryCodes(int $userId, string $password, string $code): array
     {
         $user = $this->user($userId);
@@ -76,6 +122,12 @@ final class TotpService
         return $this->newRecoveryCodes($userId);
     }
 
+    /**
+ * Performs the verify pending operation for this service.
+ * @param string $code Input used by this operation.
+ * @param bool $rememberDevice Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function verifyPending(string $code, bool $rememberDevice): array
     {
         $pending = $_SESSION['pending_2fa'] ?? null;
@@ -102,6 +154,12 @@ final class TotpService
         return ['userId' => (int) $user['id'], 'recoveryCodeUsed' => $isRecovery];
     }
 
+    /**
+ * Performs the has trusted device operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param ?string $token Input used by this operation.
+ * @return bool Result of this operation.
+ */
     public function hasTrustedDevice(int $userId, ?string $token): bool
     {
         if (!$token || !preg_match('/^[a-f0-9]{64}$/', $token)) return false;
@@ -110,6 +168,11 @@ final class TotpService
         return (bool) $query->fetchColumn();
     }
 
+    /**
+ * Performs the begin login operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function beginLogin(int $userId): void
     {
         unset($_SESSION['user_id']);
@@ -117,17 +180,34 @@ final class TotpService
         $_SESSION['pending_2fa'] = ['user_id' => $userId, 'expires' => time() + 300, 'tries' => 0];
     }
 
+    /**
+ * Performs the revoke devices operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function revokeDevices(int $userId): void
     {
         $this->db->prepare('DELETE FROM trusted_devices WHERE user_id = ?')->execute([$userId]);
     }
 
+    /**
+ * Performs the revoke all devices operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function revokeAllDevices(int $userId): void
     {
         $this->revokeDevices($userId);
         $this->clearTrustedCookie();
     }
 
+    /**
+ * Performs the verified step operation for this service.
+ * @param array $user Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @param bool $throw Input used by this operation.
+ * @return ?int Result of this operation.
+ */
     private function verifiedStep(array $user, string $code, bool $throw = true): ?int
     {
         if (empty($user['totp_secret_enc']) || empty($user['totp_enabled_at'])) {
@@ -140,6 +220,12 @@ final class TotpService
         return $step;
     }
 
+    /**
+ * Performs the consume current totp step operation for this service.
+ * @param array $user Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function consumeCurrentTotpStep(array $user, string $code): void
     {
         $step = $this->verifiedStep($user, $code);
@@ -148,6 +234,11 @@ final class TotpService
         if ($update->rowCount() !== 1) throw new \InvalidArgumentException('That authenticator code was already used. Wait for a new code.');
     }
 
+    /**
+ * Performs the new recovery codes operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function newRecoveryCodes(int $userId): array
     {
         $codes = [];
@@ -162,6 +253,12 @@ final class TotpService
         return $codes;
     }
 
+    /**
+ * Performs the consume recovery operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return bool Result of this operation.
+ */
     private function consumeRecovery(int $userId, string $code): bool
     {
         if (!preg_match('/^[A-Fa-f0-9]{10}$/', $code)) return false;
@@ -170,6 +267,11 @@ final class TotpService
         return $stmt->rowCount() === 1;
     }
 
+    /**
+ * Performs the remember device operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function rememberDevice(int $userId): void
     {
         $token = bin2hex(random_bytes(32));
@@ -178,11 +280,20 @@ final class TotpService
         setcookie(self::LOGIN_COOKIE, $token, ['expires' => time() + 30 * 86400, 'path' => '/', 'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'), 'httponly' => true, 'samesite' => 'Lax']);
     }
 
+    /**
+ * Performs the clear trusted cookie operation for this service.
+ * @return void Result of this operation.
+ */
     private function clearTrustedCookie(): void
     {
         setcookie(self::LOGIN_COOKIE, '', ['expires' => time() - 3600, 'path' => '/', 'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'), 'httponly' => true, 'samesite' => 'Lax']);
     }
 
+    /**
+ * Performs the user operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function user(int $userId): array
     {
         $stmt = $this->db->prepare('SELECT id, email, password_hash, totp_secret_enc, totp_enabled_at, totp_last_step FROM users WHERE id = ?');
@@ -192,8 +303,17 @@ final class TotpService
         return $user;
     }
 
+    /**
+ * Performs the now operation for this service.
+ * @return string Result of this operation.
+ */
     private function now(): string { return gmdate('Y-m-d H:i:s'); }
 
+    /**
+ * Performs the notify recovery use operation for this service.
+ * @param array $user Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function notifyRecoveryUse(array $user): void
     {
         $stmt = $this->db->prepare('SELECT email, full_name FROM users WHERE id = ?'); $stmt->execute([$user['id']]); $details = $stmt->fetch(PDO::FETCH_ASSOC);

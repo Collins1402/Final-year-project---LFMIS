@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements AssistantService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -9,11 +14,25 @@ use PDO;
 
 final class AssistantService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param ?AnalyticsService $analytics Input used by this operation.
+ * @param ?Closure $modelCaller Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db, private ?AnalyticsService $analytics = null, private ?Closure $modelCaller = null)
     {
         $this->analytics ??= new AnalyticsService($db);
     }
 
+    /**
+ * Performs the answer operation for this service.
+ * @param string $question Input used by this operation.
+ * @param array $user Input used by this operation.
+ * @param array $trends Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function answer(string $question, array $user, array $trends = []): array
     {
         $originalQuestion = trim($question);
@@ -72,11 +91,21 @@ final class AssistantService
         return ['mode' => 'rule-based', 'answer' => $answer, 'role' => $user['role'], 'charts' => [], 'suggestions' => $this->suggestions()];
     }
 
+    /**
+ * Performs the is report review operation for this service.
+ * @param string $question Input used by this operation.
+ * @return bool Result of this operation.
+ */
     private function isReportReview(string $question): bool
     {
         return preg_match('/\b(how is my farm doing|review my report|review the report|farm report review|farm performance summary)\b/i', $question) === 1;
     }
 
+    /**
+ * Performs the requested metrics operation for this service.
+ * @param string $question Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function requestedMetrics(string $question): array
     {
         $compare = preg_match('/\b(compare|versus|vs\.?|and)\b/', $question) === 1;
@@ -95,6 +124,13 @@ final class AssistantService
         return $metrics === [] ? [] : [array_values(array_unique($metrics))[0]];
     }
 
+    /**
+ * Performs the chart answer operation for this service.
+ * @param string $question Input used by this operation.
+ * @param array $user Input used by this operation.
+ * @param array $metrics Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function chartAnswer(string $question, array $user, array $metrics): array
     {
         $role = (string)($user['role'] ?? 'unknown');
@@ -116,6 +152,12 @@ final class AssistantService
         return ['mode' => 'analytics', 'answer' => $answer, 'role' => $role, 'charts' => $charts, 'suggestions' => $this->suggestions()];
     }
 
+    /**
+ * Performs the report digest operation for this service.
+ * @param string $question Input used by this operation.
+ * @param array $user Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function reportDigest(string $question, array $user): array
     {
         $role = (string)($user['role'] ?? 'unknown');
@@ -148,6 +190,15 @@ final class AssistantService
         return ['mode' => 'analytics', 'answer' => $advice, 'role' => $role, 'charts' => $charts, 'suggestions' => $this->suggestions()];
     }
 
+    /**
+ * Performs the digest advice operation for this service.
+ * @param array $charts Input used by this operation.
+ * @param array $overview Input used by this operation.
+ * @param array $operations Input used by this operation.
+ * @param int $forecastDays Input used by this operation.
+ * @param string $question Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function digestAdvice(array $charts, array $overview, array $operations, int $forecastDays, string $question): string
     {
         $actions = [];
@@ -169,6 +220,12 @@ final class AssistantService
         return $answer;
     }
 
+    /**
+ * Performs the insight operation for this service.
+ * @param array $charts Input used by this operation.
+ * @param string $question Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function insight(array $charts, string $question): string
     {
         $swahili = preg_match('/\b(vipi|shamba|maziwa|mayai|mauzo|gharama)\b/i', $question) === 1;
@@ -182,6 +239,11 @@ final class AssistantService
         return $swahili ? 'Hakuna rekodi za kutosha kwa ushauri wa kipindi hiki.' : 'There is no recorded data for this metric and period, so I cannot draw a conclusion.';
     }
 
+    /**
+ * Performs the requested period operation for this service.
+ * @param string $question Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function requestedPeriod(string $question): string
     {
         if (preg_match('/\b(12 months|12m|year|this year|last year)\b/', $question)) return '12m';
@@ -190,6 +252,11 @@ final class AssistantService
         return '30d';
     }
 
+    /**
+ * Performs the model chart request operation for this service.
+ * @param string $question Input used by this operation.
+ * @return ?array Result of this operation.
+ */
     private function modelChartRequest(string $question): ?array
     {
         try {
@@ -211,11 +278,28 @@ final class AssistantService
         } catch (\Throwable) { return null; }
     }
 
+    /**
+ * Performs the suggestions operation for this service.
+ * @return array Result of this operation.
+ */
     private function suggestions(): array
     {
         return ['Show milk production for the last 30 days', 'Compare sales and expenses this year', 'How is my farm doing?'];
     }
 
+    /**
+ * Performs the fallback answer operation for this service.
+ * @param string $question Input used by this operation.
+ * @param bool $trendQuestion Input used by this operation.
+ * @param array $headlines Input used by this operation.
+ * @param bool $hasFarmAccess Input used by this operation.
+ * @param int $animalCount Input used by this operation.
+ * @param float $milk Input used by this operation.
+ * @param int $openTasks Input used by this operation.
+ * @param int $stock Input used by this operation.
+ * @param int $healthDue Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function fallbackAnswer(string $question, bool $trendQuestion, array $headlines, bool $hasFarmAccess, int $animalCount, float $milk, int $openTasks, int $stock, int $healthDue): string
     {
         if ($trendQuestion) {
@@ -229,6 +313,11 @@ final class AssistantService
         return $this->localAnswer($question, $animalCount, $milk, $openTasks, $stock, $healthDue);
     }
 
+    /**
+ * Performs the trend headlines operation for this service.
+ * @param array $trends Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function trendHeadlines(array $trends): array
     {
         $headlines = [];
@@ -244,6 +333,16 @@ final class AssistantService
         return array_slice(array_values(array_unique($headlines)), 0, 6);
     }
 
+    /**
+ * Performs the local answer operation for this service.
+ * @param string $question Input used by this operation.
+ * @param int $animalCount Input used by this operation.
+ * @param float $milk Input used by this operation.
+ * @param int $openTasks Input used by this operation.
+ * @param int $stock Input used by this operation.
+ * @param int $healthDue Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function localAnswer(string $question, int $animalCount, float $milk, int $openTasks, int $stock, int $healthDue): string
     {
         if ($question === '' || preg_match('/^(hi|hello|hey|how are you|how are u|good morning|good afternoon|good evening)\b/', $question)) {
@@ -350,11 +449,21 @@ final class AssistantService
         return "I am ready to help. You can ask about:\n- Livestock care & nutrition (dairy cattle, goats, sheep, poultry, rabbits)\n- Diagnosing yield drops and optimizing milk/egg output\n- Feeds, silage, hay, and mineral supplements\n- Today's recorded milk, herd count, low stock, chores, and vet follow-ups\n- Agricultural market trends and 6-hour intelligence reports.";
     }
 
+    /**
+ * Performs the can use model operation for this service.
+ * @return bool Result of this operation.
+ */
     private function canUseModel(): bool
     {
         return Env::get('LFMIS_AI_API_URL') !== null && Env::get('LFMIS_AI_API_KEY') !== null && trim((string) Env::get('LFMIS_AI_API_KEY')) !== '';
     }
 
+    /**
+ * Performs the model answer operation for this service.
+ * @param string $question Input used by this operation.
+ * @param string $context Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     private function modelAnswer(string $question, string $context): ?string
     {
         $payload = json_encode([

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements AnimalService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -8,10 +13,19 @@ use PDOException;
 
 final class AnimalService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Returns the matching records for the requested scope.
+ * @return array Result of this operation.
+ */
     public function list(): array
     {
         return $this->db->query(
@@ -20,6 +34,12 @@ final class AnimalService
         )->fetchAll();
     }
 
+    /**
+ * Validates input and creates a new record.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function create(array $input, int $userId): array
     {
         $tag = trim((string) ($input['tagNumber'] ?? ''));
@@ -57,6 +77,12 @@ final class AnimalService
         return $this->find((int) $this->db->lastInsertId());
     }
 
+    /**
+ * Performs the update status operation for this service.
+ * @param int $id Input used by this operation.
+ * @param string $status Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function updateStatus(int $id, string $status): array
     {
         if (!in_array($status, ['active', 'sold', 'deceased', 'transferred'], true)) {
@@ -71,6 +97,12 @@ final class AnimalService
     }
 
     /** Update editable animal details while protecting unique tags and order-linked species history. */
+    /**
+ * Performs the update profile operation for this service.
+ * @param int $id Input used by this operation.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function updateProfile(int $id, array $input): array
     {
         $animal = $this->find($id);
@@ -115,6 +147,11 @@ final class AnimalService
         return $this->find($id);
     }
 
+    /**
+ * Loads one record by its identifier.
+ * @param int $id Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function find(int $id): array
     {
         $statement = $this->db->prepare('SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, status_changed_at, notes, created_at FROM animals WHERE id = ?');
@@ -126,6 +163,11 @@ final class AnimalService
         return $animal;
     }
 
+    /**
+ * Performs the profile operation for this service.
+ * @param int $id Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function profile(int $id): array
     {
         $animal = $this->find($id);
@@ -140,12 +182,24 @@ final class AnimalService
         return ['animal' => $animal, 'healthRecords' => $health->fetchAll(), 'productionRecords' => $production->fetchAll(), 'activities' => $activities->fetchAll(), 'orders' => $orders->fetchAll()];
     }
 
+    /**
+ * Performs the text or null operation for this service.
+ * @param mixed $value Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     private function textOrNull(mixed $value): ?string
     {
         $text = trim((string) $value);
         return $text === '' ? null : substr($text, 0, 500);
     }
 
+    /**
+ * Performs the limited text or null operation for this service.
+ * @param mixed $value Input used by this operation.
+ * @param int $limit Input used by this operation.
+ * @param string $label Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     private function limitedTextOrNull(mixed $value, int $limit, string $label): ?string
     {
         $text = trim((string) $value);
@@ -153,6 +207,11 @@ final class AnimalService
         return $text === '' ? null : $text;
     }
 
+    /**
+ * Performs the date or null operation for this service.
+ * @param mixed $value Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     private function dateOrNull(mixed $value): ?string
     {
         if ($value === null || trim((string) $value) === '') {

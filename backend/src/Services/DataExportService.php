@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements DataExportService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,8 +12,20 @@ use PDO;
 
 final class DataExportService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param PermissionService $permissions Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db, private PermissionService $permissions) {}
 
+    /**
+ * Performs the available sections operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $role Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function availableSections(int $userId, string $role): array
     {
         $groups = [
@@ -54,6 +71,13 @@ final class DataExportService
         return $groups[$role] ?? [];
     }
 
+    /**
+ * Performs the export operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $role Input used by this operation.
+ * @param array $selectedGroups Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function export(int $userId, string $role, array $selectedGroups): array
     {
         $groups = $this->availableSections($userId, $role);
@@ -83,6 +107,11 @@ final class DataExportService
         return array_intersect_key($data, array_fill_keys($selectedSections, true));
     }
 
+    /**
+ * Performs the administrator data operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function administratorData(int $userId): array
     {
         return [
@@ -109,6 +138,11 @@ final class DataExportService
         ];
     }
 
+    /**
+ * Performs the worker data operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function workerData(int $userId): array
     {
         $data = ['account' => $this->account($userId)];
@@ -123,6 +157,12 @@ final class DataExportService
         return $data;
     }
 
+    /**
+ * Performs the customer data operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $role Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function customerData(int $userId, string $role): array
     {
         $customerId = $this->db->prepare('SELECT id FROM customers WHERE user_id = ?');
@@ -148,6 +188,11 @@ final class DataExportService
         return $data;
     }
 
+    /**
+ * Performs the owned animal health records operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function ownedAnimalHealthRecords(int $userId): array
     {
         return $this->query('SELECT a.tag_number, a.species, a.name AS animal_name, h.record_type, h.description, h.medication,
@@ -160,11 +205,22 @@ final class DataExportService
                             ORDER BY h.record_date DESC, h.id DESC', [$userId]);
     }
 
+    /**
+ * Performs the account operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function account(int $userId): array
     {
         return $this->query('SELECT u.full_name, u.username, u.email, u.phone, r.name AS role, u.created_at FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?', [$userId]);
     }
 
+    /**
+ * Performs the query operation for this service.
+ * @param string $sql Input used by this operation.
+ * @param array $parameters Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function query(string $sql, array $parameters = []): array
     {
         $statement = $this->db->prepare($sql);

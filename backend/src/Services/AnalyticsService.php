@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements AnalyticsService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -25,6 +30,13 @@ final class AnalyticsService
     private const PERIOD_DAYS = ['7d' => 7, '30d' => 30, '90d' => 90];
     private const GROUPS = ['day', 'week', 'month', 'species', 'status', 'category', 'item'];
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param ?PermissionService $permissions Input used by this operation.
+ * @param ?\Closure $clock Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(
         private PDO $db,
         private ?PermissionService $permissions = null,
@@ -33,8 +45,22 @@ final class AnalyticsService
         $this->permissions ??= new PermissionService($db);
     }
 
+    /**
+ * Performs the metric names operation for this service.
+ * @return array Result of this operation.
+ */
+
     public static function metricNames(): array { return array_keys(self::METRICS); }
 
+    /**
+ * Performs the series operation for this service.
+ * @param string $metric Input used by this operation.
+ * @param string $period Input used by this operation.
+ * @param ?string $groupBy Input used by this operation.
+ * @param ?string $chartType Input used by this operation.
+ * @param ?string $role Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function series(string $metric, string $period = '30d', ?string $groupBy = null, ?string $chartType = null, ?string $role = null): array
     {
         if (!isset(self::METRICS[$metric])) throw new \InvalidArgumentException('Choose a supported analytics metric.');
@@ -82,6 +108,11 @@ final class AnalyticsService
         ];
     }
 
+    /**
+ * Performs the recorded production days operation for this service.
+ * @param int $periodDays Input used by this operation.
+ * @return int Result of this operation.
+ */
     public function recordedProductionDays(int $periodDays = 90): int
     {
         $start = $this->now()->modify('-' . max(1, $periodDays - 1) . ' days')->format('Y-m-d');
@@ -91,6 +122,12 @@ final class AnalyticsService
         return (int) $query->fetchColumn();
     }
 
+    /**
+ * Performs the recorded days operation for this service.
+ * @param string $scope Input used by this operation.
+ * @param int $periodDays Input used by this operation.
+ * @return int Result of this operation.
+ */
     public function recordedDays(string $scope, int $periodDays = 90): int
     {
         $start = $this->now()->modify('-' . max(1, $periodDays - 1) . ' days')->format('Y-m-d');
@@ -110,6 +147,12 @@ final class AnalyticsService
         throw new \InvalidArgumentException('Choose a supported analytics scope.');
     }
 
+    /**
+ * Performs the validate grouping operation for this service.
+ * @param string $metric Input used by this operation.
+ * @param string $groupBy Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function validateGrouping(string $metric, string $groupBy): void
     {
         $time = ['day', 'week', 'month'];
@@ -125,6 +168,15 @@ final class AnalyticsService
         if (!in_array($groupBy, $allowed, true)) throw new \InvalidArgumentException('That group-by value is not valid for the selected metric.');
     }
 
+    /**
+ * Performs the fetch values operation for this service.
+ * @param string $metric Input used by this operation.
+ * @param string $start Input used by this operation.
+ * @param string $end Input used by this operation.
+ * @param string $groupBy Input used by this operation.
+ * @param DateTimeImmutable $now Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function fetchValues(string $metric, string $start, string $end, string $groupBy, DateTimeImmutable $now): array
     {
         if ($metric === 'milk' || $metric === 'eggs') {
@@ -181,6 +233,14 @@ final class AnalyticsService
         return [];
     }
 
+    /**
+ * Performs the previous total operation for this service.
+ * @param string $metric Input used by this operation.
+ * @param array $window Input used by this operation.
+ * @param string $groupBy Input used by this operation.
+ * @param DateTimeImmutable $now Input used by this operation.
+ * @return ?float Result of this operation.
+ */
     private function previousTotal(string $metric, array $window, string $groupBy, DateTimeImmutable $now): ?float
     {
         if (in_array($metric, ['stock_levels', 'animals_by_species', 'animals_by_status'], true)) return null;
@@ -191,6 +251,14 @@ final class AnalyticsService
         return array_sum(array_map(static fn(array $row): float => (float)$row['value'], $rows));
     }
 
+    /**
+ * Performs the stats operation for this service.
+ * @param array $labels Input used by this operation.
+ * @param array $data Input used by this operation.
+ * @param ?float $previous Input used by this operation.
+ * @param int $recordCount Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function stats(array $labels, array $data, ?float $previous, int $recordCount): array
     {
         if ($recordCount === 0 || $data === []) return ['total' => null, 'average' => null, 'changePct' => null, 'trend' => 'no_data', 'movingAvg7' => null, 'bestPeriod' => null, 'worstPeriod' => null, 'anomalies' => []];
@@ -207,6 +275,13 @@ final class AnalyticsService
         return ['total' => round($sum, 2), 'average' => round($average, 2), 'changePct' => $change, 'trend' => $trend, 'movingAvg7' => round($mean7, 2), 'bestPeriod' => $bestIndex === null ? null : ['period' => $labels[$bestIndex], 'value' => $data[$bestIndex]], 'worstPeriod' => $worstIndex === null ? null : ['period' => $labels[$worstIndex], 'value' => $data[$worstIndex]], 'anomalies' => $anomalies];
     }
 
+    /**
+ * Performs the label rows operation for this service.
+ * @param array $rows Input used by this operation.
+ * @param string $groupBy Input used by this operation.
+ * @param bool $groupedCount Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function labelRows(array $rows, string $groupBy, bool $groupedCount = false): array
     {
         $out = [];
@@ -220,6 +295,15 @@ final class AnalyticsService
         return array_map(static fn($label, $value): array => ['label' => $label, 'value' => $value], array_keys($grouped), array_values($grouped));
     }
 
+    /**
+ * Performs the labels operation for this service.
+ * @param string $metric Input used by this operation.
+ * @param string $start Input used by this operation.
+ * @param string $end Input used by this operation.
+ * @param string $groupBy Input used by this operation.
+ * @param array $rows Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function labels(string $metric, string $start, string $end, string $groupBy, array $rows): array
     {
         if (in_array($metric, ['stock_levels', 'animals_by_species', 'animals_by_status', 'orders_by_status', 'health_records_by_type'], true) || ($metric === 'health_followups_due' && $groupBy === 'status')) return array_values(array_unique(array_map(static fn(array $row): string => (string)$row['label'], $rows)));
@@ -235,6 +319,13 @@ final class AnalyticsService
         return $labels;
     }
 
+    /**
+ * Performs the bucket values operation for this service.
+ * @param array $rows Input used by this operation.
+ * @param array $labels Input used by this operation.
+ * @param string $groupBy Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function bucketValues(array $rows, array $labels, string $groupBy): array
     {
         $out = array_fill_keys($labels, 0.0);
@@ -242,9 +333,26 @@ final class AnalyticsService
         return $out;
     }
 
+    /**
+ * Performs the simple rows operation for this service.
+ * @param string $sql Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function simpleRows(string $sql): array { return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC); }
+    /**
+ * Performs the rows operation for this service.
+ * @param string $sql Input used by this operation.
+ * @param array $params Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function rows(string $sql, array $params): array { $q = $this->db->prepare($sql); $q->execute($params); return $q->fetchAll(PDO::FETCH_ASSOC); }
 
+    /**
+ * Performs the window operation for this service.
+ * @param string $period Input used by this operation.
+ * @param DateTimeImmutable $now Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function window(string $period, DateTimeImmutable $now): array
     {
         if ($period === '12m') { $start = $now->modify('first day of this month')->modify('-11 months'); $end = $now->modify('tomorrow')->setTime(0, 0); $days = 365; }
@@ -252,5 +360,9 @@ final class AnalyticsService
         return ['start' => $start->format('Y-m-d'), 'end' => $end->format('Y-m-d'), 'days' => $days];
     }
 
+    /**
+ * Performs the now operation for this service.
+ * @return DateTimeImmutable Result of this operation.
+ */
     private function now(): DateTimeImmutable { return $this->clock ? ($this->clock)() : new DateTimeImmutable('today'); }
 }

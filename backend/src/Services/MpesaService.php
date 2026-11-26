@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements MpesaService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -13,11 +18,24 @@ final class MpesaService
 {
     private ?Closure $httpRequest;
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param ?Closure $httpRequest Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db, ?Closure $httpRequest = null)
     {
         $this->httpRequest = $httpRequest;
     }
 
+    /**
+ * Performs the initiate operation for this service.
+ * @param int $orderId Input used by this operation.
+ * @param array $user Input used by this operation.
+ * @param ?string $phone Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function initiate(int $orderId, array $user, ?string $phone): array
     {
         if ($orderId < 1) {
@@ -91,6 +109,12 @@ final class MpesaService
     }
 
     /** Complete a clearly identified local payment simulation without contacting Daraja. */
+    /**
+ * Processes a simulated M-Pesa result using the same payment confirmation path.
+ * @param int $orderId Input used by this operation.
+ * @param array $user Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function simulate(int $orderId, array $user): array
     {
         $orderQuery = $this->db->prepare(
@@ -131,6 +155,12 @@ final class MpesaService
         }
     }
 
+    /**
+ * Performs the handle callback operation for this service.
+ * @param string $providedSecret Input used by this operation.
+ * @param array $payload Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function handleCallback(string $providedSecret, array $payload): array
     {
         $secret = Env::get('LFMIS_MPESA_CALLBACK_SECRET', '');
@@ -192,6 +222,12 @@ final class MpesaService
         }
     }
 
+    /**
+ * Performs the normalize phone operation for this service.
+ * @param string $phone Input used by this operation.
+ * @return string Result of this operation.
+ */
+
     public static function normalizePhone(string $phone): string
     {
         $digits = preg_replace('/[\s()+-]/', '', trim($phone));
@@ -210,6 +246,13 @@ final class MpesaService
         return $digits;
     }
 
+    /**
+ * Performs the confirm payment operation for this service.
+ * @param array $payment Input used by this operation.
+ * @param array $metadata Input used by this operation.
+ * @param string $description Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function confirmPayment(array $payment, array $metadata, string $description): void
     {
         $receipt = trim((string) ($metadata['MpesaReceiptNumber'] ?? ''));
@@ -261,6 +304,12 @@ final class MpesaService
         $this->notifyStaff((int) $payment['id'], (int) $payment['order_id']);
     }
 
+    /**
+ * Performs the fail payment operation for this service.
+ * @param array $payment Input used by this operation.
+ * @param string $description Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function failPayment(array $payment, string $description): void
     {
         $this->db->prepare(
@@ -270,6 +319,12 @@ final class MpesaService
             ->execute([(int) $payment['order_id']]);
     }
 
+    /**
+ * Performs the valid success metadata operation for this service.
+ * @param array $payment Input used by this operation.
+ * @param array $metadata Input used by this operation.
+ * @return bool Result of this operation.
+ */
     private function validSuccessMetadata(array $payment, array $metadata): bool
     {
         if (trim((string) ($metadata['MpesaReceiptNumber'] ?? '')) === '') {
@@ -278,6 +333,12 @@ final class MpesaService
         return !isset($metadata['Amount']) || (int) round((float) $metadata['Amount']) === (int) round((float) $payment['amount']);
     }
 
+    /**
+ * Performs the notify staff operation for this service.
+ * @param int $paymentId Input used by this operation.
+ * @param int $orderId Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function notifyStaff(int $paymentId, int $orderId): void
     {
         $staff = $this->db->query(
@@ -294,6 +355,14 @@ final class MpesaService
         }
     }
 
+    /**
+ * Performs the send stk push operation for this service.
+ * @param int $orderId Input used by this operation.
+ * @param int $amount Input used by this operation.
+ * @param string $phone Input used by this operation.
+ * @param string $callbackUrl Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function sendStkPush(int $orderId, int $amount, string $phone, string $callbackUrl): array
     {
         $environment = Env::get('LFMIS_MPESA_ENV', 'sandbox');
@@ -343,6 +412,10 @@ final class MpesaService
         return $response;
     }
 
+    /**
+ * Performs the callback url operation for this service.
+ * @return string Result of this operation.
+ */
     private function callbackUrl(): string
     {
         $base = trim((string) Env::get('LFMIS_MPESA_CALLBACK_BASE', ''));
@@ -353,6 +426,14 @@ final class MpesaService
         return $base . (str_contains($base, '?') ? '&' : '?') . http_build_query(['token' => $secret]);
     }
 
+    /**
+ * Performs the request operation for this service.
+ * @param string $method Input used by this operation.
+ * @param string $url Input used by this operation.
+ * @param array $headers Input used by this operation.
+ * @param ?array $payload Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function request(string $method, string $url, array $headers, ?array $payload = null): array
     {
         if ($this->httpRequest !== null) {

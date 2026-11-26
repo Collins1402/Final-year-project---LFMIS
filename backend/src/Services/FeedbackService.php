@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements FeedbackService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -8,7 +13,17 @@ use PDO;
 
 final class FeedbackService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
+    /**
+ * Returns the matching records for the requested scope.
+ * @param ?int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function list(?int $userId = null): array
     {
         $query = 'SELECT feedback.id, feedback.category, feedback.message, feedback.status, feedback.created_at, users.full_name AS user_name
@@ -21,6 +36,12 @@ final class FeedbackService
         $statement->execute($userId === null ? [] : [$userId]);
         return $statement->fetchAll();
     }
+    /**
+ * Validates input and creates a new record.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function create(array $input, int $userId): array
     {
         $category=(string)($input['category']??'feedback'); $message=trim((string)($input['message']??''));
@@ -42,12 +63,23 @@ final class FeedbackService
             && Mailer::send((string) $sender['email'], $subject, $body);
         return ['id' => $id, 'acknowledgementSent' => $emailSent];
     }
+    /**
+ * Marks the selected feedback record as resolved.
+ * @param int $id Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function resolve(int $id, int $userId): void
     {
         $s=$this->db->prepare("UPDATE feedback SET status='resolved', resolved_by=?, resolved_at=NOW() WHERE id=?"); $s->execute([$userId,$id]);
     }
 
     /** Resolve every open feedback message and record which staff member handled the action. */
+    /**
+ * Marks all currently open feedback records as resolved.
+ * @param int $userId Input used by this operation.
+ * @return int Result of this operation.
+ */
     public function resolveAll(int $userId): int
     {
         $statement = $this->db->prepare("UPDATE feedback SET status='resolved', resolved_by=?, resolved_at=NOW() WHERE status='open'");

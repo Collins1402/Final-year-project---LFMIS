@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements BackupService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -12,11 +17,22 @@ final class BackupService
 {
     private ?Closure $runDump;
 
+    /**
+ * Connects this service to its required dependency.
+ * @param string $repositoryRoot Input used by this operation.
+ * @param ?Closure $runDump Input used by this operation.
+ * @param ?PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private string $repositoryRoot, ?Closure $runDump = null, private ?PDO $db = null)
     {
         $this->runDump = $runDump;
     }
 
+    /**
+ * Validates input and creates a new record.
+ * @return array Result of this operation.
+ */
     public function create(): array
     {
         $configuration = $this->databaseConfiguration();
@@ -64,6 +80,10 @@ final class BackupService
         return ['filename' => $filename, 'createdAt' => $createdAt->format(DATE_ATOM)];
     }
 
+    /**
+ * Performs the database configuration operation for this service.
+ * @return array Result of this operation.
+ */
     private function databaseConfiguration(): array
     {
         $database = (string) Env::required('LFMIS_DB_NAME');
@@ -83,6 +103,13 @@ final class BackupService
         ];
     }
 
+    /**
+ * Performs the run my sql dump operation for this service.
+ * @param array $command Input used by this operation.
+ * @param string $path Input used by this operation.
+ * @param string $password Input used by this operation.
+ * @return int Result of this operation.
+ */
     private function runMySqlDump(array $command, string $path, string $password): int
     {
         $previousPassword = getenv('MYSQL_PWD');
@@ -104,6 +131,10 @@ final class BackupService
         }
     }
 
+    /**
+ * Performs the dump executable operation for this service.
+ * @return string Result of this operation.
+ */
     private function dumpExecutable(): string
     {
         if (PHP_OS_FAMILY === 'Windows') {
@@ -115,6 +146,11 @@ final class BackupService
         return 'mysqldump';
     }
 
+    /**
+ * Performs the write pdo dump operation for this service.
+ * @param string $path Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function writePdoDump(string $path): void
     {
         if ($this->db === null) throw new BackupException('A database connection is required for the SQL backup fallback.');
@@ -167,11 +203,22 @@ final class BackupService
         }
     }
 
+    /**
+ * Performs the quote identifier operation for this service.
+ * @param string $identifier Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function quoteIdentifier(string $identifier): string
     {
         return '`' . str_replace('`', '``', $identifier) . '`';
     }
 
+    /**
+ * Performs the write operation for this service.
+ * @param mixed $stream Input used by this operation.
+ * @param string $contents Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function write($stream, string $contents): void
     {
         if (fwrite($stream, $contents) !== strlen($contents)) {

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements CommerceService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,9 +12,19 @@ use PDO;
 
 final class CommerceService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
     /** Return active listings; livestock availability is the count of active, unallocated animals. */
+    /**
+ * Returns active product listings and their current available quantity.
+ * @param ?string $role Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function products(?string $role = null): array
     {
         $query = "SELECT products.id, products.name, products.product_type, products.production_kind,
@@ -26,6 +41,11 @@ final class CommerceService
         return $this->db->query($query)->fetchAll();
     }
 
+    /**
+ * Performs the create product operation for this service.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function createProduct(array $input): array
     {
         $name = trim((string) ($input['name'] ?? ''));
@@ -51,6 +71,12 @@ final class CommerceService
     }
 
     /** Save a buyer's order and its item together after checking role, price, and available stock. */
+    /**
+ * Validates availability and saves a customer order with its item.
+ * @param array $input Input used by this operation.
+ * @param array $user Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function createCustomerOrder(array $input, array $user): array
     {
         $productId = filter_var($input['productId'] ?? null, FILTER_VALIDATE_INT);
@@ -87,6 +113,11 @@ final class CommerceService
         }
     }
 
+    /**
+ * Performs the orders operation for this service.
+ * @param ?int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function orders(?int $userId = null): array
     {
         $query = 'SELECT orders.id, orders.status, orders.total_amount, orders.ordered_at, customers.name AS customer, customers.phone,
@@ -116,6 +147,12 @@ final class CommerceService
         return $orders;
     }
 
+    /**
+ * Performs the link order product operation for this service.
+ * @param int $orderId Input used by this operation.
+ * @param int $productId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function linkOrderProduct(int $orderId, int $productId): array
     {
         $this->db->beginTransaction();
@@ -146,6 +183,12 @@ final class CommerceService
         }
     }
 
+    /**
+ * Performs the create order operation for this service.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function createOrder(array $input, int $userId): array
     {
         $name = trim((string) ($input['customerName'] ?? ''));
@@ -183,6 +226,13 @@ final class CommerceService
         }
     }
 
+    /**
+ * Performs the update order operation for this service.
+ * @param int $id Input used by this operation.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function updateOrder(int $id, array $input, int $userId): array
     {
         $status = (string) ($input['status'] ?? '');
@@ -218,6 +268,14 @@ final class CommerceService
     }
 
     /** Apply a bulk status change atomically so a failed animal allocation changes none of the selected orders. */
+    /**
+ * Performs the update orders bulk operation for this service.
+ * @param array $orderIds Input used by this operation.
+ * @param string $status Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @param array $totalAmounts Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function updateOrdersBulk(array $orderIds, string $status, int $userId, array $totalAmounts = []): array
     {
         if (!in_array($status, ['quoted', 'accepted', 'fulfilled', 'cancelled'], true)) {
@@ -281,7 +339,17 @@ final class CommerceService
         }
     }
 
+    /**
+ * Performs the sales operation for this service.
+ * @return array Result of this operation.
+ */
     public function sales(): array { return $this->db->query('SELECT * FROM sales ORDER BY sold_at DESC LIMIT 300')->fetchAll(); }
+    /**
+ * Performs the create sale operation for this service.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function createSale(array $input, int $userId): array
     {
         $description = trim((string) ($input['description'] ?? '')); $quantity = (float) ($input['quantity'] ?? 0); $unit = trim((string) ($input['unit'] ?? '')); $price = (float) ($input['unitPrice'] ?? 0); $date = date_create((string) ($input['soldAt'] ?? ''));
@@ -289,7 +357,17 @@ final class CommerceService
         $statement = $this->db->prepare('INSERT INTO sales (description, quantity, unit, unit_price, sold_at, recorded_by) VALUES (?, ?, ?, ?, ?, ?)'); $statement->execute([$description, $quantity, $unit, $price, $date->format('Y-m-d H:i:s'), $userId]); return ['id' => (int) $this->db->lastInsertId()];
     }
 
+    /**
+ * Performs the expenses operation for this service.
+ * @return array Result of this operation.
+ */
     public function expenses(): array { return $this->db->query('SELECT * FROM expenses ORDER BY expense_date DESC LIMIT 300')->fetchAll(); }
+    /**
+ * Performs the create expense operation for this service.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function createExpense(array $input, int $userId): array
     {
         $category = (string) ($input['category'] ?? ''); $description = trim((string) ($input['description'] ?? '')); $amount = (float) ($input['amount'] ?? 0); $date = date_create((string) ($input['expenseDate'] ?? ''));
@@ -297,6 +375,11 @@ final class CommerceService
         $statement = $this->db->prepare('INSERT INTO expenses (category, description, amount, expense_date, recorded_by) VALUES (?, ?, ?, ?, ?)'); $statement->execute([$category, $description, $amount, $date->format('Y-m-d'), $userId]); return ['id' => (int) $this->db->lastInsertId()];
     }
 
+    /**
+ * Performs the payments operation for this service.
+ * @param ?int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function payments(?int $userId = null): array
     {
         $query = 'SELECT payments.*, customers.name AS customer FROM payments LEFT JOIN customers ON customers.id = payments.customer_id';
@@ -307,6 +390,12 @@ final class CommerceService
         return $statement->fetchAll();
     }
     /** Record staff-received payments; cash can confirm a buyer's pending Pay on Premise request. */
+    /**
+ * Performs the create payment operation for this service.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function createPayment(array $input, int $userId): array
     {
         $orderId = filter_var($input['orderId'] ?? null, FILTER_VALIDATE_INT); $method = (string) ($input['method'] ?? ''); $reference = trim((string) ($input['transactionReference'] ?? '')) ?: null;
@@ -341,6 +430,12 @@ final class CommerceService
     }
 
     /** Keep a buyer's offline payment choice pending until farm staff record receipt. */
+    /**
+ * Performs the request offline payment operation for this service.
+ * @param array $input Input used by this operation.
+ * @param array $user Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function requestOfflinePayment(array $input, array $user): array
     {
         $orderId = filter_var($input['orderId'] ?? null, FILTER_VALIDATE_INT);
@@ -379,6 +474,10 @@ final class CommerceService
         return ['id' => (int) $this->db->lastInsertId(), 'status' => 'pending'];
     }
 
+    /**
+ * Performs the finance operation for this service.
+ * @return array Result of this operation.
+ */
     public function finance(): array
     {
         $sales = (float) $this->db->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE sold_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')")->fetchColumn();
@@ -386,6 +485,12 @@ final class CommerceService
         $expenses = (float) $this->db->query("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')")->fetchColumn();
         return ['salesThisMonth' => $sales, 'confirmedPaymentsThisMonth' => $payments, 'expensesThisMonth' => $expenses, 'estimatedNet' => $sales - $expenses];
     }
+    /**
+ * Performs the find product operation for this service.
+ * @param int $id Input used by this operation.
+ * @param bool $lock Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function findProduct(int $id, bool $lock = false): array
     {
         $query = 'SELECT id, name, product_type, production_kind, species, unit, available_quantity, unit_price, is_active FROM products WHERE id = ?';
@@ -395,6 +500,11 @@ final class CommerceService
         return $statement->fetch(PDO::FETCH_ASSOC) ?: throw new \DomainException('Product listing not found.');
     }
 
+    /**
+ * Performs the available quantity operation for this service.
+ * @param array $product Input used by this operation.
+ * @return float Result of this operation.
+ */
     private function availableQuantity(array $product): float
     {
         if ($product['product_type'] !== 'livestock') return (float) $product['available_quantity'];
@@ -406,6 +516,11 @@ final class CommerceService
     }
 
     /** Allocate only active, unlinked animals and mark each assigned animal sold within the order transaction. */
+    /**
+ * Performs the reserve order items operation for this service.
+ * @param int $orderId Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function reserveOrderItems(int $orderId): void
     {
         $items = $this->db->prepare('SELECT order_items.*, products.product_type, products.species, products.is_active FROM order_items LEFT JOIN products ON products.id = order_items.product_id WHERE order_items.order_id = ?');
@@ -439,6 +554,11 @@ final class CommerceService
         }
     }
 
+    /**
+ * Performs the release order items operation for this service.
+ * @param int $orderId Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function releaseOrderItems(int $orderId): void
     {
         $items = $this->db->prepare('SELECT order_items.product_id, order_items.quantity, products.product_type FROM order_items LEFT JOIN products ON products.id = order_items.product_id WHERE order_items.order_id = ?');
@@ -457,6 +577,12 @@ final class CommerceService
         }
     }
 
+    /**
+ * Performs the record order sales operation for this service.
+ * @param int $orderId Input used by this operation.
+ * @param int $customerId Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function recordOrderSales(int $orderId, int $customerId): void
     {
         $existing = $this->db->prepare('SELECT COUNT(*) FROM sales WHERE order_id = ?');

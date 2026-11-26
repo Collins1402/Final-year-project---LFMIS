@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements RateLimitService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,10 +12,23 @@ use PDO;
 
 final class RateLimitService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Performs the consume operation for this service.
+ * @param string $scope Input used by this operation.
+ * @param int $maximum Input used by this operation.
+ * @param int $windowSeconds Input used by this operation.
+ * @param ?string $identity Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function consume(string $scope, int $maximum, int $windowSeconds, ?string $identity = null): void
     {
         if ($scope === '' || $maximum < 1 || $windowSeconds < 1) {

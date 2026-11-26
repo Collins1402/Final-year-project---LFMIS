@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements InventoryService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,13 +12,27 @@ use PDO;
 
 final class InventoryService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Returns the matching records for the requested scope.
+ * @return array Result of this operation.
+ */
     public function list(): array
     {
         return $this->db->query('SELECT id, name, category, unit, quantity_on_hand, reorder_level, unit_cost, is_active FROM inventory_items ORDER BY name')->fetchAll();
     }
 
+    /**
+ * Performs the transactions operation for this service.
+ * @param ?int $itemId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function transactions(?int $itemId = null): array
     {
         $query = 'SELECT inventory_transactions.id, inventory_transactions.item_id, inventory_items.name AS item_name,
@@ -29,6 +48,11 @@ final class InventoryService
         return $statement->fetchAll();
     }
 
+    /**
+ * Validates input and creates a new record.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function create(array $input): array
     {
         $name = trim((string) ($input['name'] ?? ''));
@@ -48,6 +72,13 @@ final class InventoryService
         return $result->fetch();
     }
 
+    /**
+ * Performs the transact operation for this service.
+ * @param int $id Input used by this operation.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function transact(int $id, array $input, int $userId): array
     {
         $type = (string) ($input['transactionType'] ?? '');

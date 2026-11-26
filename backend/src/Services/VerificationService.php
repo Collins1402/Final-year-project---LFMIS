@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements VerificationService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -10,10 +15,22 @@ use PDO;
 
 final class VerificationService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Performs the issue operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $email Input used by this operation.
+ * @param string $name Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     public function issue(int $userId, string $email, string $name): ?string
     {
         $token = bin2hex(random_bytes(32));
@@ -39,6 +56,11 @@ final class VerificationService
         return Env::get('LFMIS_DEV_LOG_EMAIL_VERIFICATION_LINK', '0') === '1' ? $link : null;
     }
 
+    /**
+ * Performs the confirm operation for this service.
+ * @param string $token Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function confirm(string $token): array
     {
         if (!preg_match('/^[a-f0-9]{64}$/', $token)) {

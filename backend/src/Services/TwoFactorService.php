@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements TwoFactorService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -17,12 +22,23 @@ final class TwoFactorService
     private const MAX_CODE_ATTEMPTS = 5;
     private const MAX_CODES_PER_HOUR = 3;
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param ?Closure $deliverEmail Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(
         private PDO $db,
         private ?Closure $deliverEmail = null
     ) {
     }
 
+    /**
+ * Performs the status operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function status(int $userId): array
     {
         $userQuery = $this->db->prepare('SELECT 1 FROM users WHERE id = ?');
@@ -38,6 +54,12 @@ final class TwoFactorService
         ];
     }
 
+    /**
+ * Performs the begin login operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param array $methods Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function beginLogin(int $userId, array $methods): void
     {
         $allowedMethods = array_values(array_intersect($methods, ['email']));
@@ -55,11 +77,20 @@ final class TwoFactorService
         ];
     }
 
+    /**
+ * Performs the cancel login operation for this service.
+ * @return void Result of this operation.
+ */
     public function cancelLogin(): void
     {
         unset($_SESSION['pending_2fa']);
     }
 
+    /**
+ * Performs the send login code operation for this service.
+ * @param string $method Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function sendLoginCode(string $method): void
     {
         $pending = $this->pendingLogin();
@@ -70,6 +101,12 @@ final class TwoFactorService
         $this->issueCode((int) $pending['user_id'], 'login', $method, $user['destination'], $user['name']);
     }
 
+    /**
+ * Performs the verify login code operation for this service.
+ * @param string $method Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return int Result of this operation.
+ */
     public function verifyLoginCode(string $method, string $code): int
     {
         $pending = $this->pendingLogin();
@@ -81,6 +118,12 @@ final class TwoFactorService
         return (int) $pending['user_id'];
     }
 
+    /**
+ * Performs the start enrollment operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $method Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function startEnrollment(int $userId, string $method): void
     {
         $this->validateMethod($method);
@@ -94,6 +137,13 @@ final class TwoFactorService
         $this->issueCode($userId, 'enroll', $method, $user['destination'], $user['name']);
     }
 
+    /**
+ * Performs the complete enrollment operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $method Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function completeEnrollment(int $userId, string $method, string $code): void
     {
         $this->validateMethod($method);
@@ -102,6 +152,13 @@ final class TwoFactorService
             ->execute([$userId, $method, $this->now()]);
     }
 
+    /**
+ * Performs the remove method operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $method Input used by this operation.
+ * @param string $password Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function removeMethod(int $userId, string $method, string $password): void
     {
         $this->validateMethod($method);
@@ -119,6 +176,15 @@ final class TwoFactorService
         }
     }
 
+    /**
+ * Performs the issue code operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $purpose Input used by this operation.
+ * @param string $method Input used by this operation.
+ * @param string $destination Input used by this operation.
+ * @param string $name Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function issueCode(int $userId, string $purpose, string $method, string $destination, string $name): void
     {
         $now = $this->now();
@@ -157,6 +223,14 @@ final class TwoFactorService
         }
     }
 
+    /**
+ * Performs the verify code operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $purpose Input used by this operation.
+ * @param string $method Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function verifyCode(int $userId, string $purpose, string $method, string $code): array
     {
         $now = $this->now();
@@ -185,6 +259,11 @@ final class TwoFactorService
         return $challenge;
     }
 
+    /**
+ * Performs the find email delivery details operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function findEmailDeliveryDetails(int $userId): array
     {
         $statement = $this->db->prepare('SELECT email, full_name FROM users WHERE id = ?');
@@ -200,6 +279,10 @@ final class TwoFactorService
         return ['destination' => $email, 'name' => (string) $user['full_name']];
     }
 
+    /**
+ * Performs the pending login operation for this service.
+ * @return array Result of this operation.
+ */
     private function pendingLogin(): array
     {
         $pending = $_SESSION['pending_2fa'] ?? null;
@@ -210,6 +293,11 @@ final class TwoFactorService
         return $pending;
     }
 
+    /**
+ * Performs the validate method operation for this service.
+ * @param string $method Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function validateMethod(string $method): void
     {
         if ($method !== 'email') {
@@ -217,6 +305,11 @@ final class TwoFactorService
         }
     }
 
+    /**
+ * Performs the hash code operation for this service.
+ * @param string $code Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function hashCode(string $code): string
     {
         $key = Env::get('LFMIS_2FA_OTP_KEY');
@@ -226,11 +319,20 @@ final class TwoFactorService
         return hash_hmac('sha256', $code, $key);
     }
 
+    /**
+ * Performs the now operation for this service.
+ * @return string Result of this operation.
+ */
     private function now(): string
     {
         return (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
     }
 
+    /**
+ * Performs the time ago operation for this service.
+ * @param int $seconds Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function timeAgo(int $seconds): string
     {
         return (new DateTimeImmutable('now', new DateTimeZone('UTC')))->modify("-{$seconds} seconds")->format('Y-m-d H:i:s');

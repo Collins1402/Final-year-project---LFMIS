@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements EventService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -8,8 +13,17 @@ use PDO;
 
 final class EventService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Performs the public list operation for this service.
+ * @return array Result of this operation.
+ */
     public function publicList(): array
     {
         return $this->db->query(
@@ -20,6 +34,10 @@ final class EventService
         )->fetchAll();
     }
 
+    /**
+ * Performs the admin list operation for this service.
+ * @return array Result of this operation.
+ */
     public function adminList(): array
     {
         return $this->db->query(
@@ -30,6 +48,12 @@ final class EventService
         )->fetchAll();
     }
 
+    /**
+ * Validates input and creates a new record.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function create(array $input, int $userId): array
     {
         $event = $this->validate($input);
@@ -44,6 +68,12 @@ final class EventService
         return $this->find((int) $this->db->lastInsertId());
     }
 
+    /**
+ * Validates input and updates the matching record.
+ * @param int $id Input used by this operation.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function update(int $id, array $input): array
     {
         $event = $this->validate($input);
@@ -57,6 +87,12 @@ final class EventService
         return $this->find($id);
     }
 
+    /**
+ * Performs the set status operation for this service.
+ * @param int $id Input used by this operation.
+ * @param string $status Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function setStatus(int $id, string $status): array
     {
         if (!in_array($status, ['draft', 'published', 'cancelled'], true)) {
@@ -67,6 +103,11 @@ final class EventService
         return $this->find($id);
     }
 
+    /**
+ * Performs the validate operation for this service.
+ * @param array $input Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function validate(array $input): array
     {
         $title = trim((string) ($input['title'] ?? ''));
@@ -95,6 +136,11 @@ final class EventService
         return compact('title', 'description', 'eventDate', 'startTime', 'endTime', 'location', 'status');
     }
 
+    /**
+ * Loads one record by its identifier.
+ * @param int $id Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function find(int $id): array
     {
         $statement = $this->db->prepare(

@@ -1,10 +1,19 @@
 <?php
+/**
+ * File purpose: implements RequestSecurity for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Core;
 
 final class RequestSecurity
 {
+    /**
+ * Performs the client ip operation for this service.
+ * @return string Result of this operation.
+ */
     public static function clientIp(): string
     {
         $remoteAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
@@ -18,6 +27,11 @@ final class RequestSecurity
         return filter_var($remoteAddress, FILTER_VALIDATE_IP) ? $remoteAddress : 'Unavailable';
     }
 
+    /**
+ * Performs the send headers operation for this service.
+ * @return void Result of this operation.
+ */
+
     public static function sendHeaders(): void
     {
         header('X-Content-Type-Options: nosniff');
@@ -25,6 +39,14 @@ final class RequestSecurity
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header("Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
     }
+
+    /**
+ * Performs the is trusted origin operation for this service.
+ * @param ?string $origin Input used by this operation.
+ * @param ?string $referer Input used by this operation.
+ * @param string $appUrl Input used by this operation.
+ * @return bool Result of this operation.
+ */
 
     public static function isTrustedOrigin(?string $origin, ?string $referer, string $appUrl): bool
     {
@@ -59,6 +81,12 @@ final class RequestSecurity
         return self::isPrivateHost($candidateHost) && self::isPrivateHost($appHost);
     }
 
+    /**
+ * Performs the is private host operation for this service.
+ * @param string $host Input used by this operation.
+ * @return bool Result of this operation.
+ */
+
     private static function isPrivateHost(string $host): bool
     {
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
@@ -66,6 +94,12 @@ final class RequestSecurity
         }
         return false;
     }
+
+    /**
+ * Performs the origin of operation for this service.
+ * @param string $url Input used by this operation.
+ * @return ?string Result of this operation.
+ */
 
     private static function originOf(string $url): ?string
     {

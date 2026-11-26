@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements ForecastService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -12,16 +17,30 @@ final class ForecastService
 {
     private ?Closure $httpRequest;
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param ?Closure $httpRequest Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db, ?Closure $httpRequest = null)
     {
         $this->httpRequest = $httpRequest;
     }
 
+    /**
+ * Performs the training data operation for this service.
+ * @return array Result of this operation.
+ */
     public function trainingData(): array
     {
         return $this->trainingDataFor('milk');
     }
 
+    /**
+ * Returns active product listings and their current available quantity.
+ * @return array Result of this operation.
+ */
     public function products(): array
     {
         $rows = $this->db->query('SELECT produce_name, unit, MAX(production_date) AS latest_date FROM farm_produce WHERE production_date < CURRENT_DATE GROUP BY LOWER(produce_name), LOWER(unit), produce_name, unit ORDER BY produce_name, latest_date DESC')->fetchAll(PDO::FETCH_ASSOC);
@@ -33,6 +52,12 @@ final class ForecastService
         return array_values($products);
     }
 
+    /**
+ * Performs the scenario operation for this service.
+ * @param int $additionalCows Input used by this operation.
+ * @param int $additionalHens Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function scenario(int $additionalCows, int $additionalHens): array
     {
         if ($additionalCows < 0 || $additionalCows > 250 || $additionalHens < 0 || $additionalHens > 250) {
@@ -100,6 +125,11 @@ final class ForecastService
         ];
     }
 
+    /**
+ * Performs the training data for operation for this service.
+ * @param string $produceName Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function trainingDataFor(string $produceName): array
     {
         $produceName = strtolower(trim($produceName));
@@ -161,6 +191,12 @@ final class ForecastService
         return ['observations' => $observations, 'includesSimulatedData' => $includesSimulatedData, 'unit' => $unit];
     }
 
+    /**
+ * Performs the report operation for this service.
+ * @param int $userId Input used by this operation.
+ * @param string $product Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function report(int $userId, string $product = 'milk'): array
     {
         $product = strtolower(trim($product));
@@ -189,6 +225,10 @@ final class ForecastService
         ];
     }
 
+    /**
+ * Performs the history operation for this service.
+ * @return array Result of this operation.
+ */
     public function history(): array
     {
         return $this->db->query(
@@ -198,6 +238,10 @@ final class ForecastService
         )->fetchAll();
     }
 
+    /**
+ * Performs the signals operation for this service.
+ * @return array Result of this operation.
+ */
     private function signals(): array
     {
         $openTasks = (int) $this->db->query("SELECT COUNT(*) FROM farm_activities WHERE status = 'planned'")->fetchColumn();
@@ -212,6 +256,12 @@ final class ForecastService
         return ['openTasks' => $openTasks, 'stockAlerts' => $stockAlerts, 'healthDue' => (int) $health->fetchColumn()];
     }
 
+    /**
+ * Performs the post operation for this service.
+ * @param string $path Input used by this operation.
+ * @param array $payload Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function post(string $path, array $payload): array
     {
         $url = rtrim(Env::get('LFMIS_ML_URL', 'http://127.0.0.1:5000'), '/') . $path;
@@ -246,6 +296,13 @@ final class ForecastService
         return $data;
     }
 
+    /**
+ * Performs the store backtest operation for this service.
+ * @param array $result Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @param bool $includesSimulatedData Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function storeBacktest(array $result, int $userId, bool $includesSimulatedData): void
     {
         $backtest = $result['backtest'] ?? [];

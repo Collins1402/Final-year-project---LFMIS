@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements ProductionService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -9,13 +14,26 @@ final class ProductionService
 {
     private const PLAUSIBILITY_LIMITS = ['milk_litres' => 40.0, 'egg_trays' => 150.0];
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Performs the records operation for this service.
+ * @return array Result of this operation.
+ */
     public function records(): array
     {
         return $this->db->query('SELECT id, produce_name, production_date, production_session, animal_id, quantity_produced, quantity_sold, quantity_damaged, unit, notes FROM farm_produce ORDER BY production_date DESC, id DESC LIMIT 300')->fetchAll();
     }
 
+    /**
+ * Performs the summary operation for this service.
+ * @return array Result of this operation.
+ */
     public function summary(): array
     {
         $today = date('Y-m-d');
@@ -37,11 +55,24 @@ final class ProductionService
         return ['weekStart' => $weekStart, 'today' => $today, 'weeklyTotals' => $weekly, 'monthlyTotals' => $monthly, 'dailyTotals' => $daily];
     }
 
+    /**
+ * Performs the record operation for this service.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function record(array $input, int $userId): array
     {
         return $this->save($input, $userId, null);
     }
 
+    /**
+ * Validates input and updates the matching record.
+ * @param int $id Input used by this operation.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function update(int $id, array $input, int $userId): array
     {
         $find = $this->db->prepare('SELECT * FROM farm_produce WHERE id = ?');
@@ -51,6 +82,13 @@ final class ProductionService
         return $this->save($input, $userId, $existing);
     }
 
+    /**
+ * Performs the save operation for this service.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @param ?array $editing Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function save(array $input, int $userId, ?array $editing): array
     {
         $name = trim((string) ($input['produceName'] ?? $editing['produce_name'] ?? ''));
@@ -103,6 +141,13 @@ final class ProductionService
         return ['id' => (int) $this->db->lastInsertId(), 'date' => $date];
     }
 
+    /**
+ * Performs the check plausibility operation for this service.
+ * @param string $name Input used by this operation.
+ * @param string $unit Input used by this operation.
+ * @param float $quantity Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function checkPlausibility(string $name, string $unit, float $quantity): void
     {
         if (strtolower($name) === 'milk' && strtolower($unit) === 'litres' && $quantity > self::PLAUSIBILITY_LIMITS['milk_litres']) {
@@ -113,6 +158,15 @@ final class ProductionService
         }
     }
 
+    /**
+ * Performs the find duplicate operation for this service.
+ * @param string $name Input used by this operation.
+ * @param string $date Input used by this operation.
+ * @param ?string $session Input used by this operation.
+ * @param ?int $animalId Input used by this operation.
+ * @param mixed $excludeId Input used by this operation.
+ * @return ?array Result of this operation.
+ */
     private function findDuplicate(string $name, string $date, ?string $session, ?int $animalId, mixed $excludeId): ?array
     {
         $sql = 'SELECT id, produce_name, production_date, production_session, animal_id, quantity_produced, quantity_sold, quantity_damaged, unit, notes FROM farm_produce WHERE LOWER(produce_name)=? AND production_date=? AND ((production_session IS NULL AND ? IS NULL) OR production_session=?) AND ((animal_id IS NULL AND ? IS NULL) OR animal_id=?)';
@@ -125,11 +179,22 @@ final class ProductionService
         return $record ?: null;
     }
 
+    /**
+ * Performs the adjust product stock operation for this service.
+ * @param string $kind Input used by this operation.
+ * @param float $change Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function adjustProductStock(string $kind, float $change): void
     {
         $this->db->prepare('UPDATE products SET available_quantity = available_quantity + ? WHERE is_active = 1 AND production_kind = ?')->execute([$change, $kind]);
     }
 
+    /**
+ * Performs the date operation for this service.
+ * @param mixed $value Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function date(mixed $value): string
     {
         $date = date_create((string) $value);
@@ -137,6 +202,12 @@ final class ProductionService
         return $date->format('Y-m-d');
     }
 
+    /**
+ * Performs the sum amounts operation for this service.
+ * @param array $left Input used by this operation.
+ * @param array $right Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function sumAmounts(array $left, array $right): array
     {
         return ['produced' => $left['produced'] + $right['produced'], 'sold' => $left['sold'] + $right['sold'], 'damaged' => $left['damaged'] + $right['damaged']];

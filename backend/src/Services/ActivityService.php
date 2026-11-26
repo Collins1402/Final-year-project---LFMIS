@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements ActivityService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,8 +12,19 @@ use PDO;
 
 final class ActivityService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Returns the matching records for the requested scope.
+ * @param ?int $userId Input used by this operation.
+ * @param string $role Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function list(?int $userId, string $role): array
     {
         $sql = 'SELECT farm_activities.id, farm_activities.activity_type, farm_activities.description, farm_activities.animal_id,
@@ -25,6 +41,12 @@ final class ActivityService
         return $statement->fetchAll();
     }
 
+    /**
+ * Validates input and creates a new record.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function create(array $input, int $userId): array
     {
         $type = (string) ($input['activityType'] ?? '');
@@ -81,6 +103,12 @@ final class ActivityService
         }
     }
 
+    /**
+ * Performs the complete operation for this service.
+ * @param int $id Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function complete(int $id, int $userId): array
     {
         $statement = $this->db->prepare(
@@ -93,6 +121,11 @@ final class ActivityService
         return $this->find($id);
     }
 
+    /**
+ * Loads one record by its identifier.
+ * @param int $id Input used by this operation.
+ * @return array Result of this operation.
+ */
     private function find(int $id): array
     {
         $statement = $this->db->prepare('SELECT * FROM farm_activities WHERE id = ?');
@@ -100,6 +133,14 @@ final class ActivityService
         return $statement->fetch() ?: throw new \RuntimeException('Activity not found.');
     }
 
+    /**
+ * Performs the notify health staff operation for this service.
+ * @param int $activityId Input used by this operation.
+ * @param int $healthRecordId Input used by this operation.
+ * @param string $animalId Input used by this operation.
+ * @param string $symptoms Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function notifyHealthStaff(int $activityId, int $healthRecordId, string $animalId, string $symptoms): void
     {
         $staff = $this->db->prepare(

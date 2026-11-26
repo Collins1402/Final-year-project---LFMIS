@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements NotificationService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,14 +12,29 @@ use PDO;
 
 final class NotificationService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Returns the matching records for the requested scope.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function list(int $userId): array
     {
         $statement = $this->db->prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY is_read, created_at DESC LIMIT 100');
         $statement->execute([$userId]); return $statement->fetchAll();
     }
 
+    /**
+ * Performs the generate for user operation for this service.
+ * @param int $userId Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function generateForUser(int $userId): void
     {
         $dueThrough = date('Y-m-d', strtotime('+7 days'));
@@ -23,6 +43,14 @@ final class NotificationService
         $this->db->prepare("INSERT IGNORE INTO notifications (user_id, type, title, message, dedupe_key) SELECT ?, 'order_pending', 'Orders need review', CONCAT(COUNT(*), ' order(s) are awaiting action.'), CONCAT('orders:', CURRENT_DATE()) FROM orders WHERE status IN ('pending','quoted') HAVING COUNT(*) > 0")->execute([$userId]);
     }
 
+    /**
+ * Performs the add feedback notification operation for this service.
+ * @param int $feedbackId Input used by this operation.
+ * @param string $category Input used by this operation.
+ * @param string $senderName Input used by this operation.
+ * @param string $message Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function addFeedbackNotification(int $feedbackId, string $category, string $senderName, string $message): void
     {
         $admins = $this->db->query(
@@ -47,6 +75,12 @@ final class NotificationService
         }
     }
 
+    /**
+ * Performs the mark read operation for this service.
+ * @param int $id Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function markRead(int $id, int $userId): void
     {
         $statement = $this->db->prepare('UPDATE notifications SET is_read=1, read_at=NOW() WHERE id=? AND user_id=?'); $statement->execute([$id, $userId]);

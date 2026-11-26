@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements HealthService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -14,10 +19,19 @@ final class HealthService
           AND (newer.record_date > hr.record_date OR (newer.record_date = hr.record_date AND newer.id > hr.id))
     )";
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Returns the matching records for the requested scope.
+ * @return array Result of this operation.
+ */
     public function list(): array
     {
         return $this->db->query(
@@ -29,6 +43,11 @@ final class HealthService
         )->fetchAll();
     }
 
+    /**
+ * Performs the due soon operation for this service.
+ * @param int $days Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function dueSoon(int $days = 7): array
     {
         if ($days < 0) {
@@ -48,6 +67,12 @@ final class HealthService
         return $statement->fetchAll();
     }
 
+    /**
+ * Validates input and creates a new record.
+ * @param array $input Input used by this operation.
+ * @param int $userId Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function create(array $input, int $userId): array
     {
         $animalId = filter_var($input['animalId'] ?? null, FILTER_VALIDATE_INT);
@@ -80,6 +105,11 @@ final class HealthService
         return $result->fetch();
     }
 
+    /**
+ * Performs the date operation for this service.
+ * @param string $value Input used by this operation.
+ * @return string Result of this operation.
+ */
     private function date(string $value): string
     {
         $date = date_create($value);
@@ -89,6 +119,11 @@ final class HealthService
         return $date->format('Y-m-d');
     }
 
+    /**
+ * Performs the text or null operation for this service.
+ * @param mixed $value Input used by this operation.
+ * @return ?string Result of this operation.
+ */
     private function textOrNull(mixed $value): ?string
     {
         $text = trim((string) $value);

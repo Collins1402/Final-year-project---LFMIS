@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements Totp for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Core;
@@ -11,11 +16,24 @@ final class Totp
     private const PERIOD = 30;
     private const DIGITS = 6;
 
+    /**
+ * Creates a cryptographically random Base32 TOTP secret.
+ * @param int $bytes Input used by this operation.
+ * @return string Result of this operation.
+ */
+
     public static function generateSecret(int $bytes = 20): string
     {
         if ($bytes < 16 || $bytes > 64) throw new RuntimeException('TOTP secret length must be between 16 and 64 bytes.');
         return self::base32Encode(random_bytes($bytes));
     }
+
+    /**
+ * Calculates a time-based one-time password for the supplied time step.
+ * @param string $secret Input used by this operation.
+ * @param int $time Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     public static function code(string $secret, int $time): string
     {
@@ -30,6 +48,14 @@ final class Totp
     }
 
     /** Returns the matched time step, or null for an invalid, expired, or replayed code. */
+    /**
+ * Checks a TOTP code within the allowed time window and rejects replayed steps.
+ * @param string $secret Input used by this operation.
+ * @param string $code Input used by this operation.
+ * @param int $time Input used by this operation.
+ * @param int $lastStep Input used by this operation.
+ * @return ?int Result of this operation.
+ */
     public static function verify(string $secret, string $code, int $time, int $lastStep = 0): ?int
     {
         if (!preg_match('/^\d{6}$/', $code) || $time < 0 || $lastStep < 0) return null;
@@ -40,6 +66,14 @@ final class Totp
         }
         return null;
     }
+
+    /**
+ * Performs the otpauth uri operation for this service.
+ * @param string $secret Input used by this operation.
+ * @param string $account Input used by this operation.
+ * @param string $issuer Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     public static function otpauthUri(string $secret, string $account, string $issuer = 'LFMIS'): string
     {
@@ -54,12 +88,24 @@ final class Totp
         return 'otpauth://totp/' . $label . '?' . $query;
     }
 
+    /**
+ * Encrypts a TOTP secret using the configured sodium key.
+ * @param string $secret Input used by this operation.
+ * @return string Result of this operation.
+ */
+
     public static function encrypt(string $secret): string
     {
         self::requireSodium();
         $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
         return $nonce . sodium_crypto_secretbox($secret, $nonce, self::encryptionKey());
     }
+
+    /**
+ * Authenticates and decrypts a stored TOTP secret.
+ * @param string $encrypted Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     public static function decrypt(string $encrypted): string
     {
@@ -73,6 +119,11 @@ final class Totp
         return $plaintext;
     }
 
+    /**
+ * Performs the encryption key operation for this service.
+ * @return string Result of this operation.
+ */
+
     private static function encryptionKey(): string
     {
         $encoded = Env::required('LFMIS_2FA_KEY');
@@ -83,12 +134,23 @@ final class Totp
         return $key;
     }
 
+    /**
+ * Performs the require sodium operation for this service.
+ * @return void Result of this operation.
+ */
+
     private static function requireSodium(): void
     {
         if (!function_exists('sodium_crypto_secretbox')) {
             throw new RuntimeException('The PHP sodium extension is required for TOTP secret encryption.');
         }
     }
+
+    /**
+ * Performs the base32 decode operation for this service.
+ * @param string $value Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     private static function base32Decode(string $value): string
     {
@@ -106,6 +168,12 @@ final class Totp
         }
         return $bytes;
     }
+
+    /**
+ * Performs the base32 encode operation for this service.
+ * @param string $bytes Input used by this operation.
+ * @return string Result of this operation.
+ */
 
     private static function base32Encode(string $bytes): string
     {

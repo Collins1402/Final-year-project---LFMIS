@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements FarmMetricsService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -10,8 +15,17 @@ final class FarmMetricsService
 {
     public const DISCLAIMER = 'ACTUAL FARM DATA — MEASURED OPERATIONAL RECORDS';
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db) {}
 
+    /**
+ * Performs the summary operation for this service.
+ * @return array Result of this operation.
+ */
     public function summary(): array
     {
         $hasData = false;

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements PermissionService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -50,12 +55,24 @@ final class PermissionService
         'trends.manage' => 'Refresh farm trends data',
     ];
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Checks whether the role has the requested permission.
+ * @param string $role Input used by this operation.
+ * @param string $permission Input used by this operation.
+ * @return bool Result of this operation.
+ */
     public function allows(string $role, string $permission): bool
     {
+        // Bind role and permission values so user-controlled input cannot become SQL syntax.
         $statement = $this->db->prepare(
             'SELECT rp.is_allowed FROM role_permissions rp JOIN roles r ON r.id = rp.role_id
              WHERE r.name = ? AND rp.permission_code = ?'
@@ -64,6 +81,12 @@ final class PermissionService
         return (int) $statement->fetchColumn() === 1;
     }
 
+    /**
+ * Checks whether the role may view the requested analytics scope.
+ * @param string $role Input used by this operation.
+ * @param string $scope Input used by this operation.
+ * @return bool Result of this operation.
+ */
     public function canViewAnalytics(string $role, string $scope): bool
     {
         return match ($scope) {
@@ -74,6 +97,10 @@ final class PermissionService
         };
     }
 
+    /**
+ * Builds the permission matrix for every role.
+ * @return array Result of this operation.
+ */
     public function matrix(): array
     {
         $roles = $this->db->query('SELECT id, name FROM roles ORDER BY id')->fetchAll();
@@ -95,6 +122,12 @@ final class PermissionService
         return $matrix;
     }
 
+    /**
+ * Validates and saves the selected role permissions atomically.
+ * @param string $role Input used by this operation.
+ * @param array $permissions Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function updateRole(string $role, array $permissions): array
     {
         if ($role === 'admin') {

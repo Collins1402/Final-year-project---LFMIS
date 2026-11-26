@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements LoginAlertService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -13,11 +18,22 @@ final class LoginAlertService
 {
     private ?Closure $sendEmail;
 
+    /**
+ * Connects this service to its required dependency.
+ * @param ?Closure $sendEmail Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(?Closure $sendEmail = null)
     {
         $this->sendEmail = $sendEmail;
     }
 
+    /**
+ * Performs the notify operation for this service.
+ * @param array $user Input used by this operation.
+ * @param ?array $requestDetails Input used by this operation.
+ * @return bool Result of this operation.
+ */
     public function notify(array $user, ?array $requestDetails = null): bool
     {
         if (strtolower((string) Env::get('LFMIS_LOGIN_ALERTS_ENABLED', 'true')) === 'false') {

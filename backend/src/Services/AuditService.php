@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements AuditService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -7,10 +12,25 @@ use PDO;
 
 final class AuditService
 {
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db)
     {
     }
 
+    /**
+ * Performs the record operation for this service.
+ * @param ?int $userId Input used by this operation.
+ * @param string $action Input used by this operation.
+ * @param string $entityType Input used by this operation.
+ * @param ?int $entityId Input used by this operation.
+ * @param array $details Input used by this operation.
+ * @param ?string $ipAddress Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function record(
         ?int $userId,
         string $action,
@@ -41,6 +61,11 @@ final class AuditService
         $statement->execute([$userId, $action, $entityType, $entityId, $encodedDetails, $ipAddress]);
     }
 
+    /**
+ * Returns the matching records for the requested scope.
+ * @param array $filters Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function list(array $filters = []): array
     {
         $where = [];

@@ -1,4 +1,9 @@
 <?php
+/**
+ * File purpose: implements ReminderService for the farm management system.
+ * Called by the API router or other services that need this shared operation.
+ * Depends on the declared PHP classes, database connection, and configuration used below.
+ */
 declare(strict_types=1);
 
 namespace Lfmis\Services;
@@ -12,11 +17,22 @@ final class ReminderService
 {
     private ?Closure $sendEmail;
 
+    /**
+ * Connects this service to its required dependency.
+ * @param PDO $db Input used by this operation.
+ * @param ?Closure $sendEmail Input used by this operation.
+ * @return void Result of this operation.
+ */
     public function __construct(private PDO $db, ?Closure $sendEmail = null)
     {
         $this->sendEmail = $sendEmail;
     }
 
+    /**
+ * Performs the send due operation for this service.
+ * @param ?string $today Input used by this operation.
+ * @return array Result of this operation.
+ */
     public function sendDue(?string $today = null): array
     {
         $date = $today ?? date('Y-m-d');
@@ -72,6 +88,11 @@ final class ReminderService
         return $result;
     }
 
+    /**
+ * Performs the notify staff operation for this service.
+ * @param array $record Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function notifyStaff(array $record): void
     {
         $staff = $this->db->query(
@@ -94,6 +115,11 @@ final class ReminderService
         }
     }
 
+    /**
+ * Performs the email administrator operation for this service.
+ * @param array $record Input used by this operation.
+ * @return void Result of this operation.
+ */
     private function emailAdministrator(array $record): void
     {
         $administrator = $this->db->query(
