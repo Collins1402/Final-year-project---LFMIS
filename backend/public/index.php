@@ -425,6 +425,14 @@ try {
         if (!$permissions->allows($current['role'], 'animals.view')) Response::error('You do not have permission to perform this action.', 403);
         Response::json($animals->profile((int) $matches[1]));
     }
+    if ($method === 'PATCH' && preg_match('#^/api/animals/(\d+)$#', $path, $matches)) {
+        $current = $auth->currentUser();
+        if ($current === null) Response::error('Please sign in to continue.', 401);
+        if (!$permissions->allows($current['role'], 'animals.create')) Response::error('You do not have permission to perform this action.', 403);
+        $animal = $animals->updateProfile((int) $matches[1], $request->body());
+        $db->prepare('INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES (?, ?, ?, ?)')->execute([$current['id'], 'update_profile', 'animal', $animal['id']]);
+        Response::json(['animal' => $animal]);
+    }
     if ($method === 'PATCH' && preg_match('#^/api/animals/(\d+)/status$#', $path, $matches)) {
         $current = $auth->currentUser();
         if ($current === null) {

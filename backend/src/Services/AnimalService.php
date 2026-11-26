@@ -70,6 +70,50 @@ final class AnimalService
         return $this->find($id);
     }
 
+    public function updateProfile(int $id, array $input): array
+    {
+        $animal = $this->find($id);
+        $tag = trim((string) ($input['tagNumber'] ?? ''));
+        $species = (string) ($input['species'] ?? '');
+        $sex = (string) ($input['sex'] ?? '');
+        if ($tag === '' || strlen($tag) > 40 || !in_array($species, ['cattle', 'goat', 'rabbit', 'chicken', 'sheep', 'other'], true) || !in_array($sex, ['female', 'male'], true)) {
+            throw new \InvalidArgumentException('Enter a tag number, supported species and sex.');
+        }
+
+        $tagCheck = $this->db->prepare('SELECT 1 FROM animals WHERE tag_number = ? AND id <> ? LIMIT 1');
+        $tagCheck->execute([$tag, $id]);
+        if ($tagCheck->fetchColumn()) throw new \DomainException("Tag {$tag} is already registered.");
+
+        if ($species !== $animal['species']) {
+            $linked = $this->db->prepare('SELECT 1 FROM order_animals WHERE animal_id = ? LIMIT 1');
+            $linked->execute([$id]);
+            if ($linked->fetchColumn()) throw new \DomainException('Species cannot be changed after this animal has been linked to an order.');
+        }
+
+        $name = $this->limitedTextOrNull($input['name'] ?? null, 80, 'Name');
+        $breed = $this->limitedTextOrNull($input['breed'] ?? null, 80, 'Breed');
+        $notes = $this->limitedTextOrNull($input['notes'] ?? null, 500, 'Notes');
+        $dateOfBirth = $this->dateOrNull($input['dateOfBirth'] ?? null);
+        $weightInput = $input['weightKg'] ?? null;
+        $weight = $weightInput === null || trim((string) $weightInput) === '' ? null : filter_var($weightInput, FILTER_VALIDATE_FLOAT);
+        if ($weight !== null && ($weight === false || !is_finite((float) $weight) || (float) $weight <= 0)) {
+            throw new \InvalidArgumentException('Weight must be a positive number.');
+        }
+
+        $statement = $this->db->prepare(
+            'UPDATE animals SET tag_number = ?, species = ?, name = ?, breed = ?, sex = ?, date_of_birth = ?, weight_kg = ?, notes = ? WHERE id = ?'
+        );
+        try {
+            $statement->execute([$tag, $species, $name, $breed, $sex, $dateOfBirth, $weight, $notes, $id]);
+        } catch (PDOException $error) {
+            if ($error->getCode() === '23000' || (int) ($error->errorInfo[1] ?? 0) === 1062) {
+                throw new \DomainException("Tag {$tag} is already registered.");
+            }
+            throw $error;
+        }
+        return $this->find($id);
+    }
+
     public function find(int $id): array
     {
         $statement = $this->db->prepare('SELECT id, tag_number, species, breed, name, sex, date_of_birth, weight_kg, status, status_changed_at, notes, created_at FROM animals WHERE id = ?');
@@ -99,6 +143,13 @@ final class AnimalService
     {
         $text = trim((string) $value);
         return $text === '' ? null : substr($text, 0, 500);
+    }
+
+    private function limitedTextOrNull(mixed $value, int $limit, string $label): ?string
+    {
+        $text = trim((string) $value);
+        if (strlen($text) > $limit) throw new \InvalidArgumentException($label . ' must be ' . $limit . ' characters or fewer.');
+        return $text === '' ? null : $text;
     }
 
     private function dateOrNull(mixed $value): ?string

@@ -49,6 +49,7 @@ export const api = {
   overview: () => request('/api/overview'),
   animals: () => request('/api/animals'),
   animalProfile: (id) => request(`/api/animals/${Number(id)}`),
+  updateAnimal: (id, data) => request(`/api/animals/${Number(id)}`, { method: 'PATCH', body: JSON.stringify(data) }),
   updateAnimalStatus: (id, status) => request(`/api/animals/${Number(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   createAnimal: (data) => post('/api/animals', data),
   healthRecords: () => request('/api/health-records'),

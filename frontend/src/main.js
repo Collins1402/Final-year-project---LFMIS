@@ -875,8 +875,9 @@ async function renderAnimalProfilesModule(animalId = null) {
     const [animalData, permissionData] = await Promise.all([api.animals(), api.permissions()])
     const grants = permissionData.permissions || permissionData.matrix?.[permissionData.role] || {}
     const canChangeStatus = Boolean(grants['animals.status']?.allowed)
+    const canEditDetails = Boolean(grants['animals.create']?.allowed)
     if (animalId !== null) {
-      await renderAnimalProfile(content, animalId, canChangeStatus, () => renderAnimalProfilesModule())
+      await renderAnimalProfile(content, animalId, canChangeStatus, canEditDetails, () => renderAnimalProfilesModule())
       return
     }
     const animals = animalData.animals || []
@@ -905,21 +906,39 @@ async function renderAnimalProfilesModule(animalId = null) {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
-async function renderAnimalProfile(target, animalId, canChangeStatus, onBack) {
+async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDetails, onBack) {
   const profile = await api.animalProfile(animalId)
   const animal = profile.animal
   const table = (title, columns, rows, empty) => `<section class="panel"><h2>${title}</h2><div class="table-wrap"><table><thead><tr>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${columns.length}" class="empty">${empty}</td></tr>`}</tbody></table></div></section>`
-  target.innerHTML = `<header><div><p class="kicker">INDIVIDUAL ANIMAL RECORD</p><h1>${escapeHtml(animal.name || animal.tag_number)}</h1><p class="muted">${escapeHtml(animal.tag_number)} · ${escapeHtml(animal.species)} · ${escapeHtml(animal.breed || 'Breed not recorded')}</p></div><div class="animal-profile-actions"><button type="button" class="secondary-action" id="animal-profile-download">Download details</button><button type="button" class="secondary-action" id="animal-profile-back">Back to animal profiles</button></div></header><section class="panel animal-profile-summary"><div class="stats"><div><small>Status</small><strong>${escapeHtml(animal.status)}</strong>${animal.status_changed_at ? `<small>Updated ${escapeHtml(animal.status_changed_at)}</small>` : ''}</div><div><small>Sex</small><strong>${escapeHtml(animal.sex)}</strong></div><div><small>Date of birth</small><strong>${escapeHtml(animal.date_of_birth || 'Not recorded')}</small></div><div><small>Weight</small><strong>${animal.weight_kg ? `${Number(animal.weight_kg).toLocaleString()} kg` : 'Not recorded'}</strong></div></div><p>${escapeHtml(animal.notes || 'No additional notes.')}</p>${canChangeStatus ? `<form id="animal-profile-status" class="compact-form"><label>Animal status<select name="status"><option value="active" ${animal.status === 'active' ? 'selected' : ''}>Active on farm</option><option value="sold" ${animal.status === 'sold' ? 'selected' : ''}>Sold</option><option value="deceased" ${animal.status === 'deceased' ? 'selected' : ''}>Deceased</option><option value="transferred" ${animal.status === 'transferred' ? 'selected' : ''}>Transferred</option></select></label><button>Update status</button></form><div id="animal-profile-feedback" aria-live="polite"></div>` : ''}</section>${table('Health and care history',['Date','Type','Description','Medication'],profile.healthRecords.map((item)=>`<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.medication || '—')}</td></tr>`).join(''),'No health records for this animal.')}${table('Individual production history',['Date','Produce','Session','Quantity'],profile.productionRecords.map((item)=>`<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '—')}</td><td>${Number(item.quantity_produced).toLocaleString()} ${escapeHtml(item.unit)}</td></tr>`).join(''),'No individual production records. Flock-level eggs are not assigned to individual animals.')}${table('Activities',['Date','Activity','Details','Status'],profile.activities.map((item)=>`<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td></tr>`).join(''),'No activities linked to this animal.')}${table('Sale and order history',['Order','Customer','Status','Order date','Fulfilled'],profile.orders.map((item)=>`<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.customer_name || '—')}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.fulfilled_at || '—')}</td></tr>`).join(''),'No sale or order history for this animal.')}`
+  target.innerHTML = `<header><div><p class="kicker">INDIVIDUAL ANIMAL RECORD</p><h1>${escapeHtml(animal.name || animal.tag_number)}</h1><p class="muted">${escapeHtml(animal.tag_number)} - ${escapeHtml(animal.species)} - ${escapeHtml(animal.breed || 'Breed not recorded')}</p></div><div class="animal-profile-actions"><button type="button" class="secondary-action" id="animal-profile-download">Download details</button><button type="button" class="secondary-action" id="animal-profile-back">Back to animal profiles</button></div></header><section class="panel animal-profile-summary"><div class="stats"><div><small>Status</small><strong>${escapeHtml(animal.status)}</strong>${animal.status_changed_at ? `<small>Updated ${escapeHtml(animal.status_changed_at)}</small>` : ''}</div><div><small>Sex</small><strong>${escapeHtml(animal.sex)}</strong></div><div><small>Date of birth</small><strong>${escapeHtml(animal.date_of_birth || 'Not recorded')}</strong></div><div><small>Weight</small><strong>${animal.weight_kg ? `${Number(animal.weight_kg).toLocaleString()} kg` : 'Not recorded'}</strong></div></div><p>${escapeHtml(animal.notes || 'No additional notes.')}</p>${canChangeStatus ? `<form id="animal-profile-status" class="compact-form"><label>Animal status<select name="status"><option value="active" ${animal.status === 'active' ? 'selected' : ''}>Active on farm</option><option value="sold" ${animal.status === 'sold' ? 'selected' : ''}>Sold</option><option value="deceased" ${animal.status === 'deceased' ? 'selected' : ''}>Deceased</option><option value="transferred" ${animal.status === 'transferred' ? 'selected' : ''}>Transferred</option></select></label><button>Update status</button></form><div id="animal-profile-feedback" aria-live="polite"></div>` : ''}</section>${table('Health and care history', ['Date', 'Type', 'Description', 'Medication'], profile.healthRecords.map((item) => `<tr><td>${escapeHtml(item.record_date)}</td><td>${escapeHtml(item.record_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.medication || '-')}</td></tr>`).join(''), 'No health records for this animal.')}${table('Individual production history', ['Date', 'Produce', 'Session', 'Quantity'], profile.productionRecords.map((item) => `<tr><td>${escapeHtml(item.production_date)}</td><td>${escapeHtml(item.produce_name)}</td><td>${escapeHtml(item.production_session || '-')}</td><td>${Number(item.quantity_produced).toLocaleString()} ${escapeHtml(item.unit)}</td></tr>`).join(''), 'No individual production records. Flock-level eggs are not assigned to individual animals.')}${table('Activities', ['Date', 'Activity', 'Details', 'Status'], profile.activities.map((item) => `<tr><td>${escapeHtml(item.activity_at)}</td><td>${escapeHtml(item.activity_type)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.status)}</td></tr>`).join(''), 'No activities linked to this animal.')}${table('Sale and order history', ['Order', 'Customer', 'Status', 'Order date', 'Fulfilled'], profile.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.customer_name || '-')}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.fulfilled_at || '-')}</td></tr>`).join(''), 'No sale or order history for this animal.')}`
   target.querySelector('#animal-profile-back').addEventListener('click', onBack)
   target.querySelector('#animal-profile-download').addEventListener('click', () => downloadAnimalProfile(profile))
+
+  if (canEditDetails) {
+    const editPanel = document.createElement('section')
+    editPanel.className = 'panel animal-profile-edit'
+    const species = ['cattle', 'goat', 'sheep', 'rabbit', 'chicken', 'other']
+    editPanel.innerHTML = `<h2>Edit animal details</h2><form id="animal-profile-edit-form" class="compact-form"><label>Tag number<input name="tagNumber" maxlength="40" value="${escapeHtml(animal.tag_number)}" required></label><label>Name<input name="name" maxlength="80" value="${escapeHtml(animal.name || '')}"></label><label>Species<select name="species">${species.map((item) => `<option value="${item}" ${animal.species === item ? 'selected' : ''}>${item[0].toUpperCase()}${item.slice(1)}</option>`).join('')}</select></label><label>Breed<input name="breed" maxlength="80" value="${escapeHtml(animal.breed || '')}"></label><label>Sex<select name="sex"><option value="female" ${animal.sex === 'female' ? 'selected' : ''}>Female</option><option value="male" ${animal.sex === 'male' ? 'selected' : ''}>Male</option></select></label><label>Date of birth<input name="dateOfBirth" type="date" value="${escapeHtml(animal.date_of_birth || '')}"></label><label>Weight (kg)<input name="weightKg" type="number" min="0.01" step="0.01" value="${animal.weight_kg === null ? '' : Number(animal.weight_kg)}"></label><label>Notes<textarea name="notes" maxlength="500" rows="3">${escapeHtml(animal.notes || '')}</textarea></label><button>Save details</button></form><div id="animal-profile-edit-feedback" aria-live="polite"></div>`
+    target.querySelector('.animal-profile-summary').after(editPanel)
+    editPanel.querySelector('#animal-profile-edit-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const feedback = editPanel.querySelector('#animal-profile-edit-feedback')
+      try {
+        await api.updateAnimal(animal.id, Object.fromEntries(new FormData(event.target)))
+        await renderAnimalProfile(target, animal.id, canChangeStatus, canEditDetails, onBack)
+      } catch (error) { feedback.innerHTML = message(error.message, true) }
+    })
+  }
+
   target.querySelector('#animal-profile-status')?.addEventListener('submit', async (event) => {
     event.preventDefault()
     const feedback = target.querySelector('#animal-profile-feedback')
-    try { await api.updateAnimalStatus(animal.id, new FormData(event.target).get('status')); await renderAnimalProfile(target, animal.id, canChangeStatus, onBack) }
-    catch (error) { feedback.innerHTML = message(error.message, true) }
+    try {
+      await api.updateAnimalStatus(animal.id, new FormData(event.target).get('status'))
+      await renderAnimalProfile(target, animal.id, canChangeStatus, canEditDetails, onBack)
+    } catch (error) { feedback.innerHTML = message(error.message, true) }
   })
 }
-
 function downloadAnimalProfile(profile) {
   const sheets = [
     { name: 'Animal profile', columns: [['Tag number', 'tag_number', 95], ['Name', 'name', 120], ['Species', 'species', 80], ['Breed', 'breed', 115], ['Status', 'status', 80], ['Sex', 'sex', 65], ['Date of birth', 'date_of_birth', 90], ['Weight (kg)', 'weight_kg', 80], ['Notes', 'notes', 240]], rows: [profile.animal] },
@@ -1749,8 +1768,8 @@ async function renderFeedbackModule() {
 
 async function renderRoleWorkspace(initialModule) {
   const workspaces = {
-    worker: { title: 'Daily operations', description: 'Production, farm tasks and stock movements.', modules: ['Home', 'Production', 'Activities', 'Inventory', 'Assistant', 'Your rights'] },
-    veterinarian: { title: 'Animal health', description: 'Livestock records, treatment history and follow-up care.', modules: ['Home', 'Livestock', 'Health records', 'Due follow-ups', 'Assistant', 'Your rights'] },
+    worker: { title: 'Daily operations', description: 'Production, farm tasks and stock movements.', modules: ['Home', 'Production', 'Activities', 'Inventory', 'Feedback', 'Assistant', 'Your rights'] },
+    veterinarian: { title: 'Animal health', description: 'Livestock records, treatment history and follow-up care.', modules: ['Home', 'Livestock', 'Health records', 'Due follow-ups', 'Feedback', 'Assistant', 'Your rights'] },
     customer: { title: 'Farm shop', description: 'Browse farm produce, place orders and follow up on payments.', modules: ['Farm shop', 'My orders', 'Feedback', 'Assistant', 'Your rights'] },
     buyer: { title: 'Livestock buying', description: 'Browse available livestock and track your requests.', modules: ['Livestock catalogue', 'My orders', 'Feedback', 'Assistant', 'Your rights'] },
   }
@@ -1856,7 +1875,7 @@ async function renderRoleModule(module) {
       if (module === 'Livestock') {
         content.innerHTML = `<section class="panel"><h2>Animal profiles</h2><p class="muted">Select an animal to open its individual record and history.</p><div class="table-wrap"><table><thead><tr><th>Tag</th><th>Name</th><th>Species</th><th>Status</th><th></th></tr></thead><tbody>${animals.animals.map((item) => `<tr><td>${escapeHtml(item.tag_number)}</td><td>${escapeHtml(item.name || '—')}</td><td>${escapeHtml(item.species)}</td><td>${escapeHtml(item.status)}</td><td><button type="button" class="small-action" data-role-open-animal="${Number(item.id)}">Open profile</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">No animals registered.</td></tr>'}</tbody></table></div></section>`
         content.querySelectorAll('[data-role-open-animal]').forEach((button) => button.addEventListener('click', async () => {
-          try { await renderAnimalProfile(content, Number(button.dataset.roleOpenAnimal), Boolean(currentPermissions['animals.status']?.allowed), () => renderRoleModule('Livestock')) }
+          try { await renderAnimalProfile(content, Number(button.dataset.roleOpenAnimal), Boolean(currentPermissions['animals.status']?.allowed), Boolean(currentPermissions['animals.create']?.allowed), () => renderRoleModule('Livestock')) }
           catch (error) { content.innerHTML = message(error.message, true) }
         }))
         return
