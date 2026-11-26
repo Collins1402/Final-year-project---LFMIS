@@ -70,6 +70,7 @@ final class AnimalService
         return $this->find($id);
     }
 
+    /** Update editable animal details while protecting unique tags and order-linked species history. */
     public function updateProfile(int $id, array $input): array
     {
         $animal = $this->find($id);

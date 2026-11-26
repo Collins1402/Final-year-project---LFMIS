@@ -47,6 +47,7 @@ final class FeedbackService
         $s=$this->db->prepare("UPDATE feedback SET status='resolved', resolved_by=?, resolved_at=NOW() WHERE id=?"); $s->execute([$userId,$id]);
     }
 
+    /** Resolve every open feedback message and record which staff member handled the action. */
     public function resolveAll(int $userId): int
     {
         $statement = $this->db->prepare("UPDATE feedback SET status='resolved', resolved_by=?, resolved_at=NOW() WHERE status='open'");

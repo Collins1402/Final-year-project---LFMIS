@@ -906,6 +906,7 @@ async function renderAnimalProfilesModule(animalId = null) {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
+// Show the animal record and, when permitted, the form that edits its profile fields.
 async function renderAnimalProfile(target, animalId, canChangeStatus, canEditDetails, onBack) {
   const profile = await api.animalProfile(animalId)
   const animal = profile.animal
@@ -1167,11 +1168,12 @@ async function renderInventoryModule() {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
+// Render the farm's order, sales, catalogue, expense, and payment controls.
 async function renderCommerceModule() {
   const content = app.querySelector('.content')
   try {
     const [orders, sales, payments, expenses, products] = await Promise.all([api.orders(), api.sales(), api.payments(), api.expenses(), api.products()])
-    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Sales & orders</h1><p class="muted">Create orders, record sales and track payments.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create order</h2><form id="order-form" class="compact-form"><input name="customerName" placeholder="e.g. Mary Wanjiku" required><input name="customerPhone" placeholder="e.g. 0712 345 678"><select name="productId" required><option value="">Choose a listed product</option>${products.products.filter((item) => Number(item.available_quantity) > 0).map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity)} ${escapeHtml(item.unit)}</option>`).join('')}</select><input name="quantity" type="number" min=".01" step=".01" placeholder="e.g. 5 litres" required><input name="unitPrice" type="number" min="0" step=".01" placeholder="Price per unit, e.g. 75"><button>Create quote</button></form><h2>Orders</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Status</th><th>Total</th></tr></thead><tbody>${orders.orders.length ? orders.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.customer)}${item.items?.length ? `<small>${escapeHtml(item.items.map((line) => `${line.item_name} · ${line.quantity} ${line.unit}`).join('; '))}</small>` : ''}</td><td>${escapeHtml(item.status === 'fulfilled' && payments.payments.some((payment) => Number(payment.order_id) === Number(item.id) && payment.status === 'confirmed') ? 'Fulfilled / Paid' : item.status)}</td><td>${item.total_amount}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record sale</h2><form id="sale-form" class="compact-form"><input name="description"     placeholder="e.g. 10 litres sold at market"><input name="quantity" type="number" min=".01" step=".01"     placeholder="e.g. 10"><input name="unit"     placeholder="e.g. litres or trays"><input name="unitPrice" type="number" min="0" step=".01"     placeholder="KES per unit"><input name="soldAt" type="datetime-local" required><button>Save sale</button></form><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead><tbody>${payments.payments.length ? payments.payments.map((item) => `<tr><td>#${item.order_id}</td><td>${item.method === 'pay_on_premise' ? 'Pay on Premise' : item.method}</td><td>${item.status}</td><td>${item.amount}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">No payments yet.</td></tr>'}</tbody></table></div></section></section>`
+    content.innerHTML = `<header><div><p class="kicker">FARM MODULE</p><h1>Sales & orders</h1><p class="muted">Create orders, record sales and track payments.</p></div><span class="health-pill">Admin access</span></header><section class="module-grid"><section class="panel"><h2>Create order</h2><form id="order-form" class="compact-form"><input name="customerName" placeholder="e.g. Mary Wanjiku" required><input name="customerPhone" placeholder="e.g. 0712 345 678"><select name="productId" required><option value="">Choose a listed product</option>${products.products.filter((item) => Number(item.available_quantity) > 0).map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name)} · ${Number(item.available_quantity)} ${escapeHtml(item.unit)}</option>`).join('')}</select><input name="quantity" type="number" min=".01" step=".01" placeholder="e.g. 5 litres" required><input name="unitPrice" type="number" min="0" step=".01" placeholder="Price per unit, e.g. 75"><button>Create quote</button></form><h2>Orders</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Status</th><th>Total</th></tr></thead><tbody>${orders.orders.length ? orders.orders.map((item) => `<tr><td>#${Number(item.id)}</td><td>${escapeHtml(item.ordered_at)}</td><td>${escapeHtml(item.customer)}${item.items?.length ? `<small>${escapeHtml(item.items.map((line) => `${line.item_name} · ${line.quantity} ${line.unit}`).join('; '))}</small>` : ''}</td><td>${escapeHtml(item.status === 'fulfilled' && payments.payments.some((payment) => Number(payment.order_id) === Number(item.id) && payment.status === 'confirmed') ? 'Fulfilled / Paid' : item.status)}</td><td>${item.total_amount}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No orders yet.</td></tr>'}</tbody></table></div></section><section class="panel"><h2>Record sale</h2><form id="sale-form" class="compact-form"><input name="description"     placeholder="e.g. 10 litres sold at market"><input name="quantity" type="number" min=".01" step=".01"     placeholder="e.g. 10"><input name="unit"     placeholder="e.g. litres or trays"><input name="unitPrice" type="number" min="0" step=".01"     placeholder="KES per unit"><input name="soldAt" type="datetime-local" required><button>Save sale</button></form><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Order</th><th>Method</th><th>Status</th><th>Amount</th><th>Action</th></tr></thead><tbody>${payments.payments.length ? payments.payments.map((item) => `<tr><td>#${item.order_id}</td><td>${item.method === 'pay_on_premise' ? 'Pay on Premise' : item.method}</td><td>${item.status}</td><td>${item.amount}</td><td>${item.status === 'pending' && item.method === 'pay_on_premise' ? `<button type="button" class="small-action" data-confirm-payment="${Number(item.order_id)}" data-confirm-method="cash">Confirm cash received</button>` : item.status === 'pending' && item.method === 'cheque' ? `<button type="button" class="small-action" data-confirm-payment="${Number(item.order_id)}" data-confirm-method="cheque">Confirm cheque</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">No payments yet.</td></tr>'}</tbody></table></div></section></section>`
     if (orders.orders.some((order) => ['quoted', 'accepted'].includes(order.status) && Number(order.items_linked) !== 1)) {
       const warning = document.createElement('p')
       warning.className = 'message danger'
@@ -1281,6 +1283,16 @@ async function renderCommerceModule() {
     content.querySelector('#product-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createProduct(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() } catch (error) { showCommerceError(error) } })
     content.querySelector('#expense-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createExpense(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() } catch (error) { showCommerceError(error) } })
     content.querySelector('#payment-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api.createPayment(Object.fromEntries(new FormData(event.target))); await renderCommerceModule() } catch (error) { showCommerceError(error) } })
+    content.querySelectorAll('[data-confirm-payment]').forEach((button) => button.addEventListener('click', async () => {
+      button.disabled = true
+      try {
+        await api.createPayment({ orderId: Number(button.dataset.confirmPayment), method: button.dataset.confirmMethod })
+        await renderCommerceModule()
+      } catch (error) {
+        button.disabled = false
+        showCommerceError(error)
+      }
+    }))
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
@@ -1744,6 +1756,7 @@ async function renderRightsModule(target = app.querySelector('.content')) {
   } catch (error) { content.innerHTML = message(error.message, true) }
 }
 
+// Admin view of all users' feedback, including individual and bulk resolution actions.
 async function renderFeedbackModule() {
   const content = app.querySelector('.content')
   try {
@@ -1805,6 +1818,7 @@ async function renderRoleWorkspace(initialModule) {
   await renderRoleModule(activeModule)
 }
 
+// Render role-specific modules; customer and buyer data is scoped by the API to the signed-in user.
 async function renderRoleModule(module) {
   const content = app.querySelector('#role-content')
   const showError = (error) => { content.innerHTML = message(error.message, true) }

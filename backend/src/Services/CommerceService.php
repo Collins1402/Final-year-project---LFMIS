@@ -9,6 +9,7 @@ final class CommerceService
 {
     public function __construct(private PDO $db) {}
 
+    /** Return active listings; livestock availability is the count of active, unallocated animals. */
     public function products(?string $role = null): array
     {
         $query = "SELECT products.id, products.name, products.product_type, products.production_kind,
@@ -49,6 +50,7 @@ final class CommerceService
         $result = $this->db->prepare('SELECT * FROM products WHERE id = ?'); $result->execute([$id]); return $result->fetch();
     }
 
+    /** Save a buyer's order and its item together after checking role, price, and available stock. */
     public function createCustomerOrder(array $input, array $user): array
     {
         $productId = filter_var($input['productId'] ?? null, FILTER_VALIDATE_INT);
@@ -215,6 +217,7 @@ final class CommerceService
         }
     }
 
+    /** Apply a bulk status change atomically so a failed animal allocation changes none of the selected orders. */
     public function updateOrdersBulk(array $orderIds, string $status, int $userId, array $totalAmounts = []): array
     {
         if (!in_array($status, ['quoted', 'accepted', 'fulfilled', 'cancelled'], true)) {
@@ -303,6 +306,7 @@ final class CommerceService
         $statement->execute($userId === null ? [] : [$userId]);
         return $statement->fetchAll();
     }
+    /** Record staff-received payments; cash can confirm a buyer's pending Pay on Premise request. */
     public function createPayment(array $input, int $userId): array
     {
         $orderId = filter_var($input['orderId'] ?? null, FILTER_VALIDATE_INT); $method = (string) ($input['method'] ?? ''); $reference = trim((string) ($input['transactionReference'] ?? '')) ?: null;
@@ -336,6 +340,7 @@ final class CommerceService
         $status = $method === 'mpesa' ? 'pending' : 'confirmed'; $statement = $this->db->prepare('INSERT INTO payments (order_id, customer_id, amount, method, status, transaction_reference, paid_at, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'); $statement->execute([$orderId, $row['customer_id'], $row['total_amount'], $method, $status, $reference, $status === 'confirmed' ? date('Y-m-d H:i:s') : null, $userId]); return ['id' => (int) $this->db->lastInsertId(), 'status' => $status];
     }
 
+    /** Keep a buyer's offline payment choice pending until farm staff record receipt. */
     public function requestOfflinePayment(array $input, array $user): array
     {
         $orderId = filter_var($input['orderId'] ?? null, FILTER_VALIDATE_INT);
@@ -400,6 +405,7 @@ final class CommerceService
         return (float) $statement->fetchColumn();
     }
 
+    /** Allocate only active, unlinked animals and mark each assigned animal sold within the order transaction. */
     private function reserveOrderItems(int $orderId): void
     {
         $items = $this->db->prepare('SELECT order_items.*, products.product_type, products.species, products.is_active FROM order_items LEFT JOIN products ON products.id = order_items.product_id WHERE order_items.order_id = ?');

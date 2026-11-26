@@ -12,6 +12,7 @@ final class Database
     public static function connection(): PDO
     {
         if (self::$connection === null) {
+            // Credentials stay in environment variables; the application opens one MySQL connection per request.
             $password = Env::get('LFMIS_DB_PASSWORD_EMPTY') === '1'
                 ? ''
                 : Env::required('LFMIS_DB_PASSWORD');

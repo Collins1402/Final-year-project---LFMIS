@@ -228,7 +228,7 @@ python -m pytest ml/tests
 
 For timestamped test logs, run `bash scripts/export_evidence.sh` from Git Bash or another Bash shell. It stores PHPUnit `--testdox` and pytest `-v` output in `docs/test-evidence/`. The authenticated API rejects write requests from untrusted origins, applies basic per-IP/per-user request limits to login, password reset and M-PESA initiation, and sends browser security headers/CSP. Worker and veterinarian workspaces provide short English/Kiswahili labels and large home-screen shortcuts.
 
-The timed, staging-only defence sequence and expected API/database results are in [scripts/demo_walkthrough.md](scripts/demo_walkthrough.md). M-PESA is simulated locally for buyers and staff; no Daraja credentials, phone prompt, or real charge are used.
+The timed, staging-only defence sequence and expected API/database results are in [scripts/demo_walkthrough.md](scripts/demo_walkthrough.md). For panel questions about code, use the [panelist code guide](docs/PANEL_CODE_GUIDE.md) to jump to the relevant frontend, API, service and database sections. M-PESA is simulated locally for buyers and staff; no Daraja credentials, phone prompt, or real charge are used.
 
 ### Scheduled health reminders
 
