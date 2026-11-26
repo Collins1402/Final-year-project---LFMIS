@@ -1,4 +1,8 @@
-"""Forecast daily milk production with lagged values, weather features, rolling backtests, and simple baselines. The service validates observations, compares Ridge regression against baselines, and reports decision-support forecasts with limitations."""
+"""
+Forecast service: trains a Ridge model and produces short-range milk forecasts.
+The API calls this module to request forecasts and operational insight summaries.
+It uses lagged production, weather features, rolling backtests, and simple baselines.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-"""Forecast daily milk production with lagged values, weather features, rolling backtests, and simple baselines. The service validates observations, compares Ridge regression against baselines, and reports decision-support forecasts with limitations."""
+"""
+Forecast features: constructs calendar, lagged production, and optional weather inputs.
+The forecasting service calls these helpers when training and predicting milk output.
+The calculations depend on ordered daily observations and optional weather measurements.
+"""
 
 from __future__ import annotations
 

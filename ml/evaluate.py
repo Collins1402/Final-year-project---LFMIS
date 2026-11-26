@@ -1,4 +1,8 @@
-"""Forecast daily milk production with lagged values, weather features, rolling backtests, and simple baselines. The service validates observations, compares Ridge regression against baselines, and reports decision-support forecasts with limitations."""
+"""
+Forecast evaluation: validates history and measures rolling prediction errors.
+The forecast service uses these checks to compare Ridge regression with simple baselines.
+The calculations use historical production values and MAE and RMSE error measures.
+"""
 
 from __future__ import annotations
 

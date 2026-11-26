@@ -1,6 +1,6 @@
 <?php
 /**
- * Purpose: expose the LFMIS HTTP API and connect routes to their services.
+ * File purpose: exposes the LFMIS HTTP API and connects routes to services.
  * Called by: the PHP web server for each /api request from the frontend.
  * Depends on: Core helpers, service classes, environment settings, and MySQL.
  */

@@ -1,3 +1,7 @@
+/* File purpose: defines the visual layout and responsive styles for the farm application.
+ * The browser loads this stylesheet alongside the frontend page modules.
+ * It depends on the class names and elements rendered by those modules.
+ */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root { color: #19352d; background: #edf2eb; font-family: 'DM Sans', sans-serif; font-synthesis: none; }
